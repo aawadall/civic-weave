@@ -1,0 +1,21 @@
+# Copy this file to terraform.tfvars and fill in your values
+
+# GCP Project Configuration
+project_id   = "your-gcp-project-id"
+project_name = "civicweave"
+region       = "us-central1"
+zone         = "us-central1-a"
+
+# Security
+jwt_secret = "your-super-secret-jwt-key-at-least-32-characters-long"
+
+# Email Service
+mailgun_api_key = "your-mailgun-api-key"
+mailgun_domain  = "your-mailgun-domain.com"
+
+# Google OAuth
+google_client_id     = "your-google-oauth-client-id"
+google_client_secret = "your-google-oauth-client-secret"
+
+# Database
+db_password = "your-secure-database-password"
