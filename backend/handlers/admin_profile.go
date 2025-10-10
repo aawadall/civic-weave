@@ -212,27 +212,27 @@ func (h *AdminProfileHandler) GetSystemStats(c *gin.Context) {
 	activityQuery := `
 		SELECT 
 			CASE 
-				WHEN 'volunteer_registration' THEN 'New volunteer registered: ' || v.name
-				WHEN 'skill_claim' THEN 'New skill claim added: ' || sc.skill_name
-				WHEN 'initiative_created' THEN 'New initiative created: ' || i.title
+				WHEN type = 'volunteer_registration' THEN 'New volunteer registered: ' || name
+				WHEN type = 'skill_claim' THEN 'New skill claim added: ' || skill_name
+				WHEN type = 'initiative_created' THEN 'New initiative created: ' || title
 				ELSE 'System activity'
 			END as description,
-			COALESCE(v.created_at, sc.created_at, i.created_at) as timestamp
+			created_at as timestamp
 		FROM (
 			SELECT 'volunteer_registration' as type, id, name, created_at, NULL as skill_name, NULL as title
 			FROM volunteers 
 			WHERE created_at >= NOW() - INTERVAL '7 days'
 			UNION ALL
-			SELECT 'skill_claim', sc.id, v.name, sc.created_at, sc.skill_name, NULL
+			SELECT 'skill_claim' as type, sc.id, v.name, sc.created_at, sc.skill_name, NULL as title
 			FROM skill_claims sc
 			JOIN volunteers v ON sc.volunteer_id = v.id
 			WHERE sc.created_at >= NOW() - INTERVAL '7 days'
 			UNION ALL
-			SELECT 'initiative_created', i.id, NULL, i.created_at, NULL, i.title
+			SELECT 'initiative_created' as type, i.id, NULL as name, i.created_at, NULL as skill_name, i.title
 			FROM initiatives i
 			WHERE i.created_at >= NOW() - INTERVAL '7 days'
 		) as activities
-		ORDER BY timestamp DESC
+		ORDER BY created_at DESC
 		LIMIT 10`
 
 	rows, err := h.db.Query(activityQuery)
