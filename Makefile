@@ -19,6 +19,9 @@ db-migrate:
 db-seed:
 	cd backend && go run cmd/seed/main.go
 
+db-backfill-skills:
+	cd backend && go run scripts/backfill_skill_vectors.go
+
 db-reset:
 	docker-compose down -v
 	docker-compose up -d postgres
@@ -70,6 +73,7 @@ help:
 	@echo "  dev-logs      - View logs"
 	@echo "  db-migrate    - Run database migrations"
 	@echo "  db-seed       - Seed initial data"
+	@echo "  db-backfill-skills - Convert existing JSONB skills to vector claims"
 	@echo "  db-reset      - Reset database with fresh data"
 	@echo "  test          - Run tests"
 	@echo "  lint          - Run linters"
