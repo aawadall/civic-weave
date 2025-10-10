@@ -55,16 +55,16 @@ func NewEmbeddingService(apiKey, model string) *EmbeddingService {
 // GenerateEmbedding generates embedding for a single skill text using OpenAI API
 func (s *EmbeddingService) GenerateEmbedding(skillText string) (pgvector.Vector, error) {
 	if strings.TrimSpace(skillText) == "" {
-		return nil, fmt.Errorf("skill text cannot be empty")
+		return pgvector.NewVector([]float32{}), fmt.Errorf("skill text cannot be empty")
 	}
 
 	embeddings, err := s.GenerateBatchEmbeddings([]string{skillText})
 	if err != nil {
-		return nil, err
+		return pgvector.NewVector([]float32{}), err
 	}
 
 	if len(embeddings) == 0 {
-		return nil, fmt.Errorf("no embedding returned for skill text")
+		return pgvector.NewVector([]float32{}), fmt.Errorf("no embedding returned for skill text")
 	}
 
 	return embeddings[0], nil
@@ -134,7 +134,12 @@ func (s *EmbeddingService) GenerateBatchEmbeddings(skillTexts []string) ([]pgvec
 	// Convert to pgvector.Vector format
 	embeddings := make([]pgvector.Vector, len(response.Data))
 	for i, data := range response.Data {
-		embeddings[i] = pgvector.NewVector(data.Embedding)
+		// Convert []float64 to []float32
+		float32Embedding := make([]float32, len(data.Embedding))
+		for j, val := range data.Embedding {
+			float32Embedding[j] = float32(val)
+		}
+		embeddings[i] = pgvector.NewVector(float32Embedding)
 	}
 
 	return embeddings, nil
@@ -142,8 +147,8 @@ func (s *EmbeddingService) GenerateBatchEmbeddings(skillTexts []string) ([]pgvec
 
 // ValidateEmbeddingDimensions checks if an embedding has the expected dimensions
 func (s *EmbeddingService) ValidateEmbeddingDimensions(embedding pgvector.Vector, expectedDim int) error {
-	if embedding == nil {
-		return fmt.Errorf("embedding is nil")
+	if len(embedding.Slice()) == 0 {
+		return fmt.Errorf("embedding is empty")
 	}
 
 	actualDim := len(embedding.Slice())

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"strings"
-	"time"
 
 	"civicweave/backend/config"
 	"civicweave/backend/models"
@@ -18,10 +17,7 @@ import (
 
 func main() {
 	// Load configuration
-	cfg, err := config.Load()
-	if err != nil {
-		log.Fatalf("Failed to load config: %v", err)
-	}
+	cfg := config.Load()
 
 	// Connect to database
 	db, err := sql.Open("postgres", fmt.Sprintf(
@@ -127,7 +123,7 @@ func backfillSkillVectors(
 		log.Printf("🔄 Processing volunteer: %s (%d skills)", name, len(skills))
 
 		// Check if volunteer already has skill claims
-		existingClaims, err := skillClaimService.GetSkillClaimsByVolunteerID(volunteerID)
+		existingClaims, err := skillClaimService.GetActiveClaimsByVolunteer(volunteerID)
 		if err != nil {
 			log.Printf("❌ Failed to check existing claims for volunteer %s: %v", name, err)
 			errorCount++
@@ -155,18 +151,9 @@ func backfillSkillVectors(
 			}
 
 			// Create skill claim
-			claim := &models.SkillClaim{
-				VolunteerID:      volunteerID,
-				SkillName:        strings.ToLower(strings.TrimSpace(skill)),
-				Embedding:        embedding,
-				ProficiencyLevel: 3,   // Default proficiency level for backfilled skills
-				ClaimWeight:      0.5, // Default initial weight
-				IsActive:         true,
-				CreatedAt:        time.Now(),
-				UpdatedAt:        time.Now(),
-			}
-
-			if err := skillClaimService.CreateSkillClaim(claim); err != nil {
+			claimText := strings.TrimSpace(skill)
+			_, err = skillClaimService.CreateSkillClaim(volunteerID, claimText, embedding)
+			if err != nil {
 				log.Printf("❌ Failed to create skill claim for '%s' (volunteer %s): %v", skill, name, err)
 				errorCount++
 				continue
@@ -178,7 +165,7 @@ func backfillSkillVectors(
 
 		if successCount > 0 {
 			// Aggregate volunteer's skill vector
-			if err := vectorAggregationService.AggregateVolunteerSkills(volunteerID); err != nil {
+			if err := vectorAggregationService.AggregateVolunteerVector(volunteerID); err != nil {
 				log.Printf("⚠️  Failed to aggregate skill vector for volunteer %s: %v", name, err)
 			} else {
 				log.Printf("✅ Aggregated skill vector for volunteer %s", name)
