@@ -49,14 +49,15 @@ func NewAuthHandler(
 
 // RegisterRequest represents user registration request
 type RegisterRequest struct {
-	Email           string          `json:"email" binding:"required,email"`
-	Password        string          `json:"password" binding:"required,min=8"`
-	Name            string          `json:"name" binding:"required"`
-	Phone           string          `json:"phone"`
-	LocationAddress string          `json:"location_address"`
-	Skills          []string        `json:"skills"`
-	Availability    json.RawMessage `json:"availability"`
-	ConsentGiven    bool            `json:"consent_given" binding:"required"`
+	Email             string          `json:"email" binding:"required,email"`
+	Password          string          `json:"password" binding:"required,min=8"`
+	Name              string          `json:"name" binding:"required"`
+	Phone             string          `json:"phone"`
+	LocationAddress   string          `json:"location_address"`
+	SkillsDescription string          `json:"skills_description"`
+	Availability      json.RawMessage `json:"availability"`
+	SkillsVisible     bool            `json:"skills_visible"`
+	ConsentGiven      bool            `json:"consent_given" binding:"required"`
 }
 
 // Register handles user registration
@@ -125,14 +126,22 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		LocationLat:     locationLat,
 		LocationLng:     locationLng,
 		LocationAddress: req.LocationAddress,
-		Skills:          req.Skills,
+		Skills:          []string{}, // Legacy field - will be replaced by skill claims
 		Availability:    req.Availability,
+		SkillsVisible:   req.SkillsVisible,
 		ConsentGiven:    req.ConsentGiven,
 	}
 
 	if err := h.VolunteerService.Create(volunteer); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create volunteer profile"})
 		return
+	}
+
+	// Create skill claim if skills description is provided
+	if req.SkillsDescription != "" && len(req.SkillsDescription) >= 10 {
+		// TODO: This would require the embedding service to be available
+		// For now, we'll skip creating the skill claim during registration
+		// The user can add skill claims later through the profile page
 	}
 
 	// Generate verification token and send email

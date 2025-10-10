@@ -48,6 +48,7 @@ func main() {
 	var initiativeService *models.InitiativeService
 	var applicationService *models.ApplicationService
 	var oauthAccountService *models.OAuthAccountService
+	var skillClaimService *models.SkillClaimService
 
 	if db != nil {
 		userService = models.NewUserService(db)
@@ -56,6 +57,7 @@ func main() {
 		initiativeService = models.NewInitiativeService(db)
 		applicationService = models.NewApplicationService(db)
 		oauthAccountService = models.NewOAuthAccountService(db)
+		skillClaimService = models.NewSkillClaimService(db)
 		_ = models.NewEmailVerificationTokenService(db) // for future use
 		_ = models.NewPasswordResetTokenService(db)     // for future use
 	}
@@ -63,6 +65,7 @@ func main() {
 	// Initialize utility services
 	emailService := services.NewEmailService(&cfg.Mailgun)
 	geocodingService := utils.NewGeocodingService(cfg.Geocoding.NominatimBaseURL)
+	embeddingService := services.NewEmbeddingService(cfg.OpenAI.APIKey, cfg.OpenAI.EmbeddingModel)
 
 	// Initialize handlers (only if services are available)
 	var authHandler *handlers.AuthHandler
@@ -70,6 +73,7 @@ func main() {
 	var initiativeHandler *handlers.InitiativeHandler
 	var applicationHandler *handlers.ApplicationHandler
 	var matchingHandler *handlers.MatchingHandler
+	var skillClaimHandler *handlers.SkillClaimHandler
 
 	if userService != nil && volunteerService != nil && adminService != nil && oauthAccountService != nil {
 		authHandler = handlers.NewAuthHandler(
@@ -94,6 +98,24 @@ func main() {
 	if volunteerService != nil && initiativeService != nil {
 		matchingService := services.NewMatchingService(volunteerService, initiativeService)
 		matchingHandler = handlers.NewMatchingHandler(matchingService, volunteerService, initiativeService, cfg)
+	}
+
+	// Initialize vector-based services and handlers
+	var vectorAggregationService *services.VectorAggregationService
+	var vectorMatchingService *services.VectorMatchingService
+
+	if skillClaimService != nil {
+		vectorAggregationService = services.NewVectorAggregationService(db, skillClaimService)
+		if initiativeService != nil {
+			vectorMatchingService = services.NewVectorMatchingService(db, skillClaimService, vectorAggregationService)
+		}
+		skillClaimHandler = handlers.NewSkillClaimHandler(
+			skillClaimService,
+			vectorAggregationService,
+			vectorMatchingService,
+			embeddingService,
+			cfg,
+		)
 	}
 
 	// Setup Gin router
@@ -147,10 +169,28 @@ func main() {
 			protected.DELETE("/applications/:id", applicationHandler.DeleteApplication)
 
 			// Matching routes
-			protected.GET("/matching/my-matches", matchingHandler.GetMyMatches)
-			protected.GET("/matching/volunteer/:id", matchingHandler.GetMatchesForVolunteer)
-			protected.GET("/matching/initiative/:id", matchingHandler.GetMatchesForInitiative)
-			protected.GET("/matching/explanation/:volunteerId/:initiativeId", matchingHandler.GetMatchExplanation)
+			if matchingHandler != nil {
+				protected.GET("/matching/my-matches", matchingHandler.GetMyMatches)
+				protected.GET("/matching/volunteer/:id", matchingHandler.GetMatchesForVolunteer)
+				protected.GET("/matching/initiative/:id", matchingHandler.GetMatchesForInitiative)
+				protected.GET("/matching/explanation/:volunteerId/:initiativeId", matchingHandler.GetMatchExplanation)
+			}
+
+			// Skill claim routes
+			if skillClaimHandler != nil {
+				// Volunteer skill management
+				protected.GET("/volunteers/me/skills", skillClaimHandler.GetMySkillClaims)
+				protected.POST("/volunteers/me/skills", skillClaimHandler.CreateSkillClaim)
+				protected.DELETE("/volunteers/me/skills/:id", skillClaimHandler.DeleteSkillClaim)
+				protected.GET("/volunteers/me/skills-visibility", skillClaimHandler.GetSkillsVisibility)
+				protected.PUT("/volunteers/me/skills-visibility", skillClaimHandler.UpdateSkillsVisibility)
+				protected.GET("/volunteers/me/matches", skillClaimHandler.GetTopMatches)
+				protected.GET("/volunteers/me/matches/:initiative_id/explanation", skillClaimHandler.GetMatchExplanation)
+
+				// Admin skill management
+				protected.GET("/admin/skill-claims", middleware.RequireRole("admin"), skillClaimHandler.ListAllSkillClaims)
+				protected.PATCH("/admin/skill-claims/:id/weight", middleware.RequireRole("admin"), skillClaimHandler.UpdateSkillWeight)
+			}
 		}
 	}
 

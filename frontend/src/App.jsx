@@ -12,7 +12,9 @@ import CreateInitiativePage from './pages/admin/CreateInitiativePage'
 import InitiativesListPage from './pages/admin/InitiativesListPage'
 import ApplicationsPage from './pages/admin/ApplicationsPage'
 import VolunteerPortal from './pages/VolunteerPortal'
+import VolunteerProfilePage from './pages/VolunteerProfilePage'
 import InitiativeDetailPage from './pages/InitiativeDetailPage'
+import SkillManagementPage from './pages/admin/SkillManagementPage'
 import ProtectedRoute from './components/ProtectedRoute'
 import Toast from './components/Toast'
 
@@ -68,10 +70,26 @@ function App() {
                 } 
               />
               <Route 
+                path="admin/skills" 
+                element={
+                  <ProtectedRoute requiredRole="admin">
+                    <SkillManagementPage />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
                 path="volunteer" 
                 element={
                   <ProtectedRoute requiredRole="volunteer">
                     <VolunteerPortal />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="profile" 
+                element={
+                  <ProtectedRoute requiredRole="volunteer">
+                    <VolunteerProfilePage />
                   </ProtectedRoute>
                 } 
               />

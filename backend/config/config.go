@@ -6,12 +6,13 @@ import (
 
 // Config holds all configuration for the application
 type Config struct {
-	Database DatabaseConfig
-	Redis    RedisConfig
-	JWT      JWTConfig
-	Mailgun  MailgunConfig
-	Google   GoogleConfig
+	Database  DatabaseConfig
+	Redis     RedisConfig
+	JWT       JWTConfig
+	Mailgun   MailgunConfig
+	Google    GoogleConfig
 	Geocoding GeocodingConfig
+	OpenAI    OpenAIConfig
 }
 
 // DatabaseConfig holds database connection settings
@@ -53,6 +54,12 @@ type GeocodingConfig struct {
 	NominatimBaseURL string
 }
 
+// OpenAIConfig holds OpenAI API settings
+type OpenAIConfig struct {
+	APIKey         string
+	EmbeddingModel string
+}
+
 // Load loads configuration from environment variables
 func Load() *Config {
 	return &Config{
@@ -82,6 +89,10 @@ func Load() *Config {
 		},
 		Geocoding: GeocodingConfig{
 			NominatimBaseURL: getEnv("NOMINATIM_BASE_URL", "https://nominatim.openstreetmap.org"),
+		},
+		OpenAI: OpenAIConfig{
+			APIKey:         getEnv("OPENAI_API_KEY", ""),
+			EmbeddingModel: getEnv("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small"),
 		},
 	}
 }

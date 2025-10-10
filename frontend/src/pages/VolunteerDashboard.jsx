@@ -72,9 +72,9 @@ export default function VolunteerDashboard() {
             <button className="w-full btn-secondary text-left">
               View My Applications
             </button>
-            <button className="w-full btn-secondary text-left">
+            <Link to="/profile" className="w-full btn-secondary text-left block">
               Update Profile
-            </button>
+            </Link>
           </div>
         </div>
       </div>

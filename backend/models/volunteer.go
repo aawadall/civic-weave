@@ -19,6 +19,7 @@ type Volunteer struct {
 	LocationAddress string          `json:"location_address" db:"location_address"`
 	Skills          []string        `json:"skills" db:"skills"`
 	Availability    json.RawMessage `json:"availability" db:"availability"`
+	SkillsVisible   bool            `json:"skills_visible" db:"skills_visible"`
 	ConsentGiven    bool            `json:"consent_given" db:"consent_given"`
 	CreatedAt       time.Time       `json:"created_at" db:"created_at"`
 	UpdatedAt       time.Time       `json:"updated_at" db:"updated_at"`
@@ -37,17 +38,17 @@ func NewVolunteerService(db *sql.DB) *VolunteerService {
 // Create creates a new volunteer
 func (s *VolunteerService) Create(volunteer *Volunteer) error {
 	skillsJSON, _ := json.Marshal(volunteer.Skills)
-	
+
 	query := `
 		INSERT INTO volunteers (id, user_id, name, phone, location_lat, location_lng, 
-		                       location_address, skills, availability, consent_given)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		                       location_address, skills, availability, skills_visible, consent_given)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 		RETURNING created_at, updated_at`
 
 	volunteer.ID = uuid.New()
-	return s.db.QueryRow(query, volunteer.ID, volunteer.UserID, volunteer.Name, 
+	return s.db.QueryRow(query, volunteer.ID, volunteer.UserID, volunteer.Name,
 		volunteer.Phone, volunteer.LocationLat, volunteer.LocationLng,
-		volunteer.LocationAddress, skillsJSON, volunteer.Availability, volunteer.ConsentGiven).
+		volunteer.LocationAddress, skillsJSON, volunteer.Availability, volunteer.SkillsVisible, volunteer.ConsentGiven).
 		Scan(&volunteer.CreatedAt, &volunteer.UpdatedAt)
 }
 
@@ -55,16 +56,16 @@ func (s *VolunteerService) Create(volunteer *Volunteer) error {
 func (s *VolunteerService) GetByID(id uuid.UUID) (*Volunteer, error) {
 	volunteer := &Volunteer{}
 	var skillsJSON []byte
-	
+
 	query := `
 		SELECT id, user_id, name, phone, location_lat, location_lng, 
-		       location_address, skills, availability, consent_given, created_at, updated_at
+		       location_address, skills, availability, skills_visible, consent_given, created_at, updated_at
 		FROM volunteers WHERE id = $1`
 
 	err := s.db.QueryRow(query, id).Scan(
 		&volunteer.ID, &volunteer.UserID, &volunteer.Name, &volunteer.Phone,
 		&volunteer.LocationLat, &volunteer.LocationLng, &volunteer.LocationAddress,
-		&skillsJSON, &volunteer.Availability, &volunteer.ConsentGiven,
+		&skillsJSON, &volunteer.Availability, &volunteer.SkillsVisible, &volunteer.ConsentGiven,
 		&volunteer.CreatedAt, &volunteer.UpdatedAt,
 	)
 
@@ -87,16 +88,16 @@ func (s *VolunteerService) GetByID(id uuid.UUID) (*Volunteer, error) {
 func (s *VolunteerService) GetByUserID(userID uuid.UUID) (*Volunteer, error) {
 	volunteer := &Volunteer{}
 	var skillsJSON []byte
-	
+
 	query := `
 		SELECT id, user_id, name, phone, location_lat, location_lng, 
-		       location_address, skills, availability, consent_given, created_at, updated_at
+		       location_address, skills, availability, skills_visible, consent_given, created_at, updated_at
 		FROM volunteers WHERE user_id = $1`
 
 	err := s.db.QueryRow(query, userID).Scan(
 		&volunteer.ID, &volunteer.UserID, &volunteer.Name, &volunteer.Phone,
 		&volunteer.LocationLat, &volunteer.LocationLng, &volunteer.LocationAddress,
-		&skillsJSON, &volunteer.Availability, &volunteer.ConsentGiven,
+		&skillsJSON, &volunteer.Availability, &volunteer.SkillsVisible, &volunteer.ConsentGiven,
 		&volunteer.CreatedAt, &volunteer.UpdatedAt,
 	)
 
@@ -119,7 +120,7 @@ func (s *VolunteerService) GetByUserID(userID uuid.UUID) (*Volunteer, error) {
 func (s *VolunteerService) List(limit, offset int, skills []string, location string) ([]*Volunteer, error) {
 	query := `
 		SELECT id, user_id, name, phone, location_lat, location_lng, 
-		       location_address, skills, availability, consent_given, created_at, updated_at
+		       location_address, skills, availability, skills_visible, consent_given, created_at, updated_at
 		FROM volunteers 
 		WHERE ($1::text[] IS NULL OR skills ?| $1)
 		ORDER BY created_at DESC
@@ -135,11 +136,11 @@ func (s *VolunteerService) List(limit, offset int, skills []string, location str
 	for rows.Next() {
 		volunteer := &Volunteer{}
 		var skillsJSON []byte
-		
+
 		err := rows.Scan(
 			&volunteer.ID, &volunteer.UserID, &volunteer.Name, &volunteer.Phone,
 			&volunteer.LocationLat, &volunteer.LocationLng, &volunteer.LocationAddress,
-			&skillsJSON, &volunteer.Availability, &volunteer.ConsentGiven,
+			&skillsJSON, &volunteer.Availability, &volunteer.SkillsVisible, &volunteer.ConsentGiven,
 			&volunteer.CreatedAt, &volunteer.UpdatedAt,
 		)
 		if err != nil {
@@ -160,18 +161,18 @@ func (s *VolunteerService) List(limit, offset int, skills []string, location str
 // Update updates a volunteer
 func (s *VolunteerService) Update(volunteer *Volunteer) error {
 	skillsJSON, _ := json.Marshal(volunteer.Skills)
-	
+
 	query := `
 		UPDATE volunteers 
 		SET name = $2, phone = $3, location_lat = $4, location_lng = $5, 
-		    location_address = $6, skills = $7, availability = $8, consent_given = $9, 
+		    location_address = $6, skills = $7, availability = $8, skills_visible = $9, consent_given = $10, 
 		    updated_at = CURRENT_TIMESTAMP
 		WHERE id = $1
 		RETURNING updated_at`
 
 	return s.db.QueryRow(query, volunteer.ID, volunteer.Name, volunteer.Phone,
 		volunteer.LocationLat, volunteer.LocationLng, volunteer.LocationAddress,
-		skillsJSON, volunteer.Availability, volunteer.ConsentGiven).
+		skillsJSON, volunteer.Availability, volunteer.SkillsVisible, volunteer.ConsentGiven).
 		Scan(&volunteer.UpdatedAt)
 }
 
