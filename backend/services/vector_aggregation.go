@@ -105,10 +105,8 @@ func (s *VectorAggregationService) calculateWeightedAverage(claims []*models.Ski
 // createZeroVector creates a zero vector for volunteers with no skill claims
 func (s *VectorAggregationService) createZeroVector(volunteerID uuid.UUID) error {
 	// Create a zero vector with standard embedding dimension (384)
+	// Go initializes slices with zero values, so no need to explicitly set
 	zeroVector := make([]float32, 384) // text-embedding-3-small dimension
-	for i := range zeroVector {
-		zeroVector[i] = 0.0
-	}
 
 	vector := pgvector.NewVector(zeroVector)
 	locationPoint, err := s.getVolunteerLocationPoint(volunteerID)
