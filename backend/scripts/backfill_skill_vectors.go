@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"os"
 	"strings"
 	"time"
 
@@ -14,7 +13,6 @@ import (
 	"civicweave/backend/services"
 
 	"github.com/google/uuid"
-	"github.com/lib/pq"
 	_ "github.com/lib/pq"
 )
 
@@ -161,7 +159,7 @@ func backfillSkillVectors(
 				VolunteerID:      volunteerID,
 				SkillName:        strings.ToLower(strings.TrimSpace(skill)),
 				Embedding:        embedding,
-				ProficiencyLevel: 3, // Default proficiency level for backfilled skills
+				ProficiencyLevel: 3,   // Default proficiency level for backfilled skills
 				ClaimWeight:      0.5, // Default initial weight
 				IsActive:         true,
 				CreatedAt:        time.Now(),
@@ -205,7 +203,7 @@ func backfillSkillVectors(
 
 	// Verify the migration
 	log.Println("🔍 Verifying migration...")
-	
+
 	var totalClaims int
 	err = db.QueryRow(`SELECT COUNT(*) FROM skill_claims WHERE created_at >= NOW() - INTERVAL '1 hour'`).Scan(&totalClaims)
 	if err != nil {
