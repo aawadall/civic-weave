@@ -4,48 +4,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import { ChevronLeftIcon } from '@heroicons/react/24/outline'
 
-const SKILL_OPTIONS = [
-  'Event Planning',
-  'Marketing',
-  'Social Media',
-  'Content Creation',
-  'Graphic Design',
-  'Photography',
-  'Videography',
-  'Writing',
-  'Public Speaking',
-  'Community Outreach',
-  'Fundraising',
-  'Project Management',
-  'Data Analysis',
-  'Research',
-  'Teaching/Training',
-  'Translation',
-  'Legal',
-  'Accounting',
-  'Technology',
-  'Web Development',
-  'Mobile App Development',
-  'Cybersecurity',
-  'Healthcare',
-  'Mental Health',
-  'Elderly Care',
-  'Childcare',
-  'Environmental',
-  'Sustainability',
-  'Gardening',
-  'Construction',
-  'Handyman',
-  'Transportation',
-  'Cooking',
-  'Catering',
-  'Music',
-  'Art',
-  'Theater',
-  'Sports',
-  'Fitness',
-  'Other'
-]
+// Removed SKILL_OPTIONS - now using free-text input for skills
 
 export default function RegisterPage() {
   const [formData, setFormData] = useState({
@@ -55,7 +14,7 @@ export default function RegisterPage() {
     name: '',
     phone: '',
     locationAddress: '',
-    skills: [],
+    skillsDescription: '',
     availability: {
       weekdays: false,
       weekends: false,
@@ -64,6 +23,7 @@ export default function RegisterPage() {
       evenings: false,
       flexible: false
     },
+    skillsVisible: true,
     consentGiven: false
   })
   const [loading, setLoading] = useState(false)
@@ -86,14 +46,7 @@ export default function RegisterPage() {
     }
   }
 
-  const handleSkillToggle = (skill) => {
-    setFormData(prev => ({
-      ...prev,
-      skills: prev.skills.includes(skill)
-        ? prev.skills.filter(s => s !== skill)
-        : [...prev.skills, skill]
-    }))
-  }
+  // Removed handleSkillToggle - now using textarea for skills
 
   const handleAvailabilityChange = (field) => {
     setFormData(prev => ({
@@ -128,6 +81,10 @@ export default function RegisterPage() {
       newErrors.name = 'Name is required'
     }
 
+    if (formData.skillsDescription.trim().length > 0 && formData.skillsDescription.trim().length < 10) {
+      newErrors.skillsDescription = 'Skill description must be at least 10 characters if provided'
+    }
+
     if (!formData.consentGiven) {
       newErrors.consentGiven = 'You must agree to the terms and conditions'
     }
@@ -151,8 +108,9 @@ export default function RegisterPage() {
         name: formData.name,
         phone: formData.phone,
         locationAddress: formData.locationAddress,
-        skills: formData.skills,
+        skillsDescription: formData.skillsDescription,
         availability: formData.availability,
+        skillsVisible: formData.skillsVisible,
         consentGiven: formData.consentGiven
       })
       
@@ -299,27 +257,45 @@ export default function RegisterPage() {
               </p>
             </div>
 
-            {/* Skills */}
+            {/* Skills Description */}
             <div>
-              <label className="form-label">
-                Skills & Interests
+              <label htmlFor="skillsDescription" className="form-label">
+                Skills & Experience (Optional)
               </label>
-              <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto border border-secondary-300 rounded-lg p-3">
-                {SKILL_OPTIONS.map(skill => (
-                  <label key={skill} className="flex items-center space-x-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={formData.skills.includes(skill)}
-                      onChange={() => handleSkillToggle(skill)}
-                      className="rounded border-secondary-300 text-primary-600 focus:ring-primary-500"
-                    />
-                    <span>{skill}</span>
-                  </label>
-                ))}
+              <textarea
+                id="skillsDescription"
+                name="skillsDescription"
+                value={formData.skillsDescription}
+                onChange={handleInputChange}
+                className={`input-field resize-none ${errors.skillsDescription ? 'border-red-500' : ''}`}
+                placeholder="e.g., I have 2 years of experience in community event planning, social media marketing, and volunteer coordination. I've organized fundraising events and managed teams of volunteers."
+                rows={4}
+                maxLength={500}
+              />
+              <div className="mt-1 flex justify-between text-xs text-secondary-500">
+                <span>Describe your skills and experience in your own words</span>
+                <span>{formData.skillsDescription.length}/500</span>
               </div>
-              <p className="mt-1 text-xs text-secondary-500">
-                Select skills that match your interests and experience
-              </p>
+              {errors.skillsDescription && <p className="mt-1 text-sm text-red-600">{errors.skillsDescription}</p>}
+            </div>
+
+            {/* Skills Visibility */}
+            <div>
+              <label className="flex items-start space-x-2">
+                <input
+                  type="checkbox"
+                  checked={formData.skillsVisible}
+                  onChange={handleInputChange}
+                  name="skillsVisible"
+                  className="mt-1 rounded border-secondary-300 text-primary-600 focus:ring-primary-500"
+                />
+                <span className="text-sm text-secondary-700">
+                  Make my skills visible to initiative organizers for better matching
+                  <span className="block text-xs text-secondary-500 mt-1">
+                    You can change this later in your profile
+                  </span>
+                </span>
+              </label>
             </div>
 
             {/* Availability */}
