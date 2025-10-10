@@ -60,3 +60,15 @@ variable "admin_password" {
   type        = string
   sensitive   = true
 }
+
+variable "openai_api_key" {
+  description = "OpenAI API key for skill embeddings"
+  type        = string
+  sensitive   = true
+}
+
+variable "openai_embedding_model" {
+  description = "OpenAI embedding model"
+  type        = string
+  default     = "text-embedding-3-small"
+}

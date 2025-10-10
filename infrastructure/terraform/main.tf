@@ -94,7 +94,8 @@ resource "google_secret_manager_secret" "secrets" {
     "google-client-id",
     "google-client-secret",
     "db-password",
-    "admin-password"
+    "admin-password",
+    "openai-api-key"
   ])
 
   secret_id = each.key
@@ -144,6 +145,11 @@ resource "google_secret_manager_secret_version" "db_password" {
 resource "google_secret_manager_secret_version" "admin_password" {
   secret      = google_secret_manager_secret.secrets["admin-password"].id
   secret_data = var.admin_password
+}
+
+resource "google_secret_manager_secret_version" "openai_api_key" {
+  secret      = google_secret_manager_secret.secrets["openai-api-key"].id
+  secret_data = var.openai_api_key
 }
 
 # Service account for Cloud Run
@@ -289,6 +295,19 @@ resource "google_cloud_run_v2_service" "backend" {
       env {
         name  = "ADMIN_NAME"
         value = "System Administrator"
+      }
+      env {
+        name = "OPENAI_API_KEY"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.secrets["openai-api-key"].secret_id
+            version = "latest"
+          }
+        }
+      }
+      env {
+        name  = "OPENAI_EMBEDDING_MODEL"
+        value = var.openai_embedding_model
       }
     }
 

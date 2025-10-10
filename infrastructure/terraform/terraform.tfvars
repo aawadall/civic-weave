@@ -17,3 +17,6 @@ jwt_secret = "changeme-jwt-secret"
 
 # Database (CHANGE THIS PASSWORD!)
 db_password = "changeme-db-password"
+
+# OpenAI (set via environment variables: TF_VAR_openai_api_key)
+# openai_api_key = "set via TF_VAR_openai_api_key"
