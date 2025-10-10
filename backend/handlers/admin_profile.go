@@ -25,31 +25,31 @@ func NewAdminProfileHandler(db *sql.DB) *AdminProfileHandler {
 
 // AdminProfile represents the admin profile data
 type AdminProfile struct {
-	ID             uuid.UUID              `json:"id" db:"id"`
-	Name           string                 `json:"name" db:"name"`
-	Email          string                 `json:"email" db:"email"`
-	Phone          string                 `json:"phone" db:"phone"`
-	LocationAddress string                `json:"location_address" db:"location_address"`
-	Preferences    map[string]interface{} `json:"preferences" db:"preferences"`
-	CreatedAt      time.Time              `json:"created_at" db:"created_at"`
-	UpdatedAt      time.Time              `json:"updated_at" db:"updated_at"`
+	ID              uuid.UUID              `json:"id" db:"id"`
+	Name            string                 `json:"name" db:"name"`
+	Email           string                 `json:"email" db:"email"`
+	Phone           string                 `json:"phone" db:"phone"`
+	LocationAddress string                 `json:"location_address" db:"location_address"`
+	Preferences     map[string]interface{} `json:"preferences" db:"preferences"`
+	CreatedAt       time.Time              `json:"created_at" db:"created_at"`
+	UpdatedAt       time.Time              `json:"updated_at" db:"updated_at"`
 }
 
 // SystemStats represents system statistics for admin dashboard
 type SystemStats struct {
-	TotalVolunteers    int                    `json:"total_volunteers"`
-	ActiveInitiatives  int                    `json:"active_initiatives"`
-	PendingApplications int                   `json:"pending_applications"`
-	TotalSkillClaims   int                    `json:"total_skill_claims"`
-	LowWeightClaims    int                    `json:"low_weight_claims"`
-	RecentActivity     []ActivityItem         `json:"recent_activity"`
+	TotalVolunteers     int            `json:"total_volunteers"`
+	ActiveInitiatives   int            `json:"active_initiatives"`
+	PendingApplications int            `json:"pending_applications"`
+	TotalSkillClaims    int            `json:"total_skill_claims"`
+	LowWeightClaims     int            `json:"low_weight_claims"`
+	RecentActivity      []ActivityItem `json:"recent_activity"`
 }
 
 // ActivityItem represents a recent system activity
 type ActivityItem struct {
-	Description string    `json:"description"`
-	Timestamp   string    `json:"timestamp"`
-	Type        string    `json:"type"`
+	Description string `json:"description"`
+	Timestamp   string `json:"timestamp"`
+	Type        string `json:"type"`
 }
 
 // GetAdminProfile handles GET /api/admin/profile
@@ -85,19 +85,19 @@ func (h *AdminProfileHandler) GetAdminProfile(c *gin.Context) {
 		if err := json.Unmarshal(preferencesJSON, &profile.Preferences); err != nil {
 			// If parsing fails, use default preferences
 			profile.Preferences = map[string]interface{}{
-				"emailNotifications":    true,
-				"skillReviewReminders":  true,
-				"weeklyReports":         false,
-				"instantAlerts":         true,
+				"emailNotifications":   true,
+				"skillReviewReminders": true,
+				"weeklyReports":        false,
+				"instantAlerts":        true,
 			}
 		}
 	} else {
 		// Default preferences if none stored
 		profile.Preferences = map[string]interface{}{
-			"emailNotifications":    true,
-			"skillReviewReminders":  true,
-			"weeklyReports":         false,
-			"instantAlerts":         true,
+			"emailNotifications":   true,
+			"skillReviewReminders": true,
+			"weeklyReports":        false,
+			"instantAlerts":        true,
 		}
 	}
 
@@ -241,19 +241,19 @@ func (h *AdminProfileHandler) GetSystemStats(c *gin.Context) {
 		stats.RecentActivity = []ActivityItem{}
 	} else {
 		defer rows.Close()
-		
+
 		for rows.Next() {
 			var activity ActivityItem
 			err := rows.Scan(&activity.Description, &activity.Timestamp)
 			if err != nil {
 				continue
 			}
-			
+
 			// Format timestamp
 			if parsedTime, err := time.Parse(time.RFC3339, activity.Timestamp); err == nil {
 				activity.Timestamp = parsedTime.Format("Jan 2, 3:04 PM")
 			}
-			
+
 			stats.RecentActivity = append(stats.RecentActivity, activity)
 		}
 	}
@@ -301,7 +301,7 @@ func (h *AdminProfileHandler) ChangePassword(c *gin.Context) {
 	}
 
 	// Update password
-	_, err = h.db.Exec("UPDATE admins SET password_hash = $1, updated_at = $2 WHERE id = $3", 
+	_, err = h.db.Exec("UPDATE admins SET password_hash = $1, updated_at = $2 WHERE id = $3",
 		newHashedPassword, time.Now(), adminID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update password"})
