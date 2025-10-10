@@ -10,6 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // AdminProfileHandler handles admin profile related requests
@@ -199,9 +200,8 @@ func (h *AdminProfileHandler) GetSystemStats(c *gin.Context) {
 	// Get low weight skill claims (weight < 0.4)
 	err = h.db.QueryRow(`
 		SELECT COUNT(*) 
-		FROM skill_claims sc 
-		JOIN skill_weights sw ON sc.id = sw.skill_claim_id 
-		WHERE sc.is_active = true AND sw.weight < 0.4
+		FROM skill_claims 
+		WHERE is_active = true AND claim_weight < 0.4
 	`).Scan(&stats.LowWeightClaims)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get low weight claims count"})
@@ -213,17 +213,17 @@ func (h *AdminProfileHandler) GetSystemStats(c *gin.Context) {
 		SELECT 
 			CASE 
 				WHEN 'volunteer_registration' THEN 'New volunteer registered: ' || v.name
-				WHEN 'skill_claim' THEN 'New skill claim added: ' || sc.claim_text
+				WHEN 'skill_claim' THEN 'New skill claim added: ' || sc.skill_name
 				WHEN 'initiative_created' THEN 'New initiative created: ' || i.title
 				ELSE 'System activity'
 			END as description,
 			COALESCE(v.created_at, sc.created_at, i.created_at) as timestamp
 		FROM (
-			SELECT 'volunteer_registration' as type, id, name, created_at, NULL as claim_text, NULL as title
+			SELECT 'volunteer_registration' as type, id, name, created_at, NULL as skill_name, NULL as title
 			FROM volunteers 
 			WHERE created_at >= NOW() - INTERVAL '7 days'
 			UNION ALL
-			SELECT 'skill_claim', sc.id, v.name, sc.created_at, sc.claim_text, NULL
+			SELECT 'skill_claim', sc.id, v.name, sc.created_at, sc.skill_name, NULL
 			FROM skill_claims sc
 			JOIN volunteers v ON sc.volunteer_id = v.id
 			WHERE sc.created_at >= NOW() - INTERVAL '7 days'
@@ -287,12 +287,11 @@ func (h *AdminProfileHandler) ChangePassword(c *gin.Context) {
 		return
 	}
 
-	// Hash and verify current password (you'll need to implement password hashing)
-	// For now, we'll assume you have a password verification function
-	// if !verifyPassword(request.CurrentPassword, hashedPassword) {
-	//     c.JSON(http.StatusBadRequest, gin.H{"error": "Current password is incorrect"})
-	//     return
-	// }
+	// Verify current password
+	if !verifyPassword(request.CurrentPassword, hashedPassword) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Current password is incorrect"})
+		return
+	}
 
 	// Hash new password
 	newHashedPassword, err := hashPassword(request.NewPassword)
@@ -312,15 +311,16 @@ func (h *AdminProfileHandler) ChangePassword(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Password changed successfully"})
 }
 
-// Helper functions for password hashing (implement these based on your auth system)
+// Helper functions for password hashing
 func hashPassword(password string) (string, error) {
-	// Implement password hashing (e.g., using bcrypt)
-	// This is a placeholder
-	return password, nil
+	hashedBytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return "", err
+	}
+	return string(hashedBytes), nil
 }
 
 func verifyPassword(password, hash string) bool {
-	// Implement password verification
-	// This is a placeholder
-	return password == hash
+	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
+	return err == nil
 }

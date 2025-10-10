@@ -19,6 +19,7 @@ type SkillClaimHandler struct {
 	vectorMatchingService    *services.VectorMatchingService
 	embeddingService         *services.EmbeddingService
 	config                   *config.Config
+	volunteerService         *models.VolunteerService
 }
 
 // NewSkillClaimHandler creates a new skill claim handler
@@ -28,6 +29,7 @@ func NewSkillClaimHandler(
 	vectorMatchingService *services.VectorMatchingService,
 	embeddingService *services.EmbeddingService,
 	config *config.Config,
+	volunteerService *models.VolunteerService,
 ) *SkillClaimHandler {
 	return &SkillClaimHandler{
 		skillClaimService:        skillClaimService,
@@ -35,6 +37,7 @@ func NewSkillClaimHandler(
 		vectorMatchingService:    vectorMatchingService,
 		embeddingService:         embeddingService,
 		config:                   config,
+		volunteerService:         volunteerService,
 	}
 }
 

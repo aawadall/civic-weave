@@ -116,6 +116,7 @@ func main() {
 			vectorMatchingService,
 			embeddingService,
 			cfg,
+			volunteerService,
 		)
 	}
 
