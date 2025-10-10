@@ -52,6 +52,7 @@ type RegisterRequest struct {
 	Email             string          `json:"email" binding:"required,email"`
 	Password          string          `json:"password" binding:"required,min=8"`
 	Name              string          `json:"name" binding:"required"`
+	Role              string          `json:"role"`
 	Phone             string          `json:"phone"`
 	LocationAddress   string          `json:"location_address"`
 	SkillsDescription string          `json:"skills_description"`
@@ -97,7 +98,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		Email:         req.Email,
 		PasswordHash:  string(hashedPassword),
 		EmailVerified: false,
-		Role:          "volunteer",
+		Role:          req.Role, // Use the role from the request
 	}
 
 	if err := h.UserService.Create(user); err != nil {
@@ -118,23 +119,37 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		}
 	}
 
-	// Create volunteer profile
-	volunteer := &models.Volunteer{
-		UserID:          user.ID,
-		Name:            req.Name,
-		Phone:           req.Phone,
-		LocationLat:     locationLat,
-		LocationLng:     locationLng,
-		LocationAddress: req.LocationAddress,
-		Skills:          []string{}, // Legacy field - will be replaced by skill claims
-		Availability:    req.Availability,
-		SkillsVisible:   req.SkillsVisible,
-		ConsentGiven:    req.ConsentGiven,
-	}
+	// Create appropriate profile based on role
+	if req.Role == "admin" {
+		// Create admin profile
+		admin := &models.Admin{
+			UserID: user.ID,
+			Name:   req.Name,
+		}
 
-	if err := h.VolunteerService.Create(volunteer); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create volunteer profile"})
-		return
+		if err := h.AdminService.Create(admin); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create admin profile"})
+			return
+		}
+	} else {
+		// Create volunteer profile
+		volunteer := &models.Volunteer{
+			UserID:          user.ID,
+			Name:            req.Name,
+			Phone:           req.Phone,
+			LocationLat:     locationLat,
+			LocationLng:     locationLng,
+			LocationAddress: req.LocationAddress,
+			Skills:          []string{}, // Legacy field - will be replaced by skill claims
+			Availability:    req.Availability,
+			SkillsVisible:   req.SkillsVisible,
+			ConsentGiven:    req.ConsentGiven,
+		}
+
+		if err := h.VolunteerService.Create(volunteer); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create volunteer profile"})
+			return
+		}
 	}
 
 	// Create skill claim if skills description is provided
