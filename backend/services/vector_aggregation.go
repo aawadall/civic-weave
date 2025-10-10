@@ -61,26 +61,26 @@ func (s *VectorAggregationService) AggregateVolunteerVector(volunteerID uuid.UUI
 // calculateWeightedAverage calculates the weighted average of skill claim embeddings
 func (s *VectorAggregationService) calculateWeightedAverage(claims []*models.SkillClaimWithWeight) (pgvector.Vector, error) {
 	if len(claims) == 0 {
-		return nil, fmt.Errorf("no claims provided")
+		return pgvector.NewVector([]float32{}), fmt.Errorf("no claims provided")
 	}
 
 	// Get embedding dimension from first claim
 	embeddingDim := len(claims[0].Embedding.Slice())
 	if embeddingDim == 0 {
-		return nil, fmt.Errorf("invalid embedding dimension")
+		return pgvector.NewVector([]float32{}), fmt.Errorf("invalid embedding dimension")
 	}
 
 	// Initialize weighted sum and total weight
-	weightedSum := make([]float64, embeddingDim)
-	totalWeight := 0.0
+	weightedSum := make([]float32, embeddingDim)
+	totalWeight := float32(0.0)
 
 	// Calculate weighted sum
 	for _, claim := range claims {
 		embedding := claim.Embedding.Slice()
-		weight := claim.Weight.Weight
+		weight := float32(claim.Weight.Weight)
 
 		if len(embedding) != embeddingDim {
-			return nil, fmt.Errorf("embedding dimension mismatch")
+			return pgvector.NewVector([]float32{}), fmt.Errorf("embedding dimension mismatch")
 		}
 
 		for i, value := range embedding {
@@ -91,10 +91,10 @@ func (s *VectorAggregationService) calculateWeightedAverage(claims []*models.Ski
 
 	// Normalize by total weight
 	if totalWeight == 0 {
-		return nil, fmt.Errorf("total weight is zero")
+		return pgvector.NewVector([]float32{}), fmt.Errorf("total weight is zero")
 	}
 
-	normalizedVector := make([]float64, embeddingDim)
+	normalizedVector := make([]float32, embeddingDim)
 	for i, sum := range weightedSum {
 		normalizedVector[i] = sum / totalWeight
 	}
@@ -105,10 +105,8 @@ func (s *VectorAggregationService) calculateWeightedAverage(claims []*models.Ski
 // createZeroVector creates a zero vector for volunteers with no skill claims
 func (s *VectorAggregationService) createZeroVector(volunteerID uuid.UUID) error {
 	// Create a zero vector with standard embedding dimension (384)
-	zeroVector := make([]float64, 384) // text-embedding-3-small dimension
-	for i := range zeroVector {
-		zeroVector[i] = 0.0
-	}
+	// Go initializes slices with zero values, so no need to explicitly set
+	zeroVector := make([]float32, 384) // text-embedding-3-small dimension
 
 	vector := pgvector.NewVector(zeroVector)
 	locationPoint, err := s.getVolunteerLocationPoint(volunteerID)
@@ -296,15 +294,31 @@ func (s *VectorAggregationService) TriggerAggregationOnWeightChange(volunteerID 
 
 // CalculateVectorSimilarity calculates cosine similarity between two vectors
 func (s *VectorAggregationService) CalculateVectorSimilarity(vector1, vector2 pgvector.Vector) (float64, error) {
-	if vector1 == nil || vector2 == nil {
-		return 0, fmt.Errorf("vectors cannot be nil")
+	if len(vector1.Slice()) == 0 || len(vector2.Slice()) == 0 {
+		return 0, fmt.Errorf("vectors cannot be empty")
 	}
 
-	// Use pgvector's built-in cosine distance
-	distance := vector1.CosineDistance(vector2)
+	// Manual cosine similarity calculation
+	v1 := vector1.Slice()
+	v2 := vector2.Slice()
 
-	// Convert distance to similarity (0-1 scale)
-	similarity := 1 - distance
+	if len(v1) != len(v2) {
+		return 0, fmt.Errorf("vectors must have the same dimension")
+	}
+
+	var dotProduct, norm1, norm2 float64
+	for i := 0; i < len(v1); i++ {
+		dotProduct += float64(v1[i]) * float64(v2[i])
+		norm1 += float64(v1[i]) * float64(v1[i])
+		norm2 += float64(v2[i]) * float64(v2[i])
+	}
+
+	if norm1 == 0 || norm2 == 0 {
+		return 0, fmt.Errorf("one or both vectors have zero magnitude")
+	}
+
+	// Cosine similarity = dot product / (norm1 * norm2)
+	similarity := dotProduct / (math.Sqrt(norm1) * math.Sqrt(norm2))
 
 	// Ensure similarity is within bounds
 	similarity = math.Max(0, math.Min(1, similarity))

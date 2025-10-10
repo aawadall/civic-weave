@@ -7,6 +7,7 @@ import (
 	"math"
 
 	"github.com/google/uuid"
+	"github.com/pgvector/pgvector-go"
 )
 
 // VectorMatchingService handles volunteer-initiative matching using skill vectors
@@ -258,7 +259,7 @@ func (s *VectorMatchingService) CalculateVolunteerInitiativeMatch(volunteerID, i
 
 	// Calculate cosine similarity
 	similarity, err := s.vectorAggregationService.CalculateVectorSimilarity(
-		volunteerVector.AggregatedVector, requiredVector.(interface{}))
+		volunteerVector.AggregatedVector, requiredVector.(pgvector.Vector))
 	if err != nil {
 		return nil, fmt.Errorf("failed to calculate vector similarity: %w", err)
 	}

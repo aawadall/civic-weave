@@ -76,6 +76,9 @@ export default function AdminDashboard() {
             <Link to="/admin/skills" className="w-full btn-secondary text-left block">
               Manage Skill Claims
             </Link>
+            <Link to="/admin/profile" className="w-full btn-secondary text-left block">
+              Admin Profile
+            </Link>
             <button className="w-full btn-secondary text-left">
               View All Volunteers
             </button>

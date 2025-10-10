@@ -103,6 +103,7 @@ func main() {
 	// Initialize vector-based services and handlers
 	var vectorAggregationService *services.VectorAggregationService
 	var vectorMatchingService *services.VectorMatchingService
+	var adminProfileHandler *handlers.AdminProfileHandler
 
 	if skillClaimService != nil {
 		vectorAggregationService = services.NewVectorAggregationService(db, skillClaimService)
@@ -115,7 +116,13 @@ func main() {
 			vectorMatchingService,
 			embeddingService,
 			cfg,
+			volunteerService,
 		)
+	}
+
+	// Initialize admin profile handler
+	if db != nil {
+		adminProfileHandler = handlers.NewAdminProfileHandler(db)
 	}
 
 	// Setup Gin router
@@ -191,6 +198,14 @@ func main() {
 				protected.GET("/admin/skill-claims", middleware.RequireRole("admin"), skillClaimHandler.ListAllSkillClaims)
 				protected.PATCH("/admin/skill-claims/:id/weight", middleware.RequireRole("admin"), skillClaimHandler.UpdateSkillWeight)
 			}
+		}
+
+		// Admin profile routes
+		if adminProfileHandler != nil {
+			protected.GET("/admin/profile", middleware.RequireRole("admin"), adminProfileHandler.GetAdminProfile)
+			protected.PUT("/admin/profile", middleware.RequireRole("admin"), adminProfileHandler.UpdateAdminProfile)
+			protected.GET("/admin/stats", middleware.RequireRole("admin"), adminProfileHandler.GetSystemStats)
+			protected.PUT("/admin/change-password", middleware.RequireRole("admin"), adminProfileHandler.ChangePassword)
 		}
 	}
 

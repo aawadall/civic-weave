@@ -15,6 +15,7 @@ import VolunteerPortal from './pages/VolunteerPortal'
 import VolunteerProfilePage from './pages/VolunteerProfilePage'
 import InitiativeDetailPage from './pages/InitiativeDetailPage'
 import SkillManagementPage from './pages/admin/SkillManagementPage'
+import AdminProfilePage from './pages/admin/AdminProfilePage'
 import ProtectedRoute from './components/ProtectedRoute'
 import Toast from './components/Toast'
 
@@ -74,6 +75,14 @@ function App() {
                 element={
                   <ProtectedRoute requiredRole="admin">
                     <SkillManagementPage />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="admin/profile" 
+                element={
+                  <ProtectedRoute requiredRole="admin">
+                    <AdminProfilePage />
                   </ProtectedRoute>
                 } 
               />
