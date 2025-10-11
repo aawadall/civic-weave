@@ -35,7 +35,7 @@ CREATE TABLE skill_weights (
 CREATE TABLE volunteer_skill_vectors (
     volunteer_id UUID PRIMARY KEY REFERENCES volunteers(id) ON DELETE CASCADE,
     aggregated_vector vector(384) NOT NULL,
-    location_point GEOMETRY(POINT, 4326),
+    -- location_point GEOMETRY(POINT, 4326), -- Removed (PostGIS not available)
     last_aggregated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -63,7 +63,7 @@ CREATE INDEX idx_skill_weights_weight ON skill_weights(weight);
 
 -- Indexes for volunteer skill vectors
 CREATE INDEX idx_volunteer_skill_vectors_embedding ON volunteer_skill_vectors USING ivfflat (aggregated_vector vector_cosine_ops) WITH (lists = 100);
-CREATE INDEX idx_volunteer_skill_vectors_location ON volunteer_skill_vectors USING GIST (location_point);
+-- Location index removed (PostGIS not available)
 
 -- Indexes for initiative skill requirements
 CREATE INDEX idx_initiative_skill_requirements_initiative_id ON initiative_skill_requirements(initiative_id);

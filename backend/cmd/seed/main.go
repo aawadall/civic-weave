@@ -71,7 +71,7 @@ func main() {
 		migrateExistingUsers(userService, roleService)
 		return
 	}
-	
+
 	// Hash password
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(adminPassword), bcrypt.DefaultCost)
 	if err != nil {

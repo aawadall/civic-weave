@@ -230,12 +230,12 @@ func base64URLDecode(str string) ([]byte, error) {
 	// Replace URL-safe base64 characters
 	str = strings.ReplaceAll(str, "-", "+")
 	str = strings.ReplaceAll(str, "_", "/")
-	
+
 	// Add padding if needed
 	for len(str)%4 != 0 {
 		str += "="
 	}
-	
+
 	return base64.StdEncoding.DecodeString(str)
 }
 

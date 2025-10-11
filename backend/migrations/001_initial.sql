@@ -3,7 +3,6 @@
 
 -- Enable required extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE EXTENSION IF NOT EXISTS "postgis";
 
 -- Users table (unified authentication)
 CREATE TABLE users (
@@ -103,10 +102,10 @@ CREATE TABLE applications (
 CREATE INDEX idx_users_email ON users(email);
 CREATE INDEX idx_users_role ON users(role);
 CREATE INDEX idx_volunteers_skills ON volunteers USING GIN (skills);
-CREATE INDEX idx_volunteers_location ON volunteers USING GIST (ST_Point(location_lng, location_lat));
+-- Location indexes removed (PostGIS not available)
 CREATE INDEX idx_initiatives_required_skills ON initiatives USING GIN (required_skills);
 CREATE INDEX idx_initiatives_status ON initiatives(status);
-CREATE INDEX idx_initiatives_location ON initiatives USING GIST (ST_Point(location_lng, location_lat));
+-- Location indexes removed (PostGIS not available)
 CREATE INDEX idx_applications_volunteer_id ON applications(volunteer_id);
 CREATE INDEX idx_applications_initiative_id ON applications(initiative_id);
 CREATE INDEX idx_applications_status ON applications(status);

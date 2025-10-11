@@ -26,15 +26,10 @@ UPDATE volunteer_ratings SET project_id = project_id_temp;
 ALTER TABLE volunteer_ratings DROP COLUMN project_id_temp;
 
 -- Update project_team_members table references (from previous migration)
-ALTER TABLE project_team_members RENAME COLUMN project_id TO project_id_temp;
-ALTER TABLE project_team_members ADD COLUMN project_id UUID REFERENCES projects(id) ON DELETE CASCADE;
-UPDATE project_team_members SET project_id = project_id_temp;
-ALTER TABLE project_team_members DROP CONSTRAINT project_team_members_project_id_temp_fkey;
-ALTER TABLE project_team_members DROP COLUMN project_id_temp;
+ALTER TABLE project_team_members DROP CONSTRAINT project_team_members_project_id_fkey;
 ALTER TABLE project_team_members ADD CONSTRAINT project_team_members_project_id_fkey FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE;
 
 -- Update indexes
-DROP INDEX IF EXISTS idx_initiatives_location;
 DROP INDEX IF EXISTS idx_initiatives_status;
 DROP INDEX IF EXISTS idx_initiatives_required_skills;
 DROP INDEX IF EXISTS idx_initiative_skill_requirements_initiative_id;
@@ -42,7 +37,7 @@ DROP INDEX IF EXISTS idx_initiative_skill_requirements_embedding;
 DROP INDEX IF EXISTS idx_applications_initiative_id;
 
 -- Create new indexes with project naming
-CREATE INDEX idx_projects_location ON projects USING GIST (ST_Point(location_lng, location_lat));
+-- Location indexes removed (PostGIS not available)
 CREATE INDEX idx_projects_status ON projects(status);
 CREATE INDEX idx_projects_project_status ON projects(project_status);
 CREATE INDEX idx_projects_required_skills ON projects USING GIN (required_skills);
