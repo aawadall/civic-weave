@@ -84,6 +84,8 @@ func main() {
 	var roleHandler *handlers.RoleHandler
 	var volunteerRatingHandler *handlers.VolunteerRatingHandler
 	var campaignHandler *handlers.CampaignHandler
+	var skillHandler *handlers.SkillHandler
+	var skillMatchingHandler *handlers.SkillMatchingHandler
 
 	if userService != nil && volunteerService != nil && adminService != nil && oauthAccountService != nil {
 		authHandler = handlers.NewAuthHandler(
@@ -106,6 +108,16 @@ func main() {
 	}
 	if volunteerService != nil {
 		volunteerHandler = handlers.NewVolunteerHandler(volunteerService, cfg)
+	}
+
+	// Initialize skill taxonomy service and handler
+	var skillTaxonomyService *models.SkillTaxonomyService
+	var skillMatchingService *services.SkillMatchingService
+	if db != nil {
+		skillTaxonomyService = models.NewSkillTaxonomyService(db)
+		skillHandler = handlers.NewSkillHandler(skillTaxonomyService)
+		skillMatchingService = services.NewSkillMatchingService(db)
+		skillMatchingHandler = handlers.NewSkillMatchingHandler(db, skillTaxonomyService, skillMatchingService)
 	}
 	if projectService != nil {
 		projectHandler = handlers.NewProjectHandler(projectService, geocodingService, cfg)
@@ -225,20 +237,46 @@ func main() {
 			protected.PUT("/applications/:id", applicationHandler.UpdateApplication)
 			protected.DELETE("/applications/:id", applicationHandler.DeleteApplication)
 
-		// Matching routes (updated to use projects)
-		if matchingHandler != nil {
-			protected.GET("/matching/my-matches", matchingHandler.GetMyMatches)
-			protected.GET("/matching/volunteer/:id", matchingHandler.GetMatchesForVolunteer)
-			protected.GET("/matching/project/:id", matchingHandler.GetMatchesForProject)
-			protected.GET("/matching/explanation/:volunteerId/:projectId", matchingHandler.GetMatchExplanation)
+			// New matching routes (sparse vector system)
+			if skillMatchingHandler != nil {
+				protected.GET("/matching/my-matches", skillMatchingHandler.GetMyMatches)
+				protected.GET("/initiatives/:id/candidate-volunteers", skillMatchingHandler.GetCandidateVolunteers)
+				protected.GET("/volunteers/me/recommended-initiatives", skillMatchingHandler.GetRecommendedInitiatives)
+				protected.GET("/matching/explanation/:volunteerId/:initiativeId", skillMatchingHandler.GetMatchExplanation)
 			}
 
-			// Skill claim routes
+			// Legacy matching routes (updated to use projects)
+			if matchingHandler != nil {
+				protected.GET("/matching/legacy/my-matches", matchingHandler.GetMyMatches)
+				protected.GET("/matching/legacy/volunteer/:id", matchingHandler.GetMatchesForVolunteer)
+				protected.GET("/matching/legacy/project/:id", matchingHandler.GetMatchesForProject)
+				protected.GET("/matching/legacy/explanation/:volunteerId/:projectId", matchingHandler.GetMatchExplanation)
+			}
+
+			// Skill taxonomy routes (new sparse vector system)
+			if skillHandler != nil {
+				// Public skill taxonomy
+				r.GET("/api/skills/taxonomy", skillHandler.GetTaxonomy)
+				r.POST("/api/skills/taxonomy", skillHandler.AddSkill)
+
+				// Volunteer skill management
+				protected.GET("/volunteers/me/skills", skillHandler.GetVolunteerSkills)
+				protected.PUT("/volunteers/me/skills", skillHandler.UpdateVolunteerSkills)
+				protected.POST("/volunteers/me/skills", skillHandler.AddVolunteerSkills)
+				protected.DELETE("/volunteers/me/skills/:skill_id", skillHandler.RemoveVolunteerSkill)
+				protected.GET("/volunteers/me/profile-completion", skillHandler.GetProfileCompletion)
+
+				// Initiative skill management
+				protected.GET("/initiatives/:id/skills", skillHandler.GetInitiativeSkills)
+				protected.PUT("/initiatives/:id/skills", skillHandler.UpdateInitiativeSkills)
+			}
+
+			// Skill claim routes (legacy - keeping for backward compatibility)
 			if skillClaimHandler != nil {
 				// Volunteer skill management
-				protected.GET("/volunteers/me/skills", skillClaimHandler.GetMySkillClaims)
-				protected.POST("/volunteers/me/skills", skillClaimHandler.CreateSkillClaim)
-				protected.DELETE("/volunteers/me/skills/:id", skillClaimHandler.DeleteSkillClaim)
+				protected.GET("/volunteers/me/skill-claims", skillClaimHandler.GetMySkillClaims)
+				protected.POST("/volunteers/me/skill-claims", skillClaimHandler.CreateSkillClaim)
+				protected.DELETE("/volunteers/me/skill-claims/:id", skillClaimHandler.DeleteSkillClaim)
 				protected.GET("/volunteers/me/skills-visibility", skillClaimHandler.GetSkillsVisibility)
 				protected.PUT("/volunteers/me/skills-visibility", skillClaimHandler.UpdateSkillsVisibility)
 				protected.GET("/volunteers/me/matches", skillClaimHandler.GetTopMatches)
