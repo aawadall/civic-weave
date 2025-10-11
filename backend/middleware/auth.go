@@ -191,9 +191,8 @@ func OptionalAuth(jwtSecret string) gin.HandlerFunc {
 }
 
 // GenerateJWT generates a JWT token for a user
-func GenerateJWT(user *models.User, jwtSecret string) (string, error) {
+func GenerateJWT(user *models.User, userService *models.UserService, jwtSecret string) (string, error) {
 	// Get user roles
-	userService := models.NewUserService(nil) // Will be injected properly in handlers
 	roles, err := userService.GetUserRoles(user.ID)
 	if err != nil {
 		// Fallback to single role if roles service not available

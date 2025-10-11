@@ -266,7 +266,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	if gin.Mode() == gin.DebugMode {
 		log.Printf("🎫 LOGIN: Generating JWT token...")
 	}
-	token, err := middleware.GenerateJWT(user, h.config.JWT.Secret)
+	token, err := middleware.GenerateJWT(user, h.userService, h.config.JWT.Secret)
 	if err != nil {
 		if gin.Mode() == gin.DebugMode {
 			log.Printf("❌ LOGIN: Failed to generate JWT token: %v", err)

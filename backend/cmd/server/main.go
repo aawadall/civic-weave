@@ -225,12 +225,12 @@ func main() {
 			protected.PUT("/applications/:id", applicationHandler.UpdateApplication)
 			protected.DELETE("/applications/:id", applicationHandler.DeleteApplication)
 
-			// Matching routes (updated to use projects)
-			if matchingHandler != nil {
-				protected.GET("/matching/my-matches", matchingHandler.GetMyMatches)
-				protected.GET("/matching/volunteer/:id", matchingHandler.GetMatchesForVolunteer)
-				protected.GET("/matching/project/:id", matchingHandler.GetMatchesForInitiative)                     // TODO: Update handler to use projects
-				protected.GET("/matching/explanation/:volunteerId/:projectId", matchingHandler.GetMatchExplanation) // TODO: Update handler to use projects
+		// Matching routes (updated to use projects)
+		if matchingHandler != nil {
+			protected.GET("/matching/my-matches", matchingHandler.GetMyMatches)
+			protected.GET("/matching/volunteer/:id", matchingHandler.GetMatchesForVolunteer)
+			protected.GET("/matching/project/:id", matchingHandler.GetMatchesForProject)
+			protected.GET("/matching/explanation/:volunteerId/:projectId", matchingHandler.GetMatchExplanation)
 			}
 
 			// Skill claim routes

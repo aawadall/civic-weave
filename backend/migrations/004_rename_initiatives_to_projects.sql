@@ -29,8 +29,8 @@ ALTER TABLE volunteer_ratings DROP COLUMN project_id_temp;
 ALTER TABLE project_team_members RENAME COLUMN project_id TO project_id_temp;
 ALTER TABLE project_team_members ADD COLUMN project_id UUID REFERENCES projects(id) ON DELETE CASCADE;
 UPDATE project_team_members SET project_id = project_id_temp;
-ALTER TABLE project_team_members DROP COLUMN project_id_temp;
 ALTER TABLE project_team_members DROP CONSTRAINT project_team_members_project_id_temp_fkey;
+ALTER TABLE project_team_members DROP COLUMN project_id_temp;
 ALTER TABLE project_team_members ADD CONSTRAINT project_team_members_project_id_fkey FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE;
 
 -- Update indexes
