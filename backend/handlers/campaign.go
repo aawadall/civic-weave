@@ -534,7 +534,7 @@ func (h *CampaignHandler) SendCampaign(c *gin.Context) {
 	}
 
 	// Send campaign emails
-	err = h.emailService.SendCampaignEmail(recipients, campaign.EmailSubject, campaign.EmailBody, campaign.EmailBody)
+	err = h.emailService.SendCampaignEmail(recipients, campaign.EmailSubject, campaign.EmailBody, "")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send campaign emails"})
 		return

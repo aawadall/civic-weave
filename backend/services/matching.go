@@ -68,8 +68,9 @@ func (s *MatchingService) GetMatchesForVolunteer(volunteerID string, limit int) 
 
 	var results []MatchResult
 
-	for _, project := range projects {
-		score, skillScore, locationScore := s.calculateMatchScore(volunteer, &project)
+	for i := range projects {
+		project := &projects[i]
+		score, skillScore, locationScore := s.calculateMatchScore(volunteer, project)
 
 		if score > 0 {
 			results = append(results, MatchResult{

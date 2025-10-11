@@ -56,7 +56,7 @@ func main() {
 
 	// Create initial admin user
 	adminEmail := "admin@civicweave.com"
-	
+
 	// Get admin password from .env file (loaded by godotenv)
 	adminPassword := os.Getenv("ADMIN_PASSWORD")
 	if adminPassword == "" {
@@ -67,39 +67,41 @@ func main() {
 	existingUser, _ := userService.GetByEmail(adminEmail)
 	if existingUser != nil {
 		log.Println("Admin user already exists, skipping user creation")
-	} else {
-
-		// Hash password
-		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(adminPassword), bcrypt.DefaultCost)
-		if err != nil {
-			log.Fatal("Failed to hash admin password:", err)
-		}
-
-		// Create admin user
-		user := &models.User{
-			Email:         adminEmail,
-			PasswordHash:  string(hashedPassword),
-			EmailVerified: true,    // Skip verification for seeded admin
-			Role:          "admin", // Keep for backward compatibility
-		}
-
-		if err := userService.Create(user); err != nil {
-			log.Fatal("Failed to create admin user:", err)
-		}
-
-		// Create admin profile
-		admin := &models.Admin{
-			UserID: user.ID,
-			Name:   "System Administrator",
-		}
-
-		if err := adminService.Create(admin); err != nil {
-			log.Fatal("Failed to create admin profile:", err)
-		}
-
-		log.Printf("✅ Seeded admin user: %s", adminEmail)
-		log.Println("⚠️  IMPORTANT: Change the admin password after first login!")
+		// Migrate existing users to new role system
+		migrateExistingUsers(userService, roleService)
+		return
 	}
+	
+	// Hash password
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(adminPassword), bcrypt.DefaultCost)
+	if err != nil {
+		log.Fatal("Failed to hash admin password:", err)
+	}
+
+	// Create admin user
+	user := &models.User{
+		Email:         adminEmail,
+		PasswordHash:  string(hashedPassword),
+		EmailVerified: true,    // Skip verification for seeded admin
+		Role:          "admin", // Keep for backward compatibility
+	}
+
+	if err := userService.Create(user); err != nil {
+		log.Fatal("Failed to create admin user:", err)
+	}
+
+	// Create admin profile
+	admin := &models.Admin{
+		UserID: user.ID,
+		Name:   "System Administrator",
+	}
+
+	if err := adminService.Create(admin); err != nil {
+		log.Fatal("Failed to create admin profile:", err)
+	}
+
+	log.Printf("✅ Seeded admin user: %s", adminEmail)
+	log.Println("⚠️  IMPORTANT: Change the admin password after first login!")
 
 	// Migrate existing users to new role system
 	migrateExistingUsers(userService, roleService)

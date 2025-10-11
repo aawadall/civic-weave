@@ -63,7 +63,7 @@ func (s *ApplicationService) GetByID(id uuid.UUID) (*Application, error) {
 	return application, nil
 }
 
-// GetByProjectAndVolunteer retrieves an application by project and volunteer IDs\ might be interested in this function instead of the old one.
+// GetByProjectAndVolunteer retrieves an application by project and volunteer IDs (recommended over the deprecated initiative version).
 func (s *ApplicationService) GetByProjectAndVolunteer(projectID, volunteerID uuid.UUID) (*Application, error) {
 	return s.GetByVolunteerAndProject(volunteerID, projectID)
 }
