@@ -7,15 +7,15 @@ import (
 	"github.com/google/uuid"
 )
 
-// Application represents a volunteer application for an initiative
+// Application represents a volunteer application for a project
 type Application struct {
-	ID           uuid.UUID `json:"id" db:"id"`
-	VolunteerID  uuid.UUID `json:"volunteer_id" db:"volunteer_id"`
-	InitiativeID uuid.UUID `json:"initiative_id" db:"initiative_id"`
-	Status       string    `json:"status" db:"status"`
-	AppliedAt    time.Time `json:"applied_at" db:"applied_at"`
-	UpdatedAt    time.Time `json:"updated_at" db:"updated_at"`
-	AdminNotes   string    `json:"admin_notes" db:"admin_notes"`
+	ID          uuid.UUID `json:"id" db:"id"`
+	VolunteerID uuid.UUID `json:"volunteer_id" db:"volunteer_id"`
+	ProjectID   uuid.UUID `json:"project_id" db:"project_id"`
+	Status      string    `json:"status" db:"status"`
+	AppliedAt   time.Time `json:"applied_at" db:"applied_at"`
+	UpdatedAt   time.Time `json:"updated_at" db:"updated_at"`
+	AdminNotes  string    `json:"admin_notes" db:"admin_notes"`
 }
 
 // ApplicationService handles application operations
@@ -31,13 +31,13 @@ func NewApplicationService(db *sql.DB) *ApplicationService {
 // Create creates a new application
 func (s *ApplicationService) Create(application *Application) error {
 	query := `
-		INSERT INTO applications (id, volunteer_id, initiative_id, status, admin_notes)
+		INSERT INTO applications (id, volunteer_id, project_id, status, admin_notes)
 		VALUES ($1, $2, $3, $4, $5)
 		RETURNING applied_at, updated_at`
 
 	application.ID = uuid.New()
 	return s.db.QueryRow(query, application.ID, application.VolunteerID,
-		application.InitiativeID, application.Status, application.AdminNotes).
+		application.ProjectID, application.Status, application.AdminNotes).
 		Scan(&application.AppliedAt, &application.UpdatedAt)
 }
 
@@ -45,11 +45,11 @@ func (s *ApplicationService) Create(application *Application) error {
 func (s *ApplicationService) GetByID(id uuid.UUID) (*Application, error) {
 	application := &Application{}
 	query := `
-		SELECT id, volunteer_id, initiative_id, status, applied_at, updated_at, admin_notes
+		SELECT id, volunteer_id, project_id, status, applied_at, updated_at, admin_notes
 		FROM applications WHERE id = $1`
 
 	err := s.db.QueryRow(query, id).Scan(
-		&application.ID, &application.VolunteerID, &application.InitiativeID,
+		&application.ID, &application.VolunteerID, &application.ProjectID,
 		&application.Status, &application.AppliedAt, &application.UpdatedAt, &application.AdminNotes,
 	)
 
@@ -63,20 +63,25 @@ func (s *ApplicationService) GetByID(id uuid.UUID) (*Application, error) {
 	return application, nil
 }
 
-// GetByInitiativeAndVolunteer retrieves an application by initiative and volunteer IDs (alias for GetByVolunteerAndInitiative)
-func (s *ApplicationService) GetByInitiativeAndVolunteer(initiativeID, volunteerID uuid.UUID) (*Application, error) {
-	return s.GetByVolunteerAndInitiative(volunteerID, initiativeID)
+// GetByProjectAndVolunteer retrieves an application by project and volunteer IDs (recommended over the deprecated initiative version).
+func (s *ApplicationService) GetByProjectAndVolunteer(projectID, volunteerID uuid.UUID) (*Application, error) {
+	return s.GetByVolunteerAndProject(volunteerID, projectID)
 }
 
-// GetByVolunteerAndInitiative retrieves an application by volunteer and initiative IDs
-func (s *ApplicationService) GetByVolunteerAndInitiative(volunteerID, initiativeID uuid.UUID) (*Application, error) {
+// GetByInitiativeAndVolunteer retrieves an application by initiative and volunteer IDs (deprecated - use GetByProjectAndVolunteer)
+func (s *ApplicationService) GetByInitiativeAndVolunteer(initiativeID, volunteerID uuid.UUID) (*Application, error) {
+	return s.GetByProjectAndVolunteer(initiativeID, volunteerID)
+}
+
+// GetByVolunteerAndProject retrieves an application by volunteer and project IDs
+func (s *ApplicationService) GetByVolunteerAndProject(volunteerID, projectID uuid.UUID) (*Application, error) {
 	application := &Application{}
 	query := `
-		SELECT id, volunteer_id, initiative_id, status, applied_at, updated_at, admin_notes
-		FROM applications WHERE volunteer_id = $1 AND initiative_id = $2`
+		SELECT id, volunteer_id, project_id, status, applied_at, updated_at, admin_notes
+		FROM applications WHERE volunteer_id = $1 AND project_id = $2`
 
-	err := s.db.QueryRow(query, volunteerID, initiativeID).Scan(
-		&application.ID, &application.VolunteerID, &application.InitiativeID,
+	err := s.db.QueryRow(query, volunteerID, projectID).Scan(
+		&application.ID, &application.VolunteerID, &application.ProjectID,
 		&application.Status, &application.AppliedAt, &application.UpdatedAt, &application.AdminNotes,
 	)
 
@@ -93,10 +98,10 @@ func (s *ApplicationService) GetByVolunteerAndInitiative(volunteerID, initiative
 // List retrieves applications with filtering
 func (s *ApplicationService) List(limit, offset int, volunteerID, initiativeID *uuid.UUID, status string) ([]*Application, error) {
 	query := `
-		SELECT id, volunteer_id, initiative_id, status, applied_at, updated_at, admin_notes
+		SELECT id, volunteer_id, project_id, status, applied_at, updated_at, admin_notes
 		FROM applications 
 		WHERE ($1::uuid IS NULL OR volunteer_id = $1)
-		  AND ($2::uuid IS NULL OR initiative_id = $2)
+		  AND ($2::uuid IS NULL OR project_id = $2)
 		  AND ($3 = '' OR status = $3)
 		ORDER BY applied_at DESC
 		LIMIT $4 OFFSET $5`
@@ -111,7 +116,7 @@ func (s *ApplicationService) List(limit, offset int, volunteerID, initiativeID *
 	for rows.Next() {
 		application := &Application{}
 		err := rows.Scan(
-			&application.ID, &application.VolunteerID, &application.InitiativeID,
+			&application.ID, &application.VolunteerID, &application.ProjectID,
 			&application.Status, &application.AppliedAt, &application.UpdatedAt, &application.AdminNotes,
 		)
 		if err != nil {
@@ -140,4 +145,32 @@ func (s *ApplicationService) Delete(id uuid.UUID) error {
 	query := `DELETE FROM applications WHERE id = $1`
 	_, err := s.db.Exec(query, id)
 	return err
+}
+
+// GetApplicationsByProject retrieves applications for a specific project
+func (s *ApplicationService) GetApplicationsByProject(projectID uuid.UUID) ([]Application, error) {
+	query := `
+		SELECT id, volunteer_id, project_id, status, applied_at, updated_at, admin_notes
+		FROM applications 
+		WHERE project_id = $1
+		ORDER BY applied_at DESC`
+
+	rows, err := s.db.Query(query, projectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var applications []Application
+	for rows.Next() {
+		var application Application
+		err := rows.Scan(&application.ID, &application.VolunteerID, &application.ProjectID,
+			&application.Status, &application.AppliedAt, &application.UpdatedAt, &application.AdminNotes)
+		if err != nil {
+			return nil, err
+		}
+		applications = append(applications, application)
+	}
+
+	return applications, nil
 }

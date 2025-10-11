@@ -1,6 +1,7 @@
 package models
 
 import (
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"strings"
@@ -85,8 +86,8 @@ func ValidateApplication(application *Application) error {
 		return fmt.Errorf("volunteer_id: %w", err)
 	}
 
-	if err := ValidateUUID(application.InitiativeID); err != nil {
-		return fmt.Errorf("initiative_id: %w", err)
+	if err := ValidateUUID(application.ProjectID); err != nil {
+		return fmt.Errorf("project_id: %w", err)
 	}
 
 	if err := ValidateStatus(application.Status); err != nil {
@@ -229,4 +230,25 @@ func SanitizeSkills(skills []string) []string {
 		}
 	}
 	return sanitized
+}
+
+// ToJSONArray converts a string slice to JSON array string
+func ToJSONArray(slice []string) (string, error) {
+	if slice == nil {
+		return "[]", nil
+	}
+	jsonData, err := json.Marshal(slice)
+	if err != nil {
+		return "", err
+	}
+	return string(jsonData), nil
+}
+
+// ParseJSONArray parses a JSON array string into a string slice
+func ParseJSONArray(jsonStr string, target *[]string) error {
+	if jsonStr == "" {
+		*target = []string{}
+		return nil
+	}
+	return json.Unmarshal([]byte(jsonStr), target)
 }

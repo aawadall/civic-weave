@@ -8,24 +8,24 @@ import (
 	"github.com/google/uuid"
 )
 
-// MatchingService handles volunteer-initiative matching
+// MatchingService handles volunteer-project matching
 type MatchingService struct {
-	volunteerService  *models.VolunteerService
-	initiativeService *models.InitiativeService
+	volunteerService *models.VolunteerService
+	projectService   *models.ProjectService
 }
 
 // NewMatchingService creates a new matching service
-func NewMatchingService(volunteerService *models.VolunteerService, initiativeService *models.InitiativeService) *MatchingService {
+func NewMatchingService(volunteerService *models.VolunteerService, projectService *models.ProjectService) *MatchingService {
 	return &MatchingService{
-		volunteerService:  volunteerService,
-		initiativeService: initiativeService,
+		volunteerService: volunteerService,
+		projectService:   projectService,
 	}
 }
 
-// Match represents a volunteer-initiative match with score
+// Match represents a volunteer-project match with score
 type Match struct {
 	VolunteerID  string  `json:"volunteer_id"`
-	InitiativeID string  `json:"initiative_id"`
+	ProjectID    string  `json:"project_id"`
 	Score        float64 `json:"score"`
 	Reason       string  `json:"reason"`
 	SkillMatch   int     `json:"skill_match"`
@@ -35,14 +35,14 @@ type Match struct {
 // MatchResult represents the result of matching
 type MatchResult struct {
 	VolunteerID   string  `json:"volunteer_id"`
-	InitiativeID  string  `json:"initiative_id"`
+	ProjectID     string  `json:"project_id"`
 	Matches       []Match `json:"matches"`
 	TotalScore    float64 `json:"total_score"`
 	SkillScore    float64 `json:"skill_score"`
 	LocationScore float64 `json:"location_score"`
 }
 
-// GetMatchesForVolunteer finds the best initiative matches for a volunteer
+// GetMatchesForVolunteer finds the best project matches for a volunteer
 func (s *MatchingService) GetMatchesForVolunteer(volunteerID string, limit int) ([]MatchResult, error) {
 	if limit <= 0 {
 		limit = 10
@@ -60,21 +60,22 @@ func (s *MatchingService) GetMatchesForVolunteer(volunteerID string, limit int) 
 		return nil, err
 	}
 
-	// Get active initiatives
-	initiatives, err := s.initiativeService.List(100, 0, "active", []string{})
+	// Get active projects
+	projects, err := s.projectService.GetActiveProjects()
 	if err != nil {
 		return nil, err
 	}
 
 	var results []MatchResult
 
-	for _, initiative := range initiatives {
-		score, skillScore, locationScore := s.calculateMatchScore(volunteer, initiative)
+	for i := range projects {
+		project := &projects[i]
+		score, skillScore, locationScore := s.calculateMatchScore(volunteer, project)
 
 		if score > 0 {
 			results = append(results, MatchResult{
 				VolunteerID:   volunteerID,
-				InitiativeID:  initiative.ID.String(),
+				ProjectID:     project.ID.String(),
 				TotalScore:    score,
 				SkillScore:    skillScore,
 				LocationScore: locationScore,
@@ -95,21 +96,21 @@ func (s *MatchingService) GetMatchesForVolunteer(volunteerID string, limit int) 
 	return results, nil
 }
 
-// GetMatchesForInitiative finds the best volunteer matches for an initiative
-func (s *MatchingService) GetMatchesForInitiative(initiativeID string, limit int) ([]MatchResult, error) {
+// GetMatchesForProject finds the best volunteer matches for a project
+func (s *MatchingService) GetMatchesForProject(projectID string, limit int) ([]MatchResult, error) {
 	if limit <= 0 {
 		limit = 10
 	}
 
-	// Parse initiative ID
-	initiativeUUID, err := uuid.Parse(initiativeID)
+	// Parse project ID
+	projectUUID, err := uuid.Parse(projectID)
 	if err != nil {
 		return nil, err
 	}
 
-	// Get initiative
-	initiative, err := s.initiativeService.GetByID(initiativeUUID)
-	if err != nil || initiative == nil {
+	// Get project
+	project, err := s.projectService.GetByID(projectUUID)
+	if err != nil || project == nil {
 		return nil, err
 	}
 
@@ -122,12 +123,12 @@ func (s *MatchingService) GetMatchesForInitiative(initiativeID string, limit int
 	var results []MatchResult
 
 	for _, volunteer := range volunteers {
-		score, skillScore, locationScore := s.calculateMatchScore(volunteer, initiative)
+		score, skillScore, locationScore := s.calculateMatchScore(volunteer, project)
 
 		if score > 0 {
 			results = append(results, MatchResult{
 				VolunteerID:   volunteer.ID.String(),
-				InitiativeID:  initiativeID,
+				ProjectID:     projectID,
 				TotalScore:    score,
 				SkillScore:    skillScore,
 				LocationScore: locationScore,
@@ -148,13 +149,13 @@ func (s *MatchingService) GetMatchesForInitiative(initiativeID string, limit int
 	return results, nil
 }
 
-// calculateMatchScore calculates the match score between a volunteer and initiative
-func (s *MatchingService) calculateMatchScore(volunteer *models.Volunteer, initiative *models.Initiative) (totalScore, skillScore, locationScore float64) {
+// calculateMatchScore calculates the match score between a volunteer and project
+func (s *MatchingService) calculateMatchScore(volunteer *models.Volunteer, project *models.Project) (totalScore, skillScore, locationScore float64) {
 	// Skill matching (60% weight)
-	skillScore = s.calculateSkillScore(volunteer.Skills, initiative.RequiredSkills)
+	skillScore = s.calculateSkillScore(volunteer.Skills, project.RequiredSkills)
 
 	// Location matching (40% weight)
-	locationScore = s.calculateLocationScore(volunteer.LocationLat, volunteer.LocationLng, initiative.LocationLat, initiative.LocationLng)
+	locationScore = s.calculateLocationScore(volunteer.LocationLat, volunteer.LocationLng, project.LocationLat, project.LocationLng)
 
 	// Weighted total score
 	totalScore = (skillScore * 0.6) + (locationScore * 0.4)
@@ -248,15 +249,15 @@ func (s *MatchingService) calculateDistance(lat1, lng1, lat2, lng2 float64) floa
 	return earthRadius * c
 }
 
-// CalculateMatchScore calculates the match score between a volunteer and initiative (public method)
-func (s *MatchingService) CalculateMatchScore(volunteer *models.Volunteer, initiative *models.Initiative) (totalScore, skillScore, locationScore float64) {
-	return s.calculateMatchScore(volunteer, initiative)
+// CalculateMatchScore calculates the match score between a volunteer and project (public method)
+func (s *MatchingService) CalculateMatchScore(volunteer *models.Volunteer, project *models.Project) (totalScore, skillScore, locationScore float64) {
+	return s.calculateMatchScore(volunteer, project)
 }
 
 // GetMatchingExplanation provides human-readable explanation of match score
-func (s *MatchingService) GetMatchingExplanation(volunteer *models.Volunteer, initiative *models.Initiative) string {
-	skillScore := s.calculateSkillScore(volunteer.Skills, initiative.RequiredSkills)
-	locationScore := s.calculateLocationScore(volunteer.LocationLat, volunteer.LocationLng, initiative.LocationLat, initiative.LocationLng)
+func (s *MatchingService) GetMatchingExplanation(volunteer *models.Volunteer, project *models.Project) string {
+	skillScore := s.calculateSkillScore(volunteer.Skills, project.RequiredSkills)
+	locationScore := s.calculateLocationScore(volunteer.LocationLat, volunteer.LocationLng, project.LocationLat, project.LocationLng)
 
 	var explanation string
 

@@ -15,19 +15,19 @@ import (
 
 // MatchingHandler handles matching-related requests
 type MatchingHandler struct {
-	matchingService   *services.MatchingService
-	volunteerService  *models.VolunteerService
-	initiativeService *models.InitiativeService
-	config            *config.Config
+	matchingService  *services.MatchingService
+	volunteerService *models.VolunteerService
+	projectService   *models.ProjectService
+	config           *config.Config
 }
 
 // NewMatchingHandler creates a new matching handler
-func NewMatchingHandler(matchingService *services.MatchingService, volunteerService *models.VolunteerService, initiativeService *models.InitiativeService, config *config.Config) *MatchingHandler {
+func NewMatchingHandler(matchingService *services.MatchingService, volunteerService *models.VolunteerService, projectService *models.ProjectService, config *config.Config) *MatchingHandler {
 	return &MatchingHandler{
-		matchingService:   matchingService,
-		volunteerService:  volunteerService,
-		initiativeService: initiativeService,
-		config:            config,
+		matchingService:  matchingService,
+		volunteerService: volunteerService,
+		projectService:   projectService,
+		config:           config,
 	}
 }
 
@@ -59,11 +59,11 @@ func (h *MatchingHandler) GetMatchesForVolunteer(c *gin.Context) {
 	})
 }
 
-// GetMatchesForInitiative handles GET /api/matching/initiative/:id
-func (h *MatchingHandler) GetMatchesForInitiative(c *gin.Context) {
-	initiativeID := c.Param("id")
-	if initiativeID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Initiative ID is required"})
+// GetMatchesForProject handles GET /api/matching/project/:id
+func (h *MatchingHandler) GetMatchesForProject(c *gin.Context) {
+	projectID := c.Param("id")
+	if projectID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Project ID is required"})
 		return
 	}
 
@@ -74,7 +74,7 @@ func (h *MatchingHandler) GetMatchesForInitiative(c *gin.Context) {
 		limit = 10
 	}
 
-	matches, err := h.matchingService.GetMatchesForInitiative(initiativeID, limit)
+	matches, err := h.matchingService.GetMatchesForProject(projectID, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get matches"})
 		return
@@ -85,6 +85,11 @@ func (h *MatchingHandler) GetMatchesForInitiative(c *gin.Context) {
 		"count":   len(matches),
 		"limit":   limit,
 	})
+}
+
+// GetMatchesForInitiative handles GET /api/matching/initiative/:id (deprecated - use GetMatchesForProject)
+func (h *MatchingHandler) GetMatchesForInitiative(c *gin.Context) {
+	h.GetMatchesForProject(c)
 }
 
 // GetMyMatches handles GET /api/matching/my-matches
@@ -116,13 +121,13 @@ func (h *MatchingHandler) GetMyMatches(c *gin.Context) {
 	})
 }
 
-// GetMatchExplanation handles GET /api/matching/explanation/:volunteerId/:initiativeId
+// GetMatchExplanation handles GET /api/matching/explanation/:volunteerId/:projectId
 func (h *MatchingHandler) GetMatchExplanation(c *gin.Context) {
 	volunteerID := c.Param("volunteerId")
-	initiativeID := c.Param("initiativeId")
+	projectID := c.Param("projectId")
 
-	if volunteerID == "" || initiativeID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Both volunteer ID and initiative ID are required"})
+	if volunteerID == "" || projectID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Both volunteer ID and project ID are required"})
 		return
 	}
 
@@ -133,28 +138,28 @@ func (h *MatchingHandler) GetMatchExplanation(c *gin.Context) {
 		return
 	}
 
-	initiativeUUID, err := uuid.Parse(initiativeID)
+	projectUUID, err := uuid.Parse(projectID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid initiative ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid project ID"})
 		return
 	}
 
-	// Get volunteer and initiative
+	// Get volunteer and project
 	volunteer, err := h.volunteerService.GetByID(volunteerUUID)
 	if err != nil || volunteer == nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Volunteer not found"})
 		return
 	}
 
-	initiative, err := h.initiativeService.GetByID(initiativeUUID)
-	if err != nil || initiative == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Initiative not found"})
+	project, err := h.projectService.GetByID(projectUUID)
+	if err != nil || project == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
 		return
 	}
 
 	// Calculate scores
-	totalScore, skillScore, locationScore := h.matchingService.CalculateMatchScore(volunteer, initiative)
-	explanation := h.matchingService.GetMatchingExplanation(volunteer, initiative)
+	totalScore, skillScore, locationScore := h.matchingService.CalculateMatchScore(volunteer, project)
+	explanation := h.matchingService.GetMatchingExplanation(volunteer, project)
 
 	c.JSON(http.StatusOK, gin.H{
 		"total_score":    totalScore,
@@ -162,6 +167,6 @@ func (h *MatchingHandler) GetMatchExplanation(c *gin.Context) {
 		"location_score": locationScore,
 		"explanation":    explanation,
 		"volunteer_id":   volunteerID,
-		"initiative_id":  initiativeID,
+		"project_id":     projectID,
 	})
 }

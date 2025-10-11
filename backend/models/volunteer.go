@@ -158,6 +158,41 @@ func (s *VolunteerService) List(limit, offset int, skills []string, location str
 	return volunteers, rows.Err()
 }
 
+// GetVolunteerScorecard retrieves the scorecard for a volunteer
+func (s *VolunteerService) GetVolunteerScorecard(volunteerID uuid.UUID) (*VolunteerScorecard, error) {
+	ratingService := NewVolunteerRatingService(s.db)
+	return ratingService.GetVolunteerScorecard(volunteerID)
+}
+
+// GetVolunteerRatings retrieves all ratings for a volunteer
+func (s *VolunteerService) GetVolunteerRatings(volunteerID uuid.UUID, limit, offset int) ([]VolunteerRating, error) {
+	ratingService := NewVolunteerRatingService(s.db)
+	return ratingService.ListRatingsForVolunteer(volunteerID, limit, offset)
+}
+
+// GetVolunteerWithScore retrieves a volunteer with their rating score
+func (s *VolunteerService) GetVolunteerWithScore(volunteerID uuid.UUID) (*VolunteerWithScore, error) {
+	volunteer, err := s.GetByID(volunteerID)
+	if err != nil {
+		return nil, err
+	}
+	if volunteer == nil {
+		return nil, nil
+	}
+
+	ratingService := NewVolunteerRatingService(s.db)
+	scorecard, err := ratingService.GetVolunteerScorecard(volunteerID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &VolunteerWithScore{
+		Volunteer:    *volunteer,
+		OverallScore: scorecard.OverallScore,
+		TotalRatings: scorecard.TotalRatings,
+	}, nil
+}
+
 // Update updates a volunteer
 func (s *VolunteerService) Update(volunteer *Volunteer) error {
 	skillsJSON, _ := json.Marshal(volunteer.Skills)
