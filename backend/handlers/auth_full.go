@@ -2,7 +2,9 @@ package handlers
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
+	"strings"
 
 	"civicweave/backend/config"
 	"civicweave/backend/middleware"
@@ -192,64 +194,118 @@ type AuthResponse struct {
 
 // Login handles user login
 func (h *AuthHandler) Login(c *gin.Context) {
+	log.Printf("🔐 LOGIN: Starting login attempt")
+
 	var req LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Printf("❌ LOGIN: Failed to bind JSON: %v", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
+	log.Printf("📧 LOGIN: Email: %s", req.Email)
+	log.Printf("🔑 LOGIN: Password length: %d", len(req.Password))
+	log.Printf("🔑 LOGIN: Password (masked): %s", maskPassword(req.Password))
+
 	// Get user by email
+	log.Printf("🔍 LOGIN: Looking up user by email...")
 	user, err := h.UserService.GetByEmail(req.Email)
 	if err != nil {
+		log.Printf("❌ LOGIN: Database error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
 		return
 	}
 	if user == nil {
+		log.Printf("❌ LOGIN: User not found for email: %s", req.Email)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
+		return
+	}
+
+	log.Printf("✅ LOGIN: User found - ID: %s, Role: %s, EmailVerified: %v", user.ID, user.Role, user.EmailVerified)
+	log.Printf("🔑 LOGIN: Stored password hash length: %d", len(user.PasswordHash))
+	log.Printf("🔑 LOGIN: Stored password hash (first 20 chars): %s", user.PasswordHash[:min(20, len(user.PasswordHash))])
+
+	// Check if user has a password (not OAuth-only user)
+	if user.PasswordHash == "" {
+		log.Printf("❌ LOGIN: User has no password (OAuth-only user). Use Google Sign-In instead.")
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "This account uses Google Sign-In. Please use the Google Sign-In button."})
 		return
 	}
 
 	// Check password
+	log.Printf("🔍 LOGIN: Comparing passwords...")
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
+		log.Printf("❌ LOGIN: Password comparison failed: %v", err)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
 		return
 	}
+	log.Printf("✅ LOGIN: Password comparison successful")
 
 	// Check if email is verified
 	if !user.EmailVerified {
+		log.Printf("❌ LOGIN: Email not verified for user: %s", user.Email)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Please verify your email before logging in"})
 		return
 	}
+	log.Printf("✅ LOGIN: Email verified")
 
 	// Generate JWT token
+	log.Printf("🎫 LOGIN: Generating JWT token...")
 	token, err := middleware.GenerateJWT(user, h.config.JWT.Secret)
 	if err != nil {
+		log.Printf("❌ LOGIN: Failed to generate JWT token: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
 		return
 	}
+	log.Printf("✅ LOGIN: JWT token generated successfully")
 
 	// Get user profile based on role
+	log.Printf("👤 LOGIN: Getting user profile for role: %s", user.Role)
 	var userProfile interface{}
 	if user.Role == "volunteer" {
 		volunteer, err := h.VolunteerService.GetByUserID(user.ID)
 		if err != nil {
+			log.Printf("❌ LOGIN: Failed to get volunteer profile: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get volunteer profile"})
 			return
 		}
 		userProfile = volunteer
+		log.Printf("✅ LOGIN: Volunteer profile retrieved")
 	} else if user.Role == "admin" {
 		admin, err := h.AdminService.GetByUserID(user.ID)
 		if err != nil {
+			log.Printf("❌ LOGIN: Failed to get admin profile: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get admin profile"})
 			return
 		}
 		userProfile = admin
+		log.Printf("✅ LOGIN: Admin profile retrieved")
 	}
 
+	log.Printf("🎉 LOGIN: Login successful for user: %s", user.Email)
 	c.JSON(http.StatusOK, AuthResponse{
 		Token: token,
 		User:  userProfile,
 	})
+}
+
+// Helper function to mask password for logging
+func maskPassword(password string) string {
+	if len(password) == 0 {
+		return ""
+	}
+	if len(password) <= 2 {
+		return "**"
+	}
+	return password[:1] + strings.Repeat("*", len(password)-2) + password[len(password)-1:]
+}
+
+// Helper function for min
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 // VerifyEmail handles email verification

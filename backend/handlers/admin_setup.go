@@ -3,6 +3,7 @@ package handlers
 import (
 	"civicweave/backend/models"
 	"civicweave/backend/services"
+	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -36,22 +37,33 @@ type CreateAdminRequest struct {
 
 // CreateAdmin creates an admin user directly (bypasses email verification)
 func (h *AdminSetupHandler) CreateAdmin(c *gin.Context) {
+	log.Printf("👑 ADMIN_SETUP: Starting admin creation")
+
 	var req CreateAdminRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Printf("❌ ADMIN_SETUP: Failed to bind JSON: %v", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
+	log.Printf("📧 ADMIN_SETUP: Email: %s", req.Email)
+	log.Printf("🔑 ADMIN_SETUP: Password provided: %v", req.Password != "")
+	log.Printf("👤 ADMIN_SETUP: Name provided: %v", req.Name != "")
+
 	// Check if user already exists
+	log.Printf("🔍 ADMIN_SETUP: Checking if user already exists...")
 	existingUser, err := h.userService.GetByEmail(req.Email)
 	if err != nil {
+		log.Printf("❌ ADMIN_SETUP: Database error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
 		return
 	}
 	if existingUser != nil {
+		log.Printf("❌ ADMIN_SETUP: User already exists: %s", req.Email)
 		c.JSON(http.StatusConflict, gin.H{"error": "User already exists"})
 		return
 	}
+	log.Printf("✅ ADMIN_SETUP: User does not exist, proceeding with creation")
 
 	// Use password from environment variable if not provided in request
 	password := req.Password
