@@ -35,6 +35,11 @@ func NewVolunteerService(db *sql.DB) *VolunteerService {
 	return &VolunteerService{db: db}
 }
 
+// GetDB returns the database connection
+func (s *VolunteerService) GetDB() *sql.DB {
+	return s.db
+}
+
 // Create creates a new volunteer
 func (s *VolunteerService) Create(volunteer *Volunteer) error {
 	skillsJSON, _ := json.Marshal(volunteer.Skills)

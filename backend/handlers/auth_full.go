@@ -58,7 +58,7 @@ type RegisterRequest struct {
 	// Admins can promote users later through admin interface
 	Phone             string          `json:"phone"`
 	LocationAddress   string          `json:"location_address"`
-	SkillsDescription string          `json:"skills_description"`
+	SelectedSkills    []string        `json:"selected_skills"` // replaces skills_description
 	Availability      json.RawMessage `json:"availability"`
 	SkillsVisible     bool            `json:"skills_visible"`
 	ConsentGiven      bool            `json:"consent_given" binding:"required"`
@@ -141,11 +141,23 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
-	// Create skill claim if skills description is provided
-	if req.SkillsDescription != "" && len(req.SkillsDescription) >= 10 {
-		// TODO: This would require the embedding service to be available
-		// For now, we'll skip creating the skill claim during registration
-		// The user can add skill claims later through the profile page
+	// Add skills if provided (optional during registration)
+	if len(req.SelectedSkills) > 0 {
+		taxonomyService := models.NewSkillTaxonomyService(h.VolunteerService.GetDB())
+		
+		// Resolve skill names to IDs (adds new skills to taxonomy if needed)
+		skillIDs, err := taxonomyService.ResolveSkillNames(req.SelectedSkills)
+		if err != nil {
+			// Log error but don't fail registration - skills can be added later
+			log.Printf("Failed to resolve skill names during registration: %v", err)
+		} else {
+			// Add skills to volunteer with default weight 0.5
+			err = taxonomyService.AddVolunteerSkills(volunteer.ID, skillIDs)
+			if err != nil {
+				// Log error but don't fail registration
+				log.Printf("Failed to add skills during registration: %v", err)
+			}
+		}
 	}
 
 	// Generate verification token and send email

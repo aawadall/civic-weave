@@ -3,8 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import { ChevronLeftIcon } from '@heroicons/react/24/outline'
-
-// Removed SKILL_OPTIONS - now using free-text input for skills
+import SkillChipInput from '../components/SkillChipInput'
 
 export default function RegisterPage() {
   const [formData, setFormData] = useState({
@@ -14,7 +13,7 @@ export default function RegisterPage() {
     name: '',
     phone: '',
     locationAddress: '',
-    skillsDescription: '',
+    selectedSkills: [], // New chip-based skills
     availability: {
       weekdays: false,
       weekends: false,
@@ -81,9 +80,7 @@ export default function RegisterPage() {
       newErrors.name = 'Name is required'
     }
 
-    if (formData.skillsDescription.trim().length > 0 && formData.skillsDescription.trim().length < 10) {
-      newErrors.skillsDescription = 'Skill description must be at least 10 characters if provided'
-    }
+    // Skills are now optional - no validation needed
 
     if (!formData.consentGiven) {
       newErrors.consentGiven = 'You must agree to the terms and conditions'
@@ -108,7 +105,7 @@ export default function RegisterPage() {
         name: formData.name,
         phone: formData.phone,
         locationAddress: formData.locationAddress,
-        skillsDescription: formData.skillsDescription,
+        selectedSkills: formData.selectedSkills, // New chip-based skills
         availability: formData.availability,
         skillsVisible: formData.skillsVisible,
         consentGiven: formData.consentGiven
@@ -257,26 +254,20 @@ export default function RegisterPage() {
               </p>
             </div>
 
-            {/* Skills Description */}
+            {/* Skills Selection */}
             <div>
-              <label htmlFor="skillsDescription" className="form-label">
+              <label className="form-label">
                 Skills & Experience (Optional)
               </label>
-              <textarea
-                id="skillsDescription"
-                name="skillsDescription"
-                value={formData.skillsDescription}
-                onChange={handleInputChange}
-                className={`input-field resize-none ${errors.skillsDescription ? 'border-red-500' : ''}`}
-                placeholder="e.g., I have 2 years of experience in community event planning, social media marketing, and volunteer coordination. I've organized fundraising events and managed teams of volunteers."
-                rows={4}
-                maxLength={500}
-              />
-              <div className="mt-1 flex justify-between text-xs text-secondary-500">
-                <span>Describe your skills and experience in your own words</span>
-                <span>{formData.skillsDescription.length}/500</span>
+              <div className="text-sm text-secondary-600 mb-3">
+                Select your skills to help us match you with relevant opportunities. You can add more later in your profile.
               </div>
-              {errors.skillsDescription && <p className="mt-1 text-sm text-red-600">{errors.skillsDescription}</p>}
+              <SkillChipInput
+                selectedSkills={formData.selectedSkills}
+                onChange={(skills) => setFormData(prev => ({ ...prev, selectedSkills: skills }))}
+                placeholder="Type skills or select from suggestions"
+                maxSkills={15}
+              />
             </div>
 
             {/* Skills Visibility */}
