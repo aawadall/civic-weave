@@ -2,6 +2,9 @@ package main
 
 import (
 	"log"
+	"math/rand"
+	"os"
+	"time"
 
 	"civicweave/backend/config"
 	"civicweave/backend/database"
@@ -55,7 +58,15 @@ func main() {
 
 	// Create initial admin user
 	adminEmail := "admin@civicweave.com"
-	adminPassword := "admin123" // Change this in production!
+	
+	// Get admin password from environment variable
+	adminPassword := os.Getenv("ADMIN_PASSWORD")
+	if adminPassword == "" {
+		// Generate a random password if not set
+		adminPassword = generateRandomPassword()
+		log.Printf("⚠️  No ADMIN_PASSWORD set, generated random password: %s", adminPassword)
+		log.Println("⚠️  IMPORTANT: Save this password and set ADMIN_PASSWORD environment variable!")
+	}
 
 	// Check if admin already exists
 	existingUser, _ := userService.GetByEmail(adminEmail)
@@ -91,7 +102,7 @@ func main() {
 			log.Fatal("Failed to create admin profile:", err)
 		}
 
-		log.Printf("✅ Seeded admin user: %s / %s", adminEmail, adminPassword)
+		log.Printf("✅ Seeded admin user: %s", adminEmail)
 		log.Println("⚠️  IMPORTANT: Change the admin password after first login!")
 	}
 
@@ -139,4 +150,17 @@ func migrateExistingUsers(userService *models.UserService, roleService *models.R
 	}
 
 	log.Println("✅ User migration completed")
+}
+
+// generateRandomPassword generates a secure random password
+func generateRandomPassword() string {
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*"
+	const length = 16
+	
+	rand.Seed(time.Now().UnixNano())
+	password := make([]byte, length)
+	for i := range password {
+		password[i] = charset[rand.Intn(len(charset))]
+	}
+	return string(password)
 }
