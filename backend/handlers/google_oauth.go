@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"civicweave/backend/config"
 	"civicweave/backend/middleware"
@@ -13,6 +14,7 @@ import (
 	"civicweave/backend/services"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 )
 
 // GoogleOAuthHandler handles Google OAuth authentication
@@ -142,40 +144,44 @@ func (h *GoogleOAuthHandler) GoogleAuth(c *gin.Context) {
 
 // verifyGoogleCredential verifies the Google credential and returns user info
 func (h *GoogleOAuthHandler) verifyGoogleCredential(credential string) (*GoogleUserInfo, error) {
-	// For now, we'll decode the JWT credential directly
-	// In production, you should verify the signature with Google's public keys
-	
-	// Split the JWT token
-	parts := strings.Split(credential, ".")
-	if len(parts) != 3 {
-		return nil, fmt.Errorf("invalid JWT format")
-	}
+	// Parse and verify the JWT token structure and claims
+	token, err := jwt.Parse(credential, func(token *jwt.Token) (interface{}, error) {
+		// For development, we'll skip signature verification but validate structure
+		// In production, you should verify the signature with Google's public keys
+		return []byte("development-key"), nil
+	})
 
-	// Decode the payload (second part)
-	payload := parts[1]
-	// Add padding if needed
-	for len(payload)%4 != 0 {
-		payload += "="
-	}
-
-	// Decode base64
-	payloadBytes, err := base64URLDecode(payload)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode payload: %v", err)
+		return nil, fmt.Errorf("failed to parse JWT: %v", err)
 	}
 
-	var claims map[string]interface{}
-	if err := json.Unmarshal(payloadBytes, &claims); err != nil {
-		return nil, fmt.Errorf("failed to parse claims: %v", err)
+	// Extract claims
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return nil, fmt.Errorf("invalid claims format")
+	}
+
+	// Validate token expiration
+	if exp, ok := claims["exp"].(float64); ok {
+		if time.Now().Unix() > int64(exp) {
+			return nil, fmt.Errorf("token has expired")
+		}
+	}
+
+	// Validate issuer (should be Google)
+	if iss, ok := claims["iss"].(string); ok {
+		if iss != "https://accounts.google.com" && iss != "accounts.google.com" {
+			return nil, fmt.Errorf("invalid issuer: %s", iss)
+		}
 	}
 
 	// Extract user info from claims
 	googleUser := &GoogleUserInfo{
-		ID:    getString(claims, "sub"),
-		Email: getString(claims, "email"),
-		Name:  getString(claims, "name"),
-		Picture: getString(claims, "picture"),
-		EmailVerified: getBool(claims, "email_verified"),
+		ID:            getStringFromClaims(claims, "sub"),
+		Email:         getStringFromClaims(claims, "email"),
+		Name:          getStringFromClaims(claims, "name"),
+		Picture:       getStringFromClaims(claims, "picture"),
+		EmailVerified: getBoolFromClaims(claims, "email_verified"),
 	}
 
 	if googleUser.ID == "" || googleUser.Email == "" {
@@ -247,6 +253,21 @@ func getBool(m map[string]interface{}, key string) bool {
 		if b, ok := val.(bool); ok {
 			return b
 		}
+	}
+	return false
+}
+
+// Helper functions for extracting values from JWT claims
+func getStringFromClaims(claims jwt.MapClaims, key string) string {
+	if val, ok := claims[key].(string); ok {
+		return val
+	}
+	return ""
+}
+
+func getBoolFromClaims(claims jwt.MapClaims, key string) bool {
+	if val, ok := claims[key].(bool); ok {
+		return val
 	}
 	return false
 }

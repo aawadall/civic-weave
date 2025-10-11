@@ -149,14 +149,14 @@ func main() {
 		auth := api.Group("/auth")
 		{
 			if authHandler != nil {
-				auth.POST("/register", authHandler.Register)
-				auth.POST("/login", authHandler.Login)
+				auth.POST("/register", middleware.RegistrationRateLimiter(), authHandler.Register)
+				auth.POST("/login", middleware.LoginRateLimiter(), authHandler.Login)
 				auth.POST("/verify-email", authHandler.VerifyEmail)
 				// auth.POST("/forgot-password", authHandler.ForgotPassword)
 				// auth.POST("/reset-password", authHandler.ResetPassword)
 			}
 			if googleOAuthHandler != nil {
-				auth.POST("/google", googleOAuthHandler.GoogleAuth)
+				auth.POST("/google", middleware.LoginRateLimiter(), googleOAuthHandler.GoogleAuth)
 			}
 		}
 

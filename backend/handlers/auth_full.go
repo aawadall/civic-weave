@@ -181,95 +181,139 @@ type AuthResponse struct {
 
 // Login handles user login
 func (h *AuthHandler) Login(c *gin.Context) {
-	log.Printf("🔐 LOGIN: Starting login attempt")
+	// Only log in development mode
+	if gin.Mode() == gin.DebugMode {
+		log.Printf("🔐 LOGIN: Starting login attempt")
+	}
 
 	var req LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		log.Printf("❌ LOGIN: Failed to bind JSON: %v", err)
+		if gin.Mode() == gin.DebugMode {
+			log.Printf("❌ LOGIN: Failed to bind JSON: %v", err)
+		}
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	log.Printf("📧 LOGIN: Email: %s", req.Email)
-	log.Printf("🔑 LOGIN: Password length: %d", len(req.Password))
-	log.Printf("🔑 LOGIN: Password (masked): %s", maskPassword(req.Password))
+	if gin.Mode() == gin.DebugMode {
+		log.Printf("📧 LOGIN: Email: %s", req.Email)
+		log.Printf("🔑 LOGIN: Password length: %d", len(req.Password))
+		log.Printf("🔑 LOGIN: Password (masked): %s", maskPassword(req.Password))
+	}
 
 	// Get user by email
-	log.Printf("🔍 LOGIN: Looking up user by email...")
+	if gin.Mode() == gin.DebugMode {
+		log.Printf("🔍 LOGIN: Looking up user by email...")
+	}
 	user, err := h.UserService.GetByEmail(req.Email)
 	if err != nil {
-		log.Printf("❌ LOGIN: Database error: %v", err)
+		if gin.Mode() == gin.DebugMode {
+			log.Printf("❌ LOGIN: Database error: %v", err)
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
 		return
 	}
 	if user == nil {
-		log.Printf("❌ LOGIN: User not found for email: %s", req.Email)
+		if gin.Mode() == gin.DebugMode {
+			log.Printf("❌ LOGIN: User not found for email: %s", req.Email)
+		}
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
 		return
 	}
 
-	log.Printf("✅ LOGIN: User found - ID: %s, Role: %s, EmailVerified: %v", user.ID, user.Role, user.EmailVerified)
-	log.Printf("🔑 LOGIN: Stored password hash length: %d", len(user.PasswordHash))
-	log.Printf("🔑 LOGIN: Stored password hash (first 20 chars): %s", user.PasswordHash[:min(20, len(user.PasswordHash))])
+	if gin.Mode() == gin.DebugMode {
+		log.Printf("✅ LOGIN: User found - ID: %s, Role: %s, EmailVerified: %v", user.ID, user.Role, user.EmailVerified)
+		log.Printf("🔑 LOGIN: Password hash present: %v", len(user.PasswordHash) > 0)
+	}
 
 	// Check if user has a password (not OAuth-only user)
 	if user.PasswordHash == "" {
-		log.Printf("❌ LOGIN: User has no password (OAuth-only user). Use Google Sign-In instead.")
+		if gin.Mode() == gin.DebugMode {
+			log.Printf("❌ LOGIN: User has no password (OAuth-only user). Use Google Sign-In instead.")
+		}
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "This account uses Google Sign-In. Please use the Google Sign-In button."})
 		return
 	}
 
 	// Check password
-	log.Printf("🔍 LOGIN: Comparing passwords...")
+	if gin.Mode() == gin.DebugMode {
+		log.Printf("🔍 LOGIN: Comparing passwords...")
+	}
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
-		log.Printf("❌ LOGIN: Password comparison failed: %v", err)
+		if gin.Mode() == gin.DebugMode {
+			log.Printf("❌ LOGIN: Password comparison failed: %v", err)
+		}
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
 		return
 	}
-	log.Printf("✅ LOGIN: Password comparison successful")
+	if gin.Mode() == gin.DebugMode {
+		log.Printf("✅ LOGIN: Password comparison successful")
+	}
 
 	// Check if email is verified
 	if !user.EmailVerified {
-		log.Printf("❌ LOGIN: Email not verified for user: %s", user.Email)
+		if gin.Mode() == gin.DebugMode {
+			log.Printf("❌ LOGIN: Email not verified for user: %s", user.Email)
+		}
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Please verify your email before logging in"})
 		return
 	}
-	log.Printf("✅ LOGIN: Email verified")
+	if gin.Mode() == gin.DebugMode {
+		log.Printf("✅ LOGIN: Email verified")
+	}
 
 	// Generate JWT token
-	log.Printf("🎫 LOGIN: Generating JWT token...")
+	if gin.Mode() == gin.DebugMode {
+		log.Printf("🎫 LOGIN: Generating JWT token...")
+	}
 	token, err := middleware.GenerateJWT(user, h.config.JWT.Secret)
 	if err != nil {
-		log.Printf("❌ LOGIN: Failed to generate JWT token: %v", err)
+		if gin.Mode() == gin.DebugMode {
+			log.Printf("❌ LOGIN: Failed to generate JWT token: %v", err)
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
 		return
 	}
-	log.Printf("✅ LOGIN: JWT token generated successfully")
+	if gin.Mode() == gin.DebugMode {
+		log.Printf("✅ LOGIN: JWT token generated successfully")
+	}
 
 	// Get user profile based on role
-	log.Printf("👤 LOGIN: Getting user profile for role: %s", user.Role)
+	if gin.Mode() == gin.DebugMode {
+		log.Printf("👤 LOGIN: Getting user profile for role: %s", user.Role)
+	}
 	var userProfile interface{}
 	if user.Role == "volunteer" {
 		volunteer, err := h.VolunteerService.GetByUserID(user.ID)
 		if err != nil {
-			log.Printf("❌ LOGIN: Failed to get volunteer profile: %v", err)
+			if gin.Mode() == gin.DebugMode {
+				log.Printf("❌ LOGIN: Failed to get volunteer profile: %v", err)
+			}
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get volunteer profile"})
 			return
 		}
 		userProfile = volunteer
-		log.Printf("✅ LOGIN: Volunteer profile retrieved")
+		if gin.Mode() == gin.DebugMode {
+			log.Printf("✅ LOGIN: Volunteer profile retrieved")
+		}
 	} else if user.Role == "admin" {
 		admin, err := h.AdminService.GetByUserID(user.ID)
 		if err != nil {
-			log.Printf("❌ LOGIN: Failed to get admin profile: %v", err)
+			if gin.Mode() == gin.DebugMode {
+				log.Printf("❌ LOGIN: Failed to get admin profile: %v", err)
+			}
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get admin profile"})
 			return
 		}
 		userProfile = admin
-		log.Printf("✅ LOGIN: Admin profile retrieved")
+		if gin.Mode() == gin.DebugMode {
+			log.Printf("✅ LOGIN: Admin profile retrieved")
+		}
 	}
 
-	log.Printf("🎉 LOGIN: Login successful for user: %s", user.Email)
+	if gin.Mode() == gin.DebugMode {
+		log.Printf("🎉 LOGIN: Login successful for user: %s", user.Email)
+	}
 	c.JSON(http.StatusOK, AuthResponse{
 		Token: token,
 		User:  userProfile,
