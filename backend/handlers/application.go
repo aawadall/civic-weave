@@ -109,10 +109,10 @@ func (h *ApplicationHandler) CreateApplication(c *gin.Context) {
 	}
 
 	application := &models.Application{
-		InitiativeID: initiativeID,
-		VolunteerID:  userCtx.ID,
-		Status:       "pending",
-		AdminNotes:   req.Message, // Store volunteer message in admin_notes for now
+		ProjectID:   initiativeID,
+		VolunteerID: userCtx.ID,
+		Status:      "pending",
+		AdminNotes:  req.Message, // Store volunteer message in admin_notes for now
 	}
 
 	if err := h.service.Create(application); err != nil {
