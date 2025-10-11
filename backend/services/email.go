@@ -271,3 +271,27 @@ func (s *EmailService) SendApplicationStatusUpdateEmail(to, volunteerName, initi
 
 	return s.SendEmail(to, subject, html, text)
 }
+
+// SendCampaignEmail sends a campaign email to multiple recipients
+func (s *EmailService) SendCampaignEmail(recipients []string, subject, body, htmlBody string) error {
+	var lastError error
+	successCount := 0
+
+	for _, recipient := range recipients {
+		if err := s.SendEmail(recipient, subject, htmlBody, body); err != nil {
+			lastError = err
+			continue
+		}
+		successCount++
+	}
+
+	if successCount == 0 {
+		return fmt.Errorf("failed to send campaign to any recipients: %w", lastError)
+	}
+
+	if lastError != nil {
+		return fmt.Errorf("campaign sent to %d/%d recipients with errors: %w", successCount, len(recipients), lastError)
+	}
+
+	return nil
+}

@@ -45,19 +45,25 @@ func main() {
 	var userService *models.UserService
 	var volunteerService *models.VolunteerService
 	var adminService *models.AdminService
-	var initiativeService *models.InitiativeService
+	var projectService *models.ProjectService
 	var applicationService *models.ApplicationService
 	var oauthAccountService *models.OAuthAccountService
 	var skillClaimService *models.SkillClaimService
+	var roleService *models.RoleService
+	var volunteerRatingService *models.VolunteerRatingService
+	var campaignService *models.CampaignService
 
 	if db != nil {
 		userService = models.NewUserService(db)
 		volunteerService = models.NewVolunteerService(db)
 		adminService = models.NewAdminService(db)
-		initiativeService = models.NewInitiativeService(db)
+		projectService = models.NewProjectService(db)
 		applicationService = models.NewApplicationService(db)
 		oauthAccountService = models.NewOAuthAccountService(db)
 		skillClaimService = models.NewSkillClaimService(db)
+		roleService = models.NewRoleService(db)
+		volunteerRatingService = models.NewVolunteerRatingService(db)
+		campaignService = models.NewCampaignService(db)
 		_ = models.NewEmailVerificationTokenService(db) // for future use
 		_ = models.NewPasswordResetTokenService(db)     // for future use
 	}
@@ -71,10 +77,13 @@ func main() {
 	var authHandler *handlers.AuthHandler
 	var googleOAuthHandler *handlers.GoogleOAuthHandler
 	var volunteerHandler *handlers.VolunteerHandler
-	var initiativeHandler *handlers.InitiativeHandler
+	var projectHandler *handlers.ProjectHandler
 	var applicationHandler *handlers.ApplicationHandler
 	var matchingHandler *handlers.MatchingHandler
 	var skillClaimHandler *handlers.SkillClaimHandler
+	var roleHandler *handlers.RoleHandler
+	var volunteerRatingHandler *handlers.VolunteerRatingHandler
+	var campaignHandler *handlers.CampaignHandler
 
 	if userService != nil && volunteerService != nil && adminService != nil && oauthAccountService != nil {
 		authHandler = handlers.NewAuthHandler(
@@ -98,15 +107,15 @@ func main() {
 	if volunteerService != nil {
 		volunteerHandler = handlers.NewVolunteerHandler(volunteerService, cfg)
 	}
-	if initiativeService != nil {
-		initiativeHandler = handlers.NewInitiativeHandler(initiativeService, geocodingService, cfg)
+	if projectService != nil {
+		projectHandler = handlers.NewProjectHandler(projectService, geocodingService, cfg)
 	}
 	if applicationService != nil {
 		applicationHandler = handlers.NewApplicationHandler(applicationService, cfg)
 	}
-	if volunteerService != nil && initiativeService != nil {
-		matchingService := services.NewMatchingService(volunteerService, initiativeService)
-		matchingHandler = handlers.NewMatchingHandler(matchingService, volunteerService, initiativeService, cfg)
+	if volunteerService != nil && projectService != nil {
+		matchingService := services.NewMatchingService(volunteerService, projectService)
+		matchingHandler = handlers.NewMatchingHandler(matchingService, volunteerService, projectService, cfg)
 	}
 
 	// Initialize vector-based services and handlers
@@ -116,7 +125,7 @@ func main() {
 
 	if skillClaimService != nil {
 		vectorAggregationService = services.NewVectorAggregationService(db, skillClaimService)
-		if initiativeService != nil {
+		if projectService != nil {
 			vectorMatchingService = services.NewVectorMatchingService(db, skillClaimService, vectorAggregationService)
 		}
 		skillClaimHandler = handlers.NewSkillClaimHandler(
@@ -127,6 +136,17 @@ func main() {
 			cfg,
 			volunteerService,
 		)
+	}
+
+	// Initialize new handlers
+	if roleService != nil {
+		roleHandler = handlers.NewRoleHandler(roleService, cfg)
+	}
+	if volunteerRatingService != nil && volunteerService != nil {
+		volunteerRatingHandler = handlers.NewVolunteerRatingHandler(volunteerRatingService, volunteerService, cfg)
+	}
+	if campaignService != nil {
+		campaignHandler = handlers.NewCampaignHandler(campaignService, emailService, cfg)
 	}
 
 	// Initialize admin profile handler
@@ -174,12 +194,29 @@ func main() {
 			protected.GET("/volunteers/:id", volunteerHandler.GetVolunteer)
 			protected.PUT("/volunteers/:id", volunteerHandler.UpdateVolunteer)
 
-			// Initiative routes
-			protected.GET("/initiatives", initiativeHandler.ListInitiatives)
-			protected.POST("/initiatives", middleware.RequireRole("admin"), initiativeHandler.CreateInitiative)
-			protected.GET("/initiatives/:id", initiativeHandler.GetInitiative)
-			protected.PUT("/initiatives/:id", middleware.RequireRole("admin"), initiativeHandler.UpdateInitiative)
-			protected.DELETE("/initiatives/:id", middleware.RequireRole("admin"), initiativeHandler.DeleteInitiative)
+			// Volunteer rating routes
+			protected.POST("/volunteers/:id/ratings", volunteerRatingHandler.CreateRating)
+			protected.GET("/volunteers/:id/scorecard", volunteerRatingHandler.GetVolunteerScorecard)
+			protected.GET("/volunteers/:id/ratings", volunteerRatingHandler.ListRatingsForVolunteer)
+			protected.GET("/volunteers/top-rated", volunteerRatingHandler.GetTopRatedVolunteers)
+			protected.GET("/ratings/my-ratings", volunteerRatingHandler.ListRatingsByRater)
+			protected.PUT("/ratings/:id", volunteerRatingHandler.UpdateRating)
+			protected.DELETE("/ratings/:id", volunteerRatingHandler.DeleteRating)
+
+			// Project routes (renamed from initiatives)
+			protected.GET("/projects", projectHandler.ListProjects)
+			protected.POST("/projects", middleware.RequireAnyRole("team_lead", "admin"), projectHandler.CreateProject)
+			protected.GET("/projects/:id", projectHandler.GetProject)
+			protected.GET("/projects/:id/details", projectHandler.GetProjectWithDetails)
+			protected.PUT("/projects/:id", middleware.RequireAnyRole("team_lead", "admin"), projectHandler.UpdateProject)
+			protected.DELETE("/projects/:id", middleware.RequireRole("admin"), projectHandler.DeleteProject)
+
+			// Project team management routes
+			protected.GET("/projects/:id/signups", projectHandler.GetProjectSignups)
+			protected.GET("/projects/:id/team-members", projectHandler.GetProjectTeamMembers)
+			protected.POST("/projects/:id/team-members", projectHandler.AddTeamMember)
+			protected.PUT("/projects/:id/team-members/:volunteerId", projectHandler.UpdateTeamMemberStatus)
+			protected.PUT("/projects/:id/team-lead", middleware.RequireRole("admin"), projectHandler.AssignTeamLead)
 
 			// Application routes
 			protected.GET("/applications", applicationHandler.ListApplications)
@@ -188,12 +225,12 @@ func main() {
 			protected.PUT("/applications/:id", applicationHandler.UpdateApplication)
 			protected.DELETE("/applications/:id", applicationHandler.DeleteApplication)
 
-			// Matching routes
+			// Matching routes (updated to use projects)
 			if matchingHandler != nil {
 				protected.GET("/matching/my-matches", matchingHandler.GetMyMatches)
 				protected.GET("/matching/volunteer/:id", matchingHandler.GetMatchesForVolunteer)
-				protected.GET("/matching/initiative/:id", matchingHandler.GetMatchesForInitiative)
-				protected.GET("/matching/explanation/:volunteerId/:initiativeId", matchingHandler.GetMatchExplanation)
+				protected.GET("/matching/project/:id", matchingHandler.GetMatchesForInitiative)                     // TODO: Update handler to use projects
+				protected.GET("/matching/explanation/:volunteerId/:projectId", matchingHandler.GetMatchExplanation) // TODO: Update handler to use projects
 			}
 
 			// Skill claim routes
@@ -205,12 +242,25 @@ func main() {
 				protected.GET("/volunteers/me/skills-visibility", skillClaimHandler.GetSkillsVisibility)
 				protected.PUT("/volunteers/me/skills-visibility", skillClaimHandler.UpdateSkillsVisibility)
 				protected.GET("/volunteers/me/matches", skillClaimHandler.GetTopMatches)
-				protected.GET("/volunteers/me/matches/:initiative_id/explanation", skillClaimHandler.GetMatchExplanation)
+				protected.GET("/volunteers/me/matches/:project_id/explanation", skillClaimHandler.GetMatchExplanation) // TODO: Update handler to use projects
 
 				// Admin skill management
 				protected.GET("/admin/skill-claims", middleware.RequireRole("admin"), skillClaimHandler.ListAllSkillClaims)
 				protected.PATCH("/admin/skill-claims/:id/weight", middleware.RequireRole("admin"), skillClaimHandler.UpdateSkillWeight)
 			}
+		}
+
+		// Campaign routes
+		if campaignHandler != nil {
+			protected.GET("/campaigns", campaignHandler.ListCampaigns)
+			protected.POST("/campaigns", campaignHandler.CreateCampaign)
+			protected.GET("/campaigns/:id", campaignHandler.GetCampaignByID)
+			protected.PUT("/campaigns/:id", campaignHandler.UpdateCampaign)
+			protected.DELETE("/campaigns/:id", campaignHandler.DeleteCampaign)
+			protected.GET("/campaigns/:id/stats", campaignHandler.GetCampaignStats)
+			protected.GET("/campaigns/:id/recipients", campaignHandler.GetCampaignRecipients)
+			protected.GET("/campaigns/:id/preview", campaignHandler.PreviewCampaign)
+			protected.POST("/campaigns/:id/send", campaignHandler.SendCampaign)
 		}
 
 		// Admin profile routes
@@ -219,6 +269,23 @@ func main() {
 			protected.PUT("/admin/profile", middleware.RequireRole("admin"), adminProfileHandler.UpdateAdminProfile)
 			protected.GET("/admin/stats", middleware.RequireRole("admin"), adminProfileHandler.GetSystemStats)
 			protected.PUT("/admin/change-password", middleware.RequireRole("admin"), adminProfileHandler.ChangePassword)
+		}
+
+		// Role management routes (admin only)
+		if roleHandler != nil {
+			protected.GET("/admin/roles", roleHandler.ListRoles)
+			protected.POST("/admin/roles", roleHandler.CreateRole)
+			protected.GET("/admin/roles/:id", roleHandler.GetRoleByID)
+			protected.PUT("/admin/roles/:id", roleHandler.UpdateRole)
+			protected.DELETE("/admin/roles/:id", roleHandler.DeleteRole)
+			protected.GET("/admin/roles/:id/users", roleHandler.ListUsersWithRole)
+
+			// User role assignment routes
+			protected.GET("/admin/users", roleHandler.ListAllUsers)
+			protected.GET("/admin/users/:id/roles", roleHandler.GetUserRoles)
+			protected.POST("/admin/users/:id/roles", roleHandler.AssignRoleToUser)
+			protected.DELETE("/admin/users/:id/roles/:roleId", roleHandler.RevokeRoleFromUser)
+			protected.GET("/admin/users/:id/role-assignments", roleHandler.GetUserRoleAssignments)
 		}
 	}
 

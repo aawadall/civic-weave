@@ -13,9 +13,15 @@ type User struct {
 	Email         string    `json:"email" db:"email"`
 	PasswordHash  string    `json:"-" db:"password_hash"`
 	EmailVerified bool      `json:"email_verified" db:"email_verified"`
-	Role          string    `json:"role" db:"role"`
+	Role          string    `json:"role" db:"role"` // Deprecated: kept for backward compatibility
 	CreatedAt     time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt     time.Time `json:"updated_at" db:"updated_at"`
+}
+
+// UserWithRoles represents a user with their roles
+type UserWithRoles struct {
+	User
+	Roles []Role `json:"roles"`
 }
 
 // UserService handles user operations
@@ -116,4 +122,65 @@ func (s *UserService) Delete(id uuid.UUID) error {
 	query := `DELETE FROM users WHERE id = $1`
 	_, err := s.db.Exec(query, id)
 	return err
+}
+
+// GetUserRoles retrieves all roles for a user
+func (s *UserService) GetUserRoles(userID uuid.UUID) ([]Role, error) {
+	roleService := NewRoleService(s.db)
+	return roleService.GetUserRoles(userID)
+}
+
+// GetUserWithRoles retrieves a user with their roles
+func (s *UserService) GetUserWithRoles(userID uuid.UUID) (*UserWithRoles, error) {
+	user, err := s.GetByID(userID)
+	if err != nil {
+		return nil, err
+	}
+	if user == nil {
+		return nil, nil
+	}
+
+	roles, err := s.GetUserRoles(userID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &UserWithRoles{
+		User:  *user,
+		Roles: roles,
+	}, nil
+}
+
+// HasRole checks if a user has a specific role
+func (s *UserService) HasRole(userID uuid.UUID, roleName string) (bool, error) {
+	roleService := NewRoleService(s.db)
+	return roleService.HasRole(userID, roleName)
+}
+
+// HasAnyRole checks if a user has any of the specified roles
+func (s *UserService) HasAnyRole(userID uuid.UUID, roleNames ...string) (bool, error) {
+	roleService := NewRoleService(s.db)
+	return roleService.HasAnyRole(userID, roleNames...)
+}
+
+// ListAllUsers retrieves all users (for admin purposes)
+func (s *UserService) ListAllUsers() ([]User, error) {
+	query := `SELECT id, email, password_hash, email_verified, role, created_at, updated_at FROM users ORDER BY created_at DESC`
+	rows, err := s.db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var users []User
+	for rows.Next() {
+		var user User
+		err := rows.Scan(&user.ID, &user.Email, &user.PasswordHash, &user.EmailVerified, &user.Role, &user.CreatedAt, &user.UpdatedAt)
+		if err != nil {
+			return nil, err
+		}
+		users = append(users, user)
+	}
+
+	return users, nil
 }
