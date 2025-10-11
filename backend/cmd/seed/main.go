@@ -2,9 +2,7 @@ package main
 
 import (
 	"log"
-	"math/rand"
 	"os"
-	"time"
 
 	"civicweave/backend/config"
 	"civicweave/backend/database"
@@ -59,13 +57,10 @@ func main() {
 	// Create initial admin user
 	adminEmail := "admin@civicweave.com"
 	
-	// Get admin password from environment variable
+	// Get admin password from .env file (loaded by godotenv)
 	adminPassword := os.Getenv("ADMIN_PASSWORD")
 	if adminPassword == "" {
-		// Generate a random password if not set
-		adminPassword = generateRandomPassword()
-		log.Printf("⚠️  No ADMIN_PASSWORD set, generated random password: %s", adminPassword)
-		log.Println("⚠️  IMPORTANT: Save this password and set ADMIN_PASSWORD environment variable!")
+		log.Fatal("ADMIN_PASSWORD not found in .env file. Please set ADMIN_PASSWORD in your .env file.")
 	}
 
 	// Check if admin already exists
@@ -150,17 +145,4 @@ func migrateExistingUsers(userService *models.UserService, roleService *models.R
 	}
 
 	log.Println("✅ User migration completed")
-}
-
-// generateRandomPassword generates a secure random password
-func generateRandomPassword() string {
-	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*"
-	const length = 16
-	
-	rand.Seed(time.Now().UnixNano())
-	password := make([]byte, length)
-	for i := range password {
-		password[i] = charset[rand.Intn(len(charset))]
-	}
-	return string(password)
 }
