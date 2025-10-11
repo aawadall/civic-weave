@@ -112,7 +112,7 @@ func (h *GoogleOAuthHandler) GoogleAuth(c *gin.Context) {
 	}
 
 	// Generate JWT token
-	token, err := middleware.GenerateJWT(user, h.userService, h.config.JWT.Secret)
+	token, err := middleware.GenerateJWT(user, h.UserService, h.config.JWT.Secret)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
 		return
