@@ -102,6 +102,22 @@ export function AuthProvider({ children }) {
     }
   }
 
+  // Helper functions for role checking
+  const hasRole = (roleName) => {
+    if (!user?.roles) return false
+    return user.roles.includes(roleName)
+  }
+
+  const hasAnyRole = (...roleNames) => {
+    if (!user?.roles) return false
+    return roleNames.some(role => user.roles.includes(role))
+  }
+
+  const hasAllRoles = (...roleNames) => {
+    if (!user?.roles) return false
+    return roleNames.every(role => user.roles.includes(role))
+  }
+
   const value = {
     user,
     token,
@@ -111,8 +127,16 @@ export function AuthProvider({ children }) {
     logout,
     verifyEmail,
     isAuthenticated: !!token && !!user,
-    isAdmin: user?.role === 'admin',
-    isVolunteer: user?.role === 'volunteer'
+    // Legacy role checks (for backward compatibility)
+    isAdmin: user?.role === 'admin' || hasRole('admin'),
+    isVolunteer: user?.role === 'volunteer' || hasRole('volunteer'),
+    // New multi-role support
+    hasRole,
+    hasAnyRole,
+    hasAllRoles,
+    // Specific role checks
+    isTeamLead: hasRole('team_lead'),
+    isCampaignManager: hasRole('campaign_manager')
   }
 
   return (

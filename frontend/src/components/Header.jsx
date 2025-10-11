@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 
 export default function Header() {
-  const { user, logout, isAuthenticated } = useAuth()
+  const { user, logout, isAuthenticated, hasAnyRole, hasRole } = useAuth()
 
   return (
     <header className="bg-white shadow-sm border-b border-secondary-200">
@@ -32,7 +32,35 @@ export default function Header() {
                 Dashboard
               </Link>
             )}
-            {user?.role === 'admin' && (
+            {/* Projects - visible to all authenticated users */}
+            {isAuthenticated && (
+              <Link 
+                to="/projects" 
+                className="text-secondary-600 hover:text-secondary-900 px-3 py-2 text-sm font-medium"
+              >
+                Projects
+              </Link>
+            )}
+            {/* Volunteers - visible to team leads, campaign managers, and admins */}
+            {hasAnyRole('team_lead', 'campaign_manager', 'admin') && (
+              <Link 
+                to="/volunteers" 
+                className="text-secondary-600 hover:text-secondary-900 px-3 py-2 text-sm font-medium"
+              >
+                Volunteers
+              </Link>
+            )}
+            {/* Campaigns - visible to campaign managers and admins */}
+            {hasAnyRole('campaign_manager', 'admin') && (
+              <Link 
+                to="/campaigns" 
+                className="text-secondary-600 hover:text-secondary-900 px-3 py-2 text-sm font-medium"
+              >
+                Campaigns
+              </Link>
+            )}
+            {/* Admin - visible to admins only */}
+            {hasRole('admin') && (
               <Link 
                 to="/admin" 
                 className="text-secondary-600 hover:text-secondary-900 px-3 py-2 text-sm font-medium"
@@ -45,9 +73,16 @@ export default function Header() {
           <div className="flex items-center space-x-4">
             {isAuthenticated ? (
               <div className="flex items-center space-x-4">
-                <span className="text-sm text-secondary-700">
-                  Welcome, {user?.name || user?.email}
-                </span>
+                <div className="flex flex-col">
+                  <span className="text-sm text-secondary-700">
+                    Welcome, {user?.name || user?.email}
+                  </span>
+                  {user?.roles && user.roles.length > 0 && (
+                    <span className="text-xs text-secondary-500">
+                      {user.roles.join(', ')}
+                    </span>
+                  )}
+                </div>
                 <button
                   onClick={logout}
                   className="text-secondary-600 hover:text-secondary-900 text-sm font-medium"
