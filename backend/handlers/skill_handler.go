@@ -60,7 +60,7 @@ func (h *SkillHandler) AddSkill(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, gin.H{
-		"skill": skill,
+		"skill":   skill,
 		"message": "Skill added successfully",
 	})
 }
@@ -143,7 +143,7 @@ func (h *SkillHandler) UpdateVolunteerSkills(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "Skills updated successfully",
+		"message":      "Skills updated successfully",
 		"skills_added": len(skillIDs),
 	})
 }
@@ -200,7 +200,7 @@ func (h *SkillHandler) AddVolunteerSkills(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, gin.H{
-		"message": "Skills added successfully",
+		"message":      "Skills added successfully",
 		"skills_added": len(skillIDs),
 	})
 }
@@ -259,7 +259,7 @@ func (h *SkillHandler) GetProfileCompletion(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"completion_percentage": completion,
-		"is_complete": completion >= 100,
+		"is_complete":           completion >= 100,
 	})
 }
 
@@ -331,7 +331,7 @@ func (h *SkillHandler) UpdateInitiativeSkills(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "Initiative skills updated successfully",
+		"message":      "Initiative skills updated successfully",
 		"skills_added": len(skillIDs),
 	})
 }

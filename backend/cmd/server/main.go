@@ -109,7 +109,7 @@ func main() {
 	if volunteerService != nil {
 		volunteerHandler = handlers.NewVolunteerHandler(volunteerService, cfg)
 	}
-	
+
 	// Initialize skill taxonomy service and handler
 	var skillTaxonomyService *models.SkillTaxonomyService
 	var skillMatchingService *services.SkillMatchingService
@@ -237,20 +237,20 @@ func main() {
 			protected.PUT("/applications/:id", applicationHandler.UpdateApplication)
 			protected.DELETE("/applications/:id", applicationHandler.DeleteApplication)
 
-		// New matching routes (sparse vector system)
-		if skillMatchingHandler != nil {
-			protected.GET("/matching/my-matches", skillMatchingHandler.GetMyMatches)
-			protected.GET("/initiatives/:id/candidate-volunteers", skillMatchingHandler.GetCandidateVolunteers)
-			protected.GET("/volunteers/me/recommended-initiatives", skillMatchingHandler.GetRecommendedInitiatives)
-			protected.GET("/matching/explanation/:volunteerId/:initiativeId", skillMatchingHandler.GetMatchExplanation)
-		}
+			// New matching routes (sparse vector system)
+			if skillMatchingHandler != nil {
+				protected.GET("/matching/my-matches", skillMatchingHandler.GetMyMatches)
+				protected.GET("/initiatives/:id/candidate-volunteers", skillMatchingHandler.GetCandidateVolunteers)
+				protected.GET("/volunteers/me/recommended-initiatives", skillMatchingHandler.GetRecommendedInitiatives)
+				protected.GET("/matching/explanation/:volunteerId/:initiativeId", skillMatchingHandler.GetMatchExplanation)
+			}
 
-		// Legacy matching routes (updated to use projects)
-		if matchingHandler != nil {
-			protected.GET("/matching/legacy/my-matches", matchingHandler.GetMyMatches)
-			protected.GET("/matching/legacy/volunteer/:id", matchingHandler.GetMatchesForVolunteer)
-			protected.GET("/matching/legacy/project/:id", matchingHandler.GetMatchesForProject)
-			protected.GET("/matching/legacy/explanation/:volunteerId/:projectId", matchingHandler.GetMatchExplanation)
+			// Legacy matching routes (updated to use projects)
+			if matchingHandler != nil {
+				protected.GET("/matching/legacy/my-matches", matchingHandler.GetMyMatches)
+				protected.GET("/matching/legacy/volunteer/:id", matchingHandler.GetMatchesForVolunteer)
+				protected.GET("/matching/legacy/project/:id", matchingHandler.GetMatchesForProject)
+				protected.GET("/matching/legacy/explanation/:volunteerId/:projectId", matchingHandler.GetMatchExplanation)
 			}
 
 			// Skill taxonomy routes (new sparse vector system)
@@ -258,14 +258,14 @@ func main() {
 				// Public skill taxonomy
 				r.GET("/api/skills/taxonomy", skillHandler.GetTaxonomy)
 				r.POST("/api/skills/taxonomy", skillHandler.AddSkill)
-				
+
 				// Volunteer skill management
 				protected.GET("/volunteers/me/skills", skillHandler.GetVolunteerSkills)
 				protected.PUT("/volunteers/me/skills", skillHandler.UpdateVolunteerSkills)
 				protected.POST("/volunteers/me/skills", skillHandler.AddVolunteerSkills)
 				protected.DELETE("/volunteers/me/skills/:skill_id", skillHandler.RemoveVolunteerSkill)
 				protected.GET("/volunteers/me/profile-completion", skillHandler.GetProfileCompletion)
-				
+
 				// Initiative skill management
 				protected.GET("/initiatives/:id/skills", skillHandler.GetInitiativeSkills)
 				protected.PUT("/initiatives/:id/skills", skillHandler.UpdateInitiativeSkills)

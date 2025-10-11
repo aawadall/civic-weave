@@ -1,45 +1,53 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
-import SkillClaimInput from '../components/SkillClaimInput'
+import SkillChipInput from '../components/SkillChipInput'
+import ProfileCompletionModal, { useProfileCompletionModal } from '../components/ProfileCompletionModal'
 import api from '../services/api'
 import { 
   UserIcon, 
   EyeIcon, 
   EyeSlashIcon,
   CheckCircleIcon,
-  ExclamationTriangleIcon
+  ExclamationTriangleIcon,
+  PencilIcon
 } from '@heroicons/react/24/outline'
 
 export default function VolunteerProfilePage() {
-  const [skillClaims, setSkillClaims] = useState([])
+  const [selectedSkills, setSelectedSkills] = useState([])
   const [skillsVisible, setSkillsVisible] = useState(true)
   const [loading, setLoading] = useState(true)
   const [updatingVisibility, setUpdatingVisibility] = useState(false)
-  const [showSkillsPrompt, setShowSkillsPrompt] = useState(false)
+  const [updatingSkills, setUpdatingSkills] = useState(false)
+  const [profileCompletion, setProfileCompletion] = useState(0)
+  const [editingSkills, setEditingSkills] = useState(false)
   
   const { user } = useAuth()
   const { showToast } = useToast()
+  const { showModal, completionPercentage, onClose } = useProfileCompletionModal()
 
   useEffect(() => {
-    fetchSkillClaims()
+    fetchSkills()
     fetchSkillsVisibility()
-    
-    // Show prompt if user has no skills and this is their first visit
-    const lastPromptDate = localStorage.getItem('lastSkillsPrompt')
-    const today = new Date().toDateString()
-    if (!lastPromptDate || lastPromptDate !== today) {
-      setShowSkillsPrompt(true)
-      localStorage.setItem('lastSkillsPrompt', today)
-    }
+    fetchProfileCompletion()
   }, [])
 
-  const fetchSkillClaims = async () => {
+  const fetchSkills = async () => {
     try {
       const response = await api.get('/volunteers/me/skills')
-      setSkillClaims(response.data.claims || [])
+      const skills = response.data.skills || []
+      setSelectedSkills(skills.map(skill => skill.skill_name))
     } catch (error) {
-      showToast('Failed to load skill claims', 'error')
+      showToast('Failed to load skills', 'error')
+    }
+  }
+
+  const fetchProfileCompletion = async () => {
+    try {
+      const response = await api.get('/volunteers/me/profile-completion')
+      setProfileCompletion(response.data.completion_percentage || 0)
+    } catch (error) {
+      console.error('Failed to load profile completion:', error)
     }
   }
 
@@ -54,9 +62,25 @@ export default function VolunteerProfilePage() {
     }
   }
 
+  const handleSkillsUpdate = async (newSkills) => {
+    setUpdatingSkills(true)
+    try {
+      await api.put('/volunteers/me/skills', {
+        skill_names: newSkills
+      })
+      setSelectedSkills(newSkills)
+      await fetchProfileCompletion() // Refresh completion percentage
+      showToast('Skills updated successfully!', 'success')
+      setEditingSkills(false)
+    } catch (error) {
+      showToast('Failed to update skills', 'error')
+    } finally {
+      setUpdatingSkills(false)
+    }
+  }
+
   const handleSkillClaimAdded = (newClaim) => {
-    setSkillClaims(prev => [newClaim, ...prev])
-    setShowSkillsPrompt(false) // Hide prompt when user adds a skill
+    // Legacy support - not used in new system
   }
 
   const handleSkillClaimDeleted = (claimId) => {
@@ -98,17 +122,49 @@ export default function VolunteerProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-secondary-50 py-8">
+    <>
+      <ProfileCompletionModal 
+        isOpen={showModal}
+        onClose={onClose}
+        completionPercentage={completionPercentage}
+      />
+      <div className="min-h-screen bg-secondary-50 py-8">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-8">
-          <div className="flex items-center space-x-3 mb-2">
-            <UserIcon className="h-8 w-8 text-primary-600" />
-            <h1 className="text-3xl font-bold text-secondary-900">My Profile</h1>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center space-x-3">
+              <UserIcon className="h-8 w-8 text-primary-600" />
+              <div>
+                <h1 className="text-3xl font-bold text-secondary-900">My Profile</h1>
+                <p className="text-secondary-600">
+                  Manage your skills and preferences to get better volunteer opportunities
+                </p>
+              </div>
+            </div>
+            <div className="text-right">
+              <div className={`text-2xl font-bold ${
+                profileCompletion >= 100 ? 'text-green-600' :
+                profileCompletion >= 70 ? 'text-blue-600' :
+                profileCompletion >= 40 ? 'text-yellow-600' : 'text-red-600'
+              }`}>
+                {profileCompletion}%
+              </div>
+              <div className="text-sm text-secondary-500">Profile Complete</div>
+            </div>
           </div>
-          <p className="text-secondary-600">
-            Manage your skills and preferences to get better volunteer opportunities
-          </p>
+          
+          {/* Progress Bar */}
+          <div className="w-full bg-gray-200 rounded-full h-2">
+            <div 
+              className={`h-2 rounded-full transition-all duration-500 ${
+                profileCompletion >= 100 ? 'bg-green-500' :
+                profileCompletion >= 70 ? 'bg-blue-500' :
+                profileCompletion >= 40 ? 'bg-yellow-500' : 'bg-red-500'
+              }`}
+              style={{ width: `${Math.max(profileCompletion, 5)}%` }}
+            />
+          </div>
         </div>
 
         {/* Skills Update Prompt */}
@@ -147,19 +203,72 @@ export default function VolunteerProfilePage() {
             {/* Skills Management */}
             <div className="bg-white shadow rounded-lg">
               <div className="px-6 py-4 border-b border-secondary-200">
-                <h2 className="text-lg font-semibold text-secondary-900">
-                  Skills & Experience
-                </h2>
-                <p className="text-sm text-secondary-600 mt-1">
-                  Describe your skills and experience to get matched with relevant opportunities
-                </p>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-lg font-semibold text-secondary-900">
+                      Skills & Experience
+                    </h2>
+                    <p className="text-sm text-secondary-600 mt-1">
+                      Select your skills to get matched with relevant opportunities
+                    </p>
+                  </div>
+                  {!editingSkills && (
+                    <button
+                      onClick={() => setEditingSkills(true)}
+                      className="flex items-center space-x-2 px-3 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+                    >
+                      <PencilIcon className="h-4 w-4" />
+                      <span>Edit Skills</span>
+                    </button>
+                  )}
+                </div>
               </div>
               <div className="px-6 py-6">
-                <SkillClaimInput
-                  existingClaims={skillClaims}
-                  onClaimAdded={handleSkillClaimAdded}
-                  onClaimDeleted={handleSkillClaimDeleted}
-                />
+                {editingSkills ? (
+                  <div className="space-y-4">
+                    <SkillChipInput
+                      selectedSkills={selectedSkills}
+                      onChange={setSelectedSkills}
+                      placeholder="Type skills or select from suggestions"
+                      maxSkills={20}
+                    />
+                    <div className="flex justify-end space-x-3">
+                      <button
+                        onClick={() => setEditingSkills(false)}
+                        className="px-4 py-2 text-sm text-secondary-700 bg-secondary-100 rounded-lg hover:bg-secondary-200"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={() => handleSkillsUpdate(selectedSkills)}
+                        disabled={updatingSkills}
+                        className="px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
+                      >
+                        {updatingSkills ? 'Saving...' : 'Save Changes'}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    {selectedSkills.length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {selectedSkills.map((skill, index) => (
+                          <span
+                            key={`${skill}-${index}`}
+                            className="inline-flex items-center px-3 py-1 bg-primary-100 text-primary-800 rounded-full text-sm font-medium"
+                          >
+                            {skill}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 text-secondary-500">
+                        <p>No skills added yet.</p>
+                        <p className="text-sm">Click "Edit Skills" to add your skills.</p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -273,5 +382,6 @@ export default function VolunteerProfilePage() {
         </div>
       </div>
     </div>
+    </>
   )
 }

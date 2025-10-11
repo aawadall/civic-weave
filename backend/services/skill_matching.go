@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/google/uuid"
 	"civicweave/backend/models"
+
+	"github.com/google/uuid"
 )
 
 // VolunteerSkill represents a volunteer's skill with weight for matching
@@ -43,12 +44,12 @@ func (s *SkillMatchingService) CalculateMatch(volunteerSkills []VolunteerSkill, 
 	for _, vs := range volunteerSkills {
 		vMap[vs.SkillID] = vs.Weight
 	}
-	
+
 	// Find intersection and missing skills
 	var matched []int
 	var missing []int
 	var vWeights []float64 // volunteer weights in project dimensions
-	
+
 	for _, pID := range projectSkillIDs {
 		if w, exists := vMap[pID]; exists {
 			matched = append(matched, pID)
@@ -58,18 +59,18 @@ func (s *SkillMatchingService) CalculateMatch(volunteerSkills []VolunteerSkill, 
 			vWeights = append(vWeights, 0.0) // missing = weight 0
 		}
 	}
-	
+
 	normP := float64(len(projectSkillIDs))
-	
+
 	// 1. Cosine Similarity (restricted to intersection only)
 	cosineScore := s.calculateCosineSimilarity(volunteerSkills, projectSkillIDs)
-	
+
 	// 2. Euclidean Distance (all project dimensions, assume initial distance = 1)
 	euclideanScore := s.calculateEuclideanSimilarity(vWeights, normP)
-	
+
 	// 3. Weighted Coverage (simple, interpretable)
 	coverageScore := s.calculateCoverageScore(vWeights, normP)
-	
+
 	return MatchResult{
 		CosineScore:       cosineScore,
 		EuclideanScore:    euclideanScore,
@@ -89,33 +90,33 @@ func (s *SkillMatchingService) calculateCosineSimilarity(volunteerSkills []Volun
 	for _, id := range projectSkillIDs {
 		projectSet[id] = true
 	}
-	
+
 	for _, vs := range volunteerSkills {
 		if projectSet[vs.SkillID] {
 			intersectionSkills = append(intersectionSkills, vs)
 		}
 	}
-	
+
 	if len(intersectionSkills) == 0 {
 		return 0.0
 	}
-	
+
 	// Build vectors in intersection space
 	dotProduct := 0.0
 	normV := 0.0
-	
+
 	for _, vs := range intersectionSkills {
 		dotProduct += vs.Weight // P[i] = 1 for all required skills
 		normV += vs.Weight * vs.Weight
 	}
-	
+
 	normV = math.Sqrt(normV)
 	normP := math.Sqrt(float64(len(intersectionSkills))) // All P[i] = 1
-	
+
 	if normV > 0 && normP > 0 {
 		return dotProduct / (normV * normP)
 	}
-	
+
 	return 0.0
 }
 
@@ -124,20 +125,20 @@ func (s *SkillMatchingService) calculateEuclideanSimilarity(volunteerWeights []f
 	if normP == 0 {
 		return 0.0
 	}
-	
+
 	// Calculate distance from ideal (weight = 1.0 for all project skills)
 	euclideanDist := 0.0
 	for _, w := range volunteerWeights {
 		euclideanDist += (w - 1.0) * (w - 1.0) // distance from ideal = 1
 	}
 	euclideanDist = math.Sqrt(euclideanDist)
-	
+
 	// Normalize to [0,1] range
 	normalizedDist := euclideanDist / math.Sqrt(normP)
 	if normalizedDist > 1.0 {
 		normalizedDist = 1.0
 	}
-	
+
 	return 1.0 - normalizedDist // Convert distance to similarity
 }
 
@@ -146,12 +147,12 @@ func (s *SkillMatchingService) calculateCoverageScore(volunteerWeights []float64
 	if normP == 0 {
 		return 0.0
 	}
-	
+
 	weightSum := 0.0
 	for _, w := range volunteerWeights {
 		weightSum += w
 	}
-	
+
 	return weightSum / normP
 }
 
@@ -162,13 +163,13 @@ func (s *SkillMatchingService) CalculateVolunteerInitiativeMatch(volunteerID, in
 	if err != nil {
 		return nil, fmt.Errorf("failed to get volunteer skills: %w", err)
 	}
-	
+
 	// Get initiative required skills
 	projectSkills, err := s.getInitiativeSkills(initiativeID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get initiative skills: %w", err)
 	}
-	
+
 	// Convert to matching format
 	var vSkills []VolunteerSkill
 	for _, vs := range volunteerSkills {
@@ -177,12 +178,12 @@ func (s *SkillMatchingService) CalculateVolunteerInitiativeMatch(volunteerID, in
 			Weight:  vs.SkillWeight,
 		})
 	}
-	
+
 	var pSkillIDs []int
 	for _, ps := range projectSkills {
 		pSkillIDs = append(pSkillIDs, ps.SkillID)
 	}
-	
+
 	// Calculate match
 	result := s.CalculateMatch(vSkills, pSkillIDs)
 	return &result, nil
@@ -195,24 +196,24 @@ func (s *SkillMatchingService) BatchCalculateMatches() error {
 	if err != nil {
 		return fmt.Errorf("failed to get initiatives: %w", err)
 	}
-	
+
 	// Get all volunteers with their skills
 	volunteers, err := s.getAllVolunteersWithSkills()
 	if err != nil {
 		return fmt.Errorf("failed to get volunteers: %w", err)
 	}
-	
+
 	// Clear existing matches
 	_, err = s.db.Exec("TRUNCATE volunteer_initiative_matches")
 	if err != nil {
 		return fmt.Errorf("failed to clear existing matches: %w", err)
 	}
-	
+
 	// Calculate matches for all combinations
 	for _, initiative := range initiatives {
 		for _, volunteer := range volunteers {
 			result := s.CalculateMatch(volunteer.Skills, initiative.RequiredSkillIDs)
-			
+
 			// Only store if at least 1 skill matches
 			if result.MatchedSkillCount > 0 {
 				err := s.storeMatch(volunteer.ID, initiative.ID, result)
@@ -222,7 +223,7 @@ func (s *SkillMatchingService) BatchCalculateMatches() error {
 			}
 		}
 	}
-	
+
 	return nil
 }
 
@@ -234,30 +235,30 @@ func (s *SkillMatchingService) storeMatch(volunteerID, initiativeID uuid.UUID, r
 		 matched_skill_ids, matched_skill_count, calculated_at)
 		VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP)
 	`
-	
+
 	jaccardIndex := float64(result.MatchedSkillCount) / float64(result.TotalRequired)
-	
-	_, err := s.db.Exec(query, 
-		volunteerID, 
-		initiativeID, 
+
+	_, err := s.db.Exec(query,
+		volunteerID,
+		initiativeID,
 		result.CosineScore, // Use cosine as primary match score
 		jaccardIndex,
 		result.MatchedSkillIDs,
 		result.MatchedSkillCount,
 	)
-	
+
 	return err
 }
 
 // Helper types for batch processing
 type InitiativeWithSkills struct {
-	ID                  uuid.UUID `json:"id"`
-	RequiredSkillIDs    []int     `json:"required_skill_ids"`
+	ID               uuid.UUID `json:"id"`
+	RequiredSkillIDs []int     `json:"required_skill_ids"`
 }
 
 type VolunteerWithSkills struct {
-	ID      uuid.UUID      `json:"id"`
-	Skills  []VolunteerSkill `json:"skills"`
+	ID     uuid.UUID        `json:"id"`
+	Skills []VolunteerSkill `json:"skills"`
 }
 
 // getAllActiveInitiativesWithSkills retrieves all active initiatives and their required skills
@@ -269,13 +270,13 @@ func (s *SkillMatchingService) getAllActiveInitiativesWithSkills() ([]Initiative
 		WHERE i.status = 'active'
 		GROUP BY i.id
 	`
-	
+
 	rows, err := s.db.Query(query)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	
+
 	var initiatives []InitiativeWithSkills
 	for rows.Next() {
 		var initiative InitiativeWithSkills
@@ -285,7 +286,7 @@ func (s *SkillMatchingService) getAllActiveInitiativesWithSkills() ([]Initiative
 		}
 		initiatives = append(initiatives, initiative)
 	}
-	
+
 	return initiatives, rows.Err()
 }
 
@@ -297,44 +298,44 @@ func (s *SkillMatchingService) getAllVolunteersWithSkills() ([]VolunteerWithSkil
 		JOIN volunteer_skills vs ON v.id = vs.volunteer_id
 		ORDER BY v.id, vs.skill_id
 	`
-	
+
 	rows, err := s.db.Query(query)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	
+
 	volunteerMap := make(map[uuid.UUID]*VolunteerWithSkills)
-	
+
 	for rows.Next() {
 		var volunteerID uuid.UUID
 		var skillID int
 		var weight float64
-		
+
 		err := rows.Scan(&volunteerID, &skillID, &weight)
 		if err != nil {
 			return nil, err
 		}
-		
+
 		if volunteerMap[volunteerID] == nil {
 			volunteerMap[volunteerID] = &VolunteerWithSkills{
 				ID:     volunteerID,
 				Skills: []VolunteerSkill{},
 			}
 		}
-		
+
 		volunteerMap[volunteerID].Skills = append(volunteerMap[volunteerID].Skills, VolunteerSkill{
 			SkillID: skillID,
 			Weight:  weight,
 		})
 	}
-	
+
 	// Convert map to slice
 	var volunteers []VolunteerWithSkills
 	for _, volunteer := range volunteerMap {
 		volunteers = append(volunteers, *volunteer)
 	}
-	
+
 	return volunteers, rows.Err()
 }
 

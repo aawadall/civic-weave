@@ -56,12 +56,12 @@ type RegisterRequest struct {
 	Name     string `json:"name" binding:"required"`
 	// Role is hardcoded to "volunteer" for regular registration
 	// Admins can promote users later through admin interface
-	Phone             string          `json:"phone"`
-	LocationAddress   string          `json:"location_address"`
-	SelectedSkills    []string        `json:"selected_skills"` // replaces skills_description
-	Availability      json.RawMessage `json:"availability"`
-	SkillsVisible     bool            `json:"skills_visible"`
-	ConsentGiven      bool            `json:"consent_given" binding:"required"`
+	Phone           string          `json:"phone"`
+	LocationAddress string          `json:"location_address"`
+	SelectedSkills  []string        `json:"selected_skills"` // replaces skills_description
+	Availability    json.RawMessage `json:"availability"`
+	SkillsVisible   bool            `json:"skills_visible"`
+	ConsentGiven    bool            `json:"consent_given" binding:"required"`
 }
 
 // Register handles user registration
@@ -144,7 +144,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	// Add skills if provided (optional during registration)
 	if len(req.SelectedSkills) > 0 {
 		taxonomyService := models.NewSkillTaxonomyService(h.VolunteerService.GetDB())
-		
+
 		// Resolve skill names to IDs (adds new skills to taxonomy if needed)
 		skillIDs, err := taxonomyService.ResolveSkillNames(req.SelectedSkills)
 		if err != nil {

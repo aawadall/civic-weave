@@ -15,9 +15,9 @@ import (
 
 // SkillMatchingHandler handles volunteer-initiative matching endpoints using sparse vectors
 type SkillMatchingHandler struct {
-	db                *sql.DB
-	taxonomyService   *models.SkillTaxonomyService
-	matchingService   *services.SkillMatchingService
+	db              *sql.DB
+	taxonomyService *models.SkillTaxonomyService
+	matchingService *services.SkillMatchingService
 }
 
 // NewSkillMatchingHandler creates a new skill matching handler
@@ -100,16 +100,16 @@ func (h *SkillMatchingHandler) GetCandidateVolunteers(c *gin.Context) {
 		}
 
 		candidates = append(candidates, gin.H{
-			"volunteer": volunteer,
+			"volunteer":        volunteer,
 			"match_percentage": int(volunteer.MatchScore * 100),
 		})
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"candidates": candidates,
-		"count":      len(candidates),
+		"candidates":    candidates,
+		"count":         len(candidates),
 		"initiative_id": initiativeID,
-		"min_score": minScore,
+		"min_score":     minScore,
 	})
 }
 
@@ -191,16 +191,16 @@ func (h *SkillMatchingHandler) GetRecommendedInitiatives(c *gin.Context) {
 		}
 
 		recommendations = append(recommendations, gin.H{
-			"initiative": initiative,
+			"initiative":       initiative,
 			"match_percentage": int(initiative.MatchScore * 100),
 		})
 	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"recommendations": recommendations,
-		"count":          len(recommendations),
-		"volunteer_id":   volunteerUUID,
-		"min_score":      minScore,
+		"count":           len(recommendations),
+		"volunteer_id":    volunteerUUID,
+		"min_score":       minScore,
 	})
 }
 
@@ -280,14 +280,14 @@ func (h *SkillMatchingHandler) GetMatchExplanation(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"match_details": match,
-		"matched_skills": skillNames,
+		"match_details":     match,
+		"matched_skills":    skillNames,
 		"initiative_skills": initiativeSkills,
-		"volunteer_skills": volunteerSkills,
+		"volunteer_skills":  volunteerSkills,
 		"explanation": gin.H{
-			"match_percentage": int(match.MatchScore * 100),
-			"skills_matched": match.MatchedSkillCount,
-			"total_required": len(initiativeSkills),
+			"match_percentage":    int(match.MatchScore * 100),
+			"skills_matched":      match.MatchedSkillCount,
+			"total_required":      len(initiativeSkills),
 			"coverage_percentage": int(float64(match.MatchedSkillCount) / float64(len(initiativeSkills)) * 100),
 		},
 	})

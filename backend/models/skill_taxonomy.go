@@ -18,16 +18,16 @@ type SkillTaxonomy struct {
 
 // VolunteerSkill represents a volunteer's skill with weight
 type VolunteerSkill struct {
-	VolunteerID       uuid.UUID `json:"volunteer_id" db:"volunteer_id"`
-	SkillID           int       `json:"skill_id" db:"skill_id"`
-	SkillWeight       float64   `json:"skill_weight" db:"skill_weight"`
-	ProficiencyLevel  *string   `json:"proficiency_level" db:"proficiency_level"`
-	YearsExperience   *int      `json:"years_experience" db:"years_experience"`
-	LastUsedYear      *int      `json:"last_used_year" db:"last_used_year"`
-	AddedAt           time.Time `json:"added_at" db:"added_at"`
-	UpdatedAt         time.Time `json:"updated_at" db:"updated_at"`
+	VolunteerID      uuid.UUID `json:"volunteer_id" db:"volunteer_id"`
+	SkillID          int       `json:"skill_id" db:"skill_id"`
+	SkillWeight      float64   `json:"skill_weight" db:"skill_weight"`
+	ProficiencyLevel *string   `json:"proficiency_level" db:"proficiency_level"`
+	YearsExperience  *int      `json:"years_experience" db:"years_experience"`
+	LastUsedYear     *int      `json:"last_used_year" db:"last_used_year"`
+	AddedAt          time.Time `json:"added_at" db:"added_at"`
+	UpdatedAt        time.Time `json:"updated_at" db:"updated_at"`
 	// Joined fields
-	SkillName         string    `json:"skill_name" db:"skill_name"`
+	SkillName string `json:"skill_name" db:"skill_name"`
 }
 
 // InitiativeRequiredSkill represents a required skill for an initiative
@@ -36,18 +36,18 @@ type InitiativeRequiredSkill struct {
 	SkillID      int       `json:"skill_id" db:"skill_id"`
 	AddedAt      time.Time `json:"added_at" db:"added_at"`
 	// Joined fields
-	SkillName    string    `json:"skill_name" db:"skill_name"`
+	SkillName string `json:"skill_name" db:"skill_name"`
 }
 
 // VolunteerInitiativeMatch represents pre-calculated match scores
 type VolunteerInitiativeMatch struct {
-	VolunteerID        uuid.UUID `json:"volunteer_id" db:"volunteer_id"`
-	InitiativeID       uuid.UUID `json:"initiative_id" db:"initiative_id"`
-	MatchScore         float64   `json:"match_score" db:"match_score"`
-	JaccardIndex       float64   `json:"jaccard_index" db:"jaccard_index"`
-	MatchedSkillIDs    []int     `json:"matched_skill_ids" db:"matched_skill_ids"`
-	MatchedSkillCount  int       `json:"matched_skill_count" db:"matched_skill_count"`
-	CalculatedAt       time.Time `json:"calculated_at" db:"calculated_at"`
+	VolunteerID       uuid.UUID `json:"volunteer_id" db:"volunteer_id"`
+	InitiativeID      uuid.UUID `json:"initiative_id" db:"initiative_id"`
+	MatchScore        float64   `json:"match_score" db:"match_score"`
+	JaccardIndex      float64   `json:"jaccard_index" db:"jaccard_index"`
+	MatchedSkillIDs   []int     `json:"matched_skill_ids" db:"matched_skill_ids"`
+	MatchedSkillCount int       `json:"matched_skill_count" db:"matched_skill_count"`
+	CalculatedAt      time.Time `json:"calculated_at" db:"calculated_at"`
 }
 
 // SkillTaxonomyService handles skill taxonomy operations
@@ -67,13 +67,13 @@ func (s *SkillTaxonomyService) GetAllSkills() ([]SkillTaxonomy, error) {
 		FROM skill_taxonomy
 		ORDER BY skill_name
 	`
-	
+
 	rows, err := s.db.Query(query)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query skills: %w", err)
 	}
 	defer rows.Close()
-	
+
 	var skills []SkillTaxonomy
 	for rows.Next() {
 		var skill SkillTaxonomy
@@ -83,7 +83,7 @@ func (s *SkillTaxonomyService) GetAllSkills() ([]SkillTaxonomy, error) {
 		}
 		skills = append(skills, skill)
 	}
-	
+
 	return skills, rows.Err()
 }
 
@@ -96,31 +96,31 @@ func (s *SkillTaxonomyService) AddSkill(name string) (*SkillTaxonomy, error) {
 		FROM skill_taxonomy
 		WHERE LOWER(skill_name) = LOWER($1)
 	`, name).Scan(&existing.ID, &existing.SkillName, &existing.CreatedAt, &existing.UpdatedAt)
-	
+
 	if err == nil {
 		return &existing, nil // Skill already exists
 	}
-	
+
 	if err != sql.ErrNoRows {
 		return nil, fmt.Errorf("failed to check existing skill: %w", err)
 	}
-	
+
 	// Create new skill
 	skill := &SkillTaxonomy{
 		SkillName: name,
 	}
-	
+
 	query := `
 		INSERT INTO skill_taxonomy (skill_name)
 		VALUES ($1)
 		RETURNING id, created_at, updated_at
 	`
-	
+
 	err = s.db.QueryRow(query, name).Scan(&skill.ID, &skill.CreatedAt, &skill.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create skill: %w", err)
 	}
-	
+
 	return skill, nil
 }
 
@@ -135,13 +135,13 @@ func (s *SkillTaxonomyService) GetVolunteerSkills(volunteerID uuid.UUID) ([]Volu
 		WHERE vs.volunteer_id = $1
 		ORDER BY st.skill_name
 	`
-	
+
 	rows, err := s.db.Query(query, volunteerID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query volunteer skills: %w", err)
 	}
 	defer rows.Close()
-	
+
 	var skills []VolunteerSkill
 	for rows.Next() {
 		var skill VolunteerSkill
@@ -155,7 +155,7 @@ func (s *SkillTaxonomyService) GetVolunteerSkills(volunteerID uuid.UUID) ([]Volu
 		}
 		skills = append(skills, skill)
 	}
-	
+
 	return skills, rows.Err()
 }
 
@@ -167,7 +167,7 @@ func (s *SkillTaxonomyService) UpdateVolunteerSkills(volunteerID uuid.UUID, skil
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer tx.Rollback()
-	
+
 	// Delete existing skills
 	_, err = tx.Exec(`
 		DELETE FROM volunteer_skills WHERE volunteer_id = $1
@@ -175,7 +175,7 @@ func (s *SkillTaxonomyService) UpdateVolunteerSkills(volunteerID uuid.UUID, skil
 	if err != nil {
 		return fmt.Errorf("failed to delete existing skills: %w", err)
 	}
-	
+
 	// Insert new skills with default weight 0.5
 	for _, skillID := range skillIDs {
 		_, err = tx.Exec(`
@@ -186,7 +186,7 @@ func (s *SkillTaxonomyService) UpdateVolunteerSkills(volunteerID uuid.UUID, skil
 			return fmt.Errorf("failed to insert skill %d: %w", skillID, err)
 		}
 	}
-	
+
 	return tx.Commit()
 }
 
@@ -227,13 +227,13 @@ func (s *SkillTaxonomyService) GetInitiativeSkills(initiativeID uuid.UUID) ([]In
 		WHERE irs.initiative_id = $1
 		ORDER BY st.skill_name
 	`
-	
+
 	rows, err := s.db.Query(query, initiativeID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query initiative skills: %w", err)
 	}
 	defer rows.Close()
-	
+
 	var skills []InitiativeRequiredSkill
 	for rows.Next() {
 		var skill InitiativeRequiredSkill
@@ -243,7 +243,7 @@ func (s *SkillTaxonomyService) GetInitiativeSkills(initiativeID uuid.UUID) ([]In
 		}
 		skills = append(skills, skill)
 	}
-	
+
 	return skills, rows.Err()
 }
 
@@ -255,7 +255,7 @@ func (s *SkillTaxonomyService) UpdateInitiativeSkills(initiativeID uuid.UUID, sk
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer tx.Rollback()
-	
+
 	// Delete existing required skills
 	_, err = tx.Exec(`
 		DELETE FROM initiative_required_skills WHERE initiative_id = $1
@@ -263,7 +263,7 @@ func (s *SkillTaxonomyService) UpdateInitiativeSkills(initiativeID uuid.UUID, sk
 	if err != nil {
 		return fmt.Errorf("failed to delete existing initiative skills: %w", err)
 	}
-	
+
 	// Insert new required skills
 	for _, skillID := range skillIDs {
 		_, err = tx.Exec(`
@@ -274,26 +274,26 @@ func (s *SkillTaxonomyService) UpdateInitiativeSkills(initiativeID uuid.UUID, sk
 			return fmt.Errorf("failed to insert initiative skill %d: %w", skillID, err)
 		}
 	}
-	
+
 	return tx.Commit()
 }
 
 // ResolveSkillNames converts skill names to IDs, adding new skills to taxonomy if needed
 func (s *SkillTaxonomyService) ResolveSkillNames(skillNames []string) ([]int, error) {
 	var skillIDs []int
-	
+
 	for _, name := range skillNames {
 		if name == "" {
 			continue // Skip empty names
 		}
-		
+
 		skill, err := s.AddSkill(name)
 		if err != nil {
 			return nil, fmt.Errorf("failed to resolve skill '%s': %w", name, err)
 		}
 		skillIDs = append(skillIDs, skill.ID)
 	}
-	
+
 	return skillIDs, nil
 }
 
@@ -308,7 +308,7 @@ func (s *SkillTaxonomyService) GetVolunteerProfileCompletion(volunteerID uuid.UU
 	if err != nil {
 		return 0, fmt.Errorf("failed to check location: %w", err)
 	}
-	
+
 	// Check if volunteer has availability set
 	var hasAvailability bool
 	err = s.db.QueryRow(`
@@ -318,7 +318,7 @@ func (s *SkillTaxonomyService) GetVolunteerProfileCompletion(volunteerID uuid.UU
 	if err != nil {
 		return 0, fmt.Errorf("failed to check availability: %w", err)
 	}
-	
+
 	// Check if volunteer has skills
 	var skillCount int
 	err = s.db.QueryRow(`
@@ -328,7 +328,7 @@ func (s *SkillTaxonomyService) GetVolunteerProfileCompletion(volunteerID uuid.UU
 		return 0, fmt.Errorf("failed to count skills: %w", err)
 	}
 	hasSkills := skillCount > 0
-	
+
 	// Calculate completion percentage
 	// Skills: 40%, Location: 30%, Availability: 30%
 	completion := 0
@@ -341,6 +341,6 @@ func (s *SkillTaxonomyService) GetVolunteerProfileCompletion(volunteerID uuid.UU
 	if hasAvailability {
 		completion += 30
 	}
-	
+
 	return completion, nil
 }
