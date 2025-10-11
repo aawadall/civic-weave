@@ -4,7 +4,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import api from '../../services/api'
 
 export default function CampaignsListPage() {
-  const { hasAnyRole, hasRole } = useAuth()
+  const { hasAnyRole, hasRole, user } = useAuth()
   const [campaigns, setCampaigns] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
