@@ -256,8 +256,8 @@ func main() {
 			// Skill taxonomy routes (new sparse vector system)
 			if skillHandler != nil {
 				// Public skill taxonomy
-				r.GET("/api/skills/taxonomy", skillHandler.GetTaxonomy)
-				r.POST("/api/skills/taxonomy", skillHandler.AddSkill)
+				api.GET("/skills/taxonomy", skillHandler.GetTaxonomy)
+				api.POST("/skills/taxonomy", skillHandler.AddSkill)
 
 				// Volunteer skill management
 				protected.GET("/volunteers/me/skills", skillHandler.GetVolunteerSkills)

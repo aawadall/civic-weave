@@ -16,8 +16,8 @@ type VolunteerSkill struct {
 	Weight  float64 `json:"weight"` // 0.1 to 1.0
 }
 
-// MatchResult contains the results of skill matching calculations
-type MatchResult struct {
+// SkillMatchResult contains the results of skill matching calculations
+type SkillMatchResult struct {
 	CosineScore       float64 `json:"cosine_score"`
 	EuclideanScore    float64 `json:"euclidean_score"`
 	CoverageScore     float64 `json:"coverage_score"`
@@ -38,7 +38,7 @@ func NewSkillMatchingService(db *sql.DB) *SkillMatchingService {
 }
 
 // CalculateMatch calculates match scores between volunteer skills and project requirements
-func (s *SkillMatchingService) CalculateMatch(volunteerSkills []VolunteerSkill, projectSkillIDs []int) MatchResult {
+func (s *SkillMatchingService) CalculateMatch(volunteerSkills []VolunteerSkill, projectSkillIDs []int) SkillMatchResult {
 	// Create map for fast lookup: skillID → weight
 	vMap := make(map[int]float64)
 	for _, vs := range volunteerSkills {
@@ -71,7 +71,7 @@ func (s *SkillMatchingService) CalculateMatch(volunteerSkills []VolunteerSkill, 
 	// 3. Weighted Coverage (simple, interpretable)
 	coverageScore := s.calculateCoverageScore(vWeights, normP)
 
-	return MatchResult{
+	return SkillMatchResult{
 		CosineScore:       cosineScore,
 		EuclideanScore:    euclideanScore,
 		CoverageScore:     coverageScore,
@@ -157,7 +157,7 @@ func (s *SkillMatchingService) calculateCoverageScore(volunteerWeights []float64
 }
 
 // CalculateVolunteerInitiativeMatch calculates match for a specific volunteer-initiative pair
-func (s *SkillMatchingService) CalculateVolunteerInitiativeMatch(volunteerID, initiativeID uuid.UUID) (*MatchResult, error) {
+func (s *SkillMatchingService) CalculateVolunteerInitiativeMatch(volunteerID, initiativeID uuid.UUID) (*SkillMatchResult, error) {
 	// Get volunteer skills
 	volunteerSkills, err := s.getVolunteerSkills(volunteerID)
 	if err != nil {
@@ -228,7 +228,7 @@ func (s *SkillMatchingService) BatchCalculateMatches() error {
 }
 
 // storeMatch stores a calculated match in the database
-func (s *SkillMatchingService) storeMatch(volunteerID, initiativeID uuid.UUID, result MatchResult) error {
+func (s *SkillMatchingService) storeMatch(volunteerID, initiativeID uuid.UUID, result SkillMatchResult) error {
 	query := `
 		INSERT INTO volunteer_initiative_matches 
 		(volunteer_id, initiative_id, match_score, jaccard_index, 
