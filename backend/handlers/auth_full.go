@@ -51,9 +51,9 @@ func NewAuthHandler(
 
 // RegisterRequest represents user registration request
 type RegisterRequest struct {
-	Email             string          `json:"email" binding:"required,email"`
-	Password          string          `json:"password" binding:"required,min=8"`
-	Name              string          `json:"name" binding:"required"`
+	Email    string `json:"email" binding:"required,email"`
+	Password string `json:"password" binding:"required,min=8"`
+	Name     string `json:"name" binding:"required"`
 	// Role is hardcoded to "volunteer" for regular registration
 	// Admins can promote users later through admin interface
 	Phone             string          `json:"phone"`
