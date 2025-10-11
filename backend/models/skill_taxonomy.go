@@ -3,6 +3,7 @@ package models
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -70,6 +71,11 @@ func (s *SkillTaxonomyService) GetAllSkills() ([]SkillTaxonomy, error) {
 
 	rows, err := s.db.Query(query)
 	if err != nil {
+		// If table doesn't exist, return empty array instead of error
+		// This allows frontend to work even before migration is run
+		if strings.Contains(err.Error(), "does not exist") || strings.Contains(err.Error(), "relation") {
+			return []SkillTaxonomy{}, nil
+		}
 		return nil, fmt.Errorf("failed to query skills: %w", err)
 	}
 	defer rows.Close()
