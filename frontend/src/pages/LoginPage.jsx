@@ -16,16 +16,28 @@ export default function LoginPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    console.log('🔐 FRONTEND_LOGIN: Starting login attempt')
+    console.log('📧 FRONTEND_LOGIN: Email:', formData.email)
+    console.log('🔑 FRONTEND_LOGIN: Password length:', formData.password.length)
+    console.log('🔑 FRONTEND_LOGIN: Password (masked):', formData.password ? formData.password[0] + '*'.repeat(formData.password.length - 2) + formData.password[formData.password.length - 1] : '')
+    
     setLoading(true)
 
     try {
-      await login(formData.email, formData.password)
+      console.log('🚀 FRONTEND_LOGIN: Calling login function...')
+      const result = await login(formData.email, formData.password)
+      console.log('✅ FRONTEND_LOGIN: Login successful, result:', result)
       showToast('Login successful!', 'success')
+      console.log('🧭 FRONTEND_LOGIN: Navigating to dashboard...')
       navigate('/dashboard')
     } catch (error) {
+      console.error('❌ FRONTEND_LOGIN: Login failed:', error)
+      console.error('❌ FRONTEND_LOGIN: Error message:', error.message)
+      console.error('❌ FRONTEND_LOGIN: Error stack:', error.stack)
       showToast(error.message, 'error')
     } finally {
       setLoading(false)
+      console.log('🏁 FRONTEND_LOGIN: Login attempt completed')
     }
   }
 

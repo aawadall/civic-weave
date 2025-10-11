@@ -69,6 +69,7 @@ func main() {
 
 	// Initialize handlers (only if services are available)
 	var authHandler *handlers.AuthHandler
+	var googleOAuthHandler *handlers.GoogleOAuthHandler
 	var volunteerHandler *handlers.VolunteerHandler
 	var initiativeHandler *handlers.InitiativeHandler
 	var applicationHandler *handlers.ApplicationHandler
@@ -83,6 +84,14 @@ func main() {
 			oauthAccountService,
 			emailService,
 			geocodingService,
+			cfg,
+		)
+		googleOAuthHandler = handlers.NewGoogleOAuthHandler(
+			userService,
+			volunteerService,
+			adminService,
+			oauthAccountService,
+			emailService,
 			cfg,
 		)
 	}
@@ -121,8 +130,10 @@ func main() {
 	}
 
 	// Initialize admin profile handler
+	var adminSetupHandler *handlers.AdminSetupHandler
 	if db != nil {
 		adminProfileHandler = handlers.NewAdminProfileHandler(db)
+		adminSetupHandler = handlers.NewAdminSetupHandler(userService, adminService, emailService)
 	}
 
 	// Setup Gin router
@@ -138,12 +149,14 @@ func main() {
 		auth := api.Group("/auth")
 		{
 			if authHandler != nil {
-				auth.POST("/register", authHandler.Register)
-				auth.POST("/login", authHandler.Login)
-				// auth.POST("/google", authHandler.GoogleAuth)
+				auth.POST("/register", middleware.RegistrationRateLimiter(), authHandler.Register)
+				auth.POST("/login", middleware.LoginRateLimiter(), authHandler.Login)
 				auth.POST("/verify-email", authHandler.VerifyEmail)
 				// auth.POST("/forgot-password", authHandler.ForgotPassword)
 				// auth.POST("/reset-password", authHandler.ResetPassword)
+			}
+			if googleOAuthHandler != nil {
+				auth.POST("/google", middleware.LoginRateLimiter(), googleOAuthHandler.GoogleAuth)
 			}
 		}
 
@@ -207,6 +220,11 @@ func main() {
 			protected.GET("/admin/stats", middleware.RequireRole("admin"), adminProfileHandler.GetSystemStats)
 			protected.PUT("/admin/change-password", middleware.RequireRole("admin"), adminProfileHandler.ChangePassword)
 		}
+	}
+
+	// Admin setup routes (no authentication required for initial setup)
+	if adminSetupHandler != nil {
+		router.POST("/api/admin/setup", adminSetupHandler.CreateAdmin)
 	}
 
 	// Health check

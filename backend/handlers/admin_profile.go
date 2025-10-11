@@ -54,7 +54,7 @@ type ActivityItem struct {
 
 // GetAdminProfile handles GET /api/admin/profile
 func (h *AdminProfileHandler) GetAdminProfile(c *gin.Context) {
-	adminID, exists := c.Get("userID")
+	adminID, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Admin ID not found in context"})
 		return
@@ -106,7 +106,7 @@ func (h *AdminProfileHandler) GetAdminProfile(c *gin.Context) {
 
 // UpdateAdminProfile handles PUT /api/admin/profile
 func (h *AdminProfileHandler) UpdateAdminProfile(c *gin.Context) {
-	adminID, exists := c.Get("userID")
+	adminID, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Admin ID not found in context"})
 		return
@@ -263,7 +263,7 @@ func (h *AdminProfileHandler) GetSystemStats(c *gin.Context) {
 
 // ChangePassword handles PUT /api/admin/change-password
 func (h *AdminProfileHandler) ChangePassword(c *gin.Context) {
-	adminID, exists := c.Get("userID")
+	adminID, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Admin ID not found in context"})
 		return
@@ -281,7 +281,7 @@ func (h *AdminProfileHandler) ChangePassword(c *gin.Context) {
 
 	// Verify current password
 	var hashedPassword string
-	err := h.db.QueryRow("SELECT password_hash FROM admins WHERE id = $1", adminID).Scan(&hashedPassword)
+	err := h.db.QueryRow("SELECT password_hash FROM users WHERE id = $1", adminID).Scan(&hashedPassword)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify current password"})
 		return
@@ -301,7 +301,7 @@ func (h *AdminProfileHandler) ChangePassword(c *gin.Context) {
 	}
 
 	// Update password
-	_, err = h.db.Exec("UPDATE admins SET password_hash = $1, updated_at = $2 WHERE id = $3",
+	_, err = h.db.Exec("UPDATE users SET password_hash = $1, updated_at = $2 WHERE id = $3",
 		newHashedPassword, time.Now(), adminID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update password"})
