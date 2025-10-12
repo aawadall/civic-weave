@@ -192,7 +192,7 @@ func (s *ProjectService) List(limit, offset int, status *string, skills []string
 	// Build query based on whether skills filter is provided
 	var query string
 	var args []interface{}
-	
+
 	if len(skills) > 0 {
 		// Query with skills filter
 		query = `
@@ -200,8 +200,8 @@ func (s *ProjectService) List(limit, offset int, status *string, skills []string
 			       location_address, start_date, end_date, status, project_status, 
 			       created_by_admin_id, team_lead_id, created_at, updated_at
 			FROM projects
-			WHERE ($1 IS NULL OR status = $1 OR project_status = $1)
-			AND required_skills && $2
+			WHERE ($1::text IS NULL OR status = $1 OR project_status::text = $1)
+			AND required_skills && $2::jsonb
 			ORDER BY created_at DESC
 			LIMIT $3 OFFSET $4`
 		
@@ -214,7 +214,7 @@ func (s *ProjectService) List(limit, offset int, status *string, skills []string
 			       location_address, start_date, end_date, status, project_status, 
 			       created_by_admin_id, team_lead_id, created_at, updated_at
 			FROM projects
-			WHERE ($1 IS NULL OR status = $1 OR project_status = $1)
+			WHERE ($1::text IS NULL OR status = $1 OR project_status::text = $1)
 			ORDER BY created_at DESC
 			LIMIT $2 OFFSET $3`
 		
