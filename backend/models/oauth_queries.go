@@ -22,4 +22,3 @@ const (
 
 	oauthDeleteQuery = `DELETE FROM oauth_accounts WHERE id = $1`
 )
-

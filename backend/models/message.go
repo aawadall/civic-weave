@@ -237,4 +237,3 @@ func (s *MessageService) CanUserEdit(messageID, userID uuid.UUID) (bool, error) 
 
 	return canEdit, nil
 }
-

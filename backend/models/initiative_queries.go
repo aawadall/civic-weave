@@ -31,4 +31,3 @@ const (
 
 	initiativeDeleteQuery = `DELETE FROM initiatives WHERE id = $1`
 )
-

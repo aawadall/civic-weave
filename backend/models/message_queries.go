@@ -118,4 +118,3 @@ const (
 		FROM project_messages
 		WHERE id = $1`
 )
-

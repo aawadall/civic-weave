@@ -93,4 +93,3 @@ const (
 		WHERE project_status IN ('recruiting', 'active')
 		ORDER BY created_at DESC`
 )
-

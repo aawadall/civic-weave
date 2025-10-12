@@ -38,4 +38,3 @@ const (
 		WHERE project_id = $1
 		ORDER BY applied_at DESC`
 )
-

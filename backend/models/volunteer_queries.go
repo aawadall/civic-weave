@@ -36,4 +36,3 @@ const (
 
 	volunteerDeleteQuery = `DELETE FROM volunteers WHERE id = $1`
 )
-

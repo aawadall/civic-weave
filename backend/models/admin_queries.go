@@ -27,4 +27,3 @@ const (
 
 	adminDeleteQuery = `DELETE FROM admins WHERE id = $1`
 )
-

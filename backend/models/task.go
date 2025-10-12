@@ -328,4 +328,3 @@ func (s *TaskService) GetTaskWithUpdates(taskID uuid.UUID) (*TaskWithUpdates, er
 		Updates:     updates,
 	}, nil
 }
-
