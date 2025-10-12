@@ -189,25 +189,41 @@ func (s *ProjectService) GetByIDWithDetails(id uuid.UUID) (*ProjectWithDetails, 
 
 // List retrieves projects with optional filtering
 func (s *ProjectService) List(limit, offset int, status *string, skills []string) ([]Project, error) {
-	// Use basic query for backward compatibility
-	query := `
-		SELECT id, title, description, required_skills, location_lat, location_lng, 
-		       location_address, start_date, end_date, status, project_status, 
-		       created_by_admin_id, team_lead_id, created_at, updated_at
-		FROM projects
-		WHERE ($1 IS NULL OR status = $1 OR project_status = $1)
-		AND ($2 IS NULL OR required_skills && $2)
-		ORDER BY created_at DESC
-		LIMIT $3 OFFSET $4`
-
-	var skillsJSON interface{}
+	// Build query based on whether skills filter is provided
+	var query string
+	var args []interface{}
+	
 	if len(skills) > 0 {
-		skillsJSON, _ = ToJSONArray(skills)
+		// Query with skills filter
+		query = `
+			SELECT id, title, description, required_skills, location_lat, location_lng, 
+			       location_address, start_date, end_date, status, project_status, 
+			       created_by_admin_id, team_lead_id, created_at, updated_at
+			FROM projects
+			WHERE ($1 IS NULL OR status = $1 OR project_status = $1)
+			AND required_skills && $2
+			ORDER BY created_at DESC
+			LIMIT $3 OFFSET $4`
+		
+		skillsJSON, _ := ToJSONArray(skills)
+		args = []interface{}{status, skillsJSON, limit, offset}
+	} else {
+		// Query without skills filter
+		query = `
+			SELECT id, title, description, required_skills, location_lat, location_lng, 
+			       location_address, start_date, end_date, status, project_status, 
+			       created_by_admin_id, team_lead_id, created_at, updated_at
+			FROM projects
+			WHERE ($1 IS NULL OR status = $1 OR project_status = $1)
+			ORDER BY created_at DESC
+			LIMIT $2 OFFSET $3`
+		
+		args = []interface{}{status, limit, offset}
 	}
 
-	log.Printf("🔍 PROJECT_LIST_QUERY: Executing query with params - status=%v, skills=%v, limit=%d, offset=%d", status, skillsJSON, limit, offset)
-	
-	rows, err := s.db.Query(query, status, skillsJSON, limit, offset)
+	log.Printf("🔍 PROJECT_LIST_QUERY: Executing query with params - status=%v, skills=%v, limit=%d, offset=%d", status, skills, limit, offset)
+
+	rows, err := s.db.Query(query, args...)
 	if err != nil {
 		log.Printf("❌ PROJECT_LIST_QUERY: Database query failed: %v", err)
 		return nil, err
