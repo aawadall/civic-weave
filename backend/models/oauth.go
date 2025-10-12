@@ -30,13 +30,8 @@ func NewOAuthAccountService(db *sql.DB) *OAuthAccountService {
 
 // Create creates a new OAuth account
 func (s *OAuthAccountService) Create(account *OAuthAccount) error {
-	query := `
-		INSERT INTO oauth_accounts (id, user_id, provider, provider_user_id, access_token, refresh_token)
-		VALUES ($1, $2, $3, $4, $5, $6)
-		RETURNING created_at`
-
 	account.ID = uuid.New()
-	return s.db.QueryRow(query, account.ID, account.UserID, account.Provider,
+	return s.db.QueryRow(oauthCreateQuery, account.ID, account.UserID, account.Provider,
 		account.ProviderUserID, account.AccessToken, account.RefreshToken).
 		Scan(&account.CreatedAt)
 }
@@ -44,11 +39,8 @@ func (s *OAuthAccountService) Create(account *OAuthAccount) error {
 // GetByProviderAndUserID retrieves an OAuth account by provider and user ID
 func (s *OAuthAccountService) GetByProviderAndUserID(provider, providerUserID string) (*OAuthAccount, error) {
 	account := &OAuthAccount{}
-	query := `
-		SELECT id, user_id, provider, provider_user_id, access_token, refresh_token, created_at
-		FROM oauth_accounts WHERE provider = $1 AND provider_user_id = $2`
 
-	err := s.db.QueryRow(query, provider, providerUserID).Scan(
+	err := s.db.QueryRow(oauthGetByProviderAndUserIDQuery, provider, providerUserID).Scan(
 		&account.ID, &account.UserID, &account.Provider, &account.ProviderUserID,
 		&account.AccessToken, &account.RefreshToken, &account.CreatedAt,
 	)
@@ -65,11 +57,7 @@ func (s *OAuthAccountService) GetByProviderAndUserID(provider, providerUserID st
 
 // GetByUserID retrieves OAuth accounts by user ID
 func (s *OAuthAccountService) GetByUserID(userID uuid.UUID) ([]*OAuthAccount, error) {
-	query := `
-		SELECT id, user_id, provider, provider_user_id, access_token, refresh_token, created_at
-		FROM oauth_accounts WHERE user_id = $1`
-
-	rows, err := s.db.Query(query, userID)
+	rows, err := s.db.Query(oauthGetByUserIDQuery, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -93,18 +81,12 @@ func (s *OAuthAccountService) GetByUserID(userID uuid.UUID) ([]*OAuthAccount, er
 
 // Update updates an OAuth account
 func (s *OAuthAccountService) Update(account *OAuthAccount) error {
-	query := `
-		UPDATE oauth_accounts 
-		SET access_token = $2, refresh_token = $3
-		WHERE id = $1`
-
-	_, err := s.db.Exec(query, account.ID, account.AccessToken, account.RefreshToken)
+	_, err := s.db.Exec(oauthUpdateQuery, account.ID, account.AccessToken, account.RefreshToken)
 	return err
 }
 
 // Delete deletes an OAuth account
 func (s *OAuthAccountService) Delete(id uuid.UUID) error {
-	query := `DELETE FROM oauth_accounts WHERE id = $1`
-	_, err := s.db.Exec(query, id)
+	_, err := s.db.Exec(oauthDeleteQuery, id)
 	return err
 }

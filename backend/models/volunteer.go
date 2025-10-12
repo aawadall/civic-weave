@@ -44,14 +44,8 @@ func (s *VolunteerService) GetDB() *sql.DB {
 func (s *VolunteerService) Create(volunteer *Volunteer) error {
 	skillsJSON, _ := json.Marshal(volunteer.Skills)
 
-	query := `
-		INSERT INTO volunteers (id, user_id, name, phone, location_lat, location_lng, 
-		                       location_address, skills, availability, skills_visible, consent_given)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-		RETURNING created_at, updated_at`
-
 	volunteer.ID = uuid.New()
-	return s.db.QueryRow(query, volunteer.ID, volunteer.UserID, volunteer.Name,
+	return s.db.QueryRow(volunteerCreateQuery, volunteer.ID, volunteer.UserID, volunteer.Name,
 		volunteer.Phone, volunteer.LocationLat, volunteer.LocationLng,
 		volunteer.LocationAddress, skillsJSON, volunteer.Availability, volunteer.SkillsVisible, volunteer.ConsentGiven).
 		Scan(&volunteer.CreatedAt, &volunteer.UpdatedAt)
@@ -62,12 +56,7 @@ func (s *VolunteerService) GetByID(id uuid.UUID) (*Volunteer, error) {
 	volunteer := &Volunteer{}
 	var skillsJSON []byte
 
-	query := `
-		SELECT id, user_id, name, phone, location_lat, location_lng, 
-		       location_address, skills, availability, skills_visible, consent_given, created_at, updated_at
-		FROM volunteers WHERE id = $1`
-
-	err := s.db.QueryRow(query, id).Scan(
+	err := s.db.QueryRow(volunteerGetByIDQuery, id).Scan(
 		&volunteer.ID, &volunteer.UserID, &volunteer.Name, &volunteer.Phone,
 		&volunteer.LocationLat, &volunteer.LocationLng, &volunteer.LocationAddress,
 		&skillsJSON, &volunteer.Availability, &volunteer.SkillsVisible, &volunteer.ConsentGiven,
@@ -94,12 +83,7 @@ func (s *VolunteerService) GetByUserID(userID uuid.UUID) (*Volunteer, error) {
 	volunteer := &Volunteer{}
 	var skillsJSON []byte
 
-	query := `
-		SELECT id, user_id, name, phone, location_lat, location_lng, 
-		       location_address, skills, availability, skills_visible, consent_given, created_at, updated_at
-		FROM volunteers WHERE user_id = $1`
-
-	err := s.db.QueryRow(query, userID).Scan(
+	err := s.db.QueryRow(volunteerGetByUserIDQuery, userID).Scan(
 		&volunteer.ID, &volunteer.UserID, &volunteer.Name, &volunteer.Phone,
 		&volunteer.LocationLat, &volunteer.LocationLng, &volunteer.LocationAddress,
 		&skillsJSON, &volunteer.Availability, &volunteer.SkillsVisible, &volunteer.ConsentGiven,
@@ -123,15 +107,7 @@ func (s *VolunteerService) GetByUserID(userID uuid.UUID) (*Volunteer, error) {
 
 // List retrieves volunteers with filtering
 func (s *VolunteerService) List(limit, offset int, skills []string, location string) ([]*Volunteer, error) {
-	query := `
-		SELECT id, user_id, name, phone, location_lat, location_lng, 
-		       location_address, skills, availability, skills_visible, consent_given, created_at, updated_at
-		FROM volunteers 
-		WHERE ($1::text[] IS NULL OR skills ?| $1)
-		ORDER BY created_at DESC
-		LIMIT $2 OFFSET $3`
-
-	rows, err := s.db.Query(query, skills, limit, offset)
+	rows, err := s.db.Query(volunteerListQuery, skills, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -202,15 +178,7 @@ func (s *VolunteerService) GetVolunteerWithScore(volunteerID uuid.UUID) (*Volunt
 func (s *VolunteerService) Update(volunteer *Volunteer) error {
 	skillsJSON, _ := json.Marshal(volunteer.Skills)
 
-	query := `
-		UPDATE volunteers 
-		SET name = $2, phone = $3, location_lat = $4, location_lng = $5, 
-		    location_address = $6, skills = $7, availability = $8, skills_visible = $9, consent_given = $10, 
-		    updated_at = CURRENT_TIMESTAMP
-		WHERE id = $1
-		RETURNING updated_at`
-
-	return s.db.QueryRow(query, volunteer.ID, volunteer.Name, volunteer.Phone,
+	return s.db.QueryRow(volunteerUpdateQuery, volunteer.ID, volunteer.Name, volunteer.Phone,
 		volunteer.LocationLat, volunteer.LocationLng, volunteer.LocationAddress,
 		skillsJSON, volunteer.Availability, volunteer.SkillsVisible, volunteer.ConsentGiven).
 		Scan(&volunteer.UpdatedAt)
@@ -218,7 +186,6 @@ func (s *VolunteerService) Update(volunteer *Volunteer) error {
 
 // Delete deletes a volunteer
 func (s *VolunteerService) Delete(id uuid.UUID) error {
-	query := `DELETE FROM volunteers WHERE id = $1`
-	_, err := s.db.Exec(query, id)
+	_, err := s.db.Exec(volunteerDeleteQuery, id)
 	return err
 }
