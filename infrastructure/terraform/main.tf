@@ -48,12 +48,10 @@ resource "google_sql_database_instance" "postgres" {
     }
 
     ip_configuration {
-      ipv4_enabled    = true
+      ipv4_enabled    = false  # Disable public IP for security
       ssl_mode        = "ENCRYPTED_ONLY"
-      authorized_networks {
-        name  = "cloud-run"
-        value = "0.0.0.0/0" # Allow Cloud Run access
-      }
+      # No authorized_networks - private access only via Cloud SQL Proxy
+      # Cloud Run will use Cloud SQL connection through service account
     }
   }
 
@@ -194,12 +192,17 @@ resource "google_cloud_run_v2_service" "backend" {
   template {
     service_account = google_service_account.civicweave_sa.email
 
+    # Cloud SQL connection via Unix socket
+    cloud_sql_instances {
+      instances = [google_sql_database_instance.postgres.connection_name]
+    }
+
     containers {
       image = "${var.region}-docker.pkg.dev/${var.project_id}/${var.project_name}/backend:latest"
 
       env {
         name  = "DB_HOST"
-        value = "107.178.212.19"
+        value = "/cloudsql/${google_sql_database_instance.postgres.connection_name}"
       }
       env {
         name  = "DB_PORT"
@@ -308,6 +311,10 @@ resource "google_cloud_run_v2_service" "backend" {
       env {
         name  = "OPENAI_EMBEDDING_MODEL"
         value = var.openai_embedding_model
+      }
+      env {
+        name  = "ENABLE_EMAIL"
+        value = "false"
       }
     }
 

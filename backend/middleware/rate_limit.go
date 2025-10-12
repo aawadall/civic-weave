@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -22,13 +23,13 @@ var (
 		Requests: 5,
 		Period:   time.Minute,
 	}
-	
+
 	// Registration rate limiting: 3 attempts per minute
 	RegistrationRateLimit = RateLimiterConfig{
 		Requests: 3,
 		Period:   time.Minute,
 	}
-	
+
 	// General API rate limiting: 100 requests per minute
 	APIRateLimit = RateLimiterConfig{
 		Requests: 100,
@@ -44,13 +45,13 @@ func RateLimiter(config RateLimiterConfig) gin.HandlerFunc {
 		Period: config.Period,
 		Limit:  int64(config.Requests),
 	}
-	
+
 	instance := limiter.New(store, rate)
-	
+
 	return func(c *gin.Context) {
 		// Get client IP
 		clientIP := c.ClientIP()
-		
+
 		// Get rate limit context
 		context, err := instance.Get(c, clientIP)
 		if err != nil {
@@ -58,12 +59,12 @@ func RateLimiter(config RateLimiterConfig) gin.HandlerFunc {
 			c.Abort()
 			return
 		}
-		
+
 		// Set rate limit headers
-		c.Header("X-RateLimit-Limit", string(rune(context.Limit)))
-		c.Header("X-RateLimit-Remaining", string(rune(context.Remaining)))
-		c.Header("X-RateLimit-Reset", string(rune(context.Reset)))
-		
+		c.Header("X-RateLimit-Limit", fmt.Sprintf("%d", context.Limit))
+		c.Header("X-RateLimit-Remaining", fmt.Sprintf("%d", context.Remaining))
+		c.Header("X-RateLimit-Reset", fmt.Sprintf("%d", context.Reset))
+
 		// Check if rate limit exceeded
 		if context.Reached {
 			resetTime := time.Unix(context.Reset, 0)
@@ -72,13 +73,13 @@ func RateLimiter(config RateLimiterConfig) gin.HandlerFunc {
 				retryAfter = 0
 			}
 			c.JSON(http.StatusTooManyRequests, gin.H{
-				"error": "Rate limit exceeded. Please try again later.",
+				"error":       "Rate limit exceeded. Please try again later.",
 				"retry_after": retryAfter,
 			})
 			c.Abort()
 			return
 		}
-		
+
 		c.Next()
 	}
 }

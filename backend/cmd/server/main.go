@@ -162,10 +162,10 @@ func main() {
 	}
 
 	// Initialize admin profile handler
-	var adminSetupHandler *handlers.AdminSetupHandler
+	// var adminSetupHandler *handlers.AdminSetupHandler  // Disabled for security
 	if db != nil {
 		adminProfileHandler = handlers.NewAdminProfileHandler(db)
-		adminSetupHandler = handlers.NewAdminSetupHandler(userService, adminService, emailService)
+		// adminSetupHandler = handlers.NewAdminSetupHandler(userService, adminService, emailService)  // Disabled for security
 	}
 
 	// Setup Gin router
@@ -327,10 +327,11 @@ func main() {
 		}
 	}
 
-	// Admin setup routes (no authentication required for initial setup)
-	if adminSetupHandler != nil {
-		router.POST("/api/admin/setup", adminSetupHandler.CreateAdmin)
-	}
+	// Admin setup routes (disabled by default for security)
+	// Uncomment only if you need to create another admin user manually
+	// if adminSetupHandler != nil {
+	// 	router.POST("/api/admin/setup", adminSetupHandler.CreateAdmin)
+	// }
 
 	// Health check
 	router.GET("/health", func(c *gin.Context) {

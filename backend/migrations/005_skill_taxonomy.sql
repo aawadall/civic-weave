@@ -24,24 +24,24 @@ CREATE TABLE volunteer_skills (
     PRIMARY KEY (volunteer_id, skill_id)
 );
 
--- Junction table: initiative → required skills  
-CREATE TABLE initiative_required_skills (
-    initiative_id UUID REFERENCES initiatives(id) ON DELETE CASCADE,
+-- Junction table: project → required skills  
+CREATE TABLE project_required_skills (
+    project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
     skill_id INTEGER REFERENCES skill_taxonomy(id) ON DELETE CASCADE,
     added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (initiative_id, skill_id)
+    PRIMARY KEY (project_id, skill_id)
 );
 
 -- Pre-calculated match scores (populated by hourly Python batch job)
-CREATE TABLE volunteer_initiative_matches (
+CREATE TABLE volunteer_project_matches (
     volunteer_id UUID REFERENCES volunteers(id) ON DELETE CASCADE,
-    initiative_id UUID REFERENCES initiatives(id) ON DELETE CASCADE,
+    project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
     match_score DECIMAL(5,4) NOT NULL CHECK (match_score >= 0.0 AND match_score <= 1.0),
     jaccard_index DECIMAL(5,4) NOT NULL CHECK (jaccard_index >= 0.0 AND jaccard_index <= 1.0),
     matched_skill_ids INTEGER[] NOT NULL,
     matched_skill_count INTEGER NOT NULL,
     calculated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (volunteer_id, initiative_id)
+    PRIMARY KEY (volunteer_id, project_id)
 );
 
 -- Track weight adjustments by TLs (audit trail)
@@ -52,7 +52,7 @@ CREATE TABLE volunteer_skill_weight_overrides (
     original_weight DECIMAL(3,2) NOT NULL,
     override_weight DECIMAL(3,2) NOT NULL CHECK (override_weight >= 0.1 AND override_weight <= 1.0),
     adjusted_by_admin_id UUID REFERENCES admins(id),
-    initiative_id UUID REFERENCES initiatives(id),  -- context: which project prompted adjustment
+    project_id UUID REFERENCES projects(id),  -- context: which project prompted adjustment
     reason TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -60,11 +60,11 @@ CREATE TABLE volunteer_skill_weight_overrides (
 -- Indexes for fast lookups and matching queries
 CREATE INDEX idx_volunteer_skills_volunteer ON volunteer_skills(volunteer_id);
 CREATE INDEX idx_volunteer_skills_skill ON volunteer_skills(skill_id);
-CREATE INDEX idx_initiative_skills_initiative ON initiative_required_skills(initiative_id);
-CREATE INDEX idx_initiative_skills_skill ON initiative_required_skills(skill_id);
-CREATE INDEX idx_matches_volunteer ON volunteer_initiative_matches(volunteer_id, match_score DESC);
-CREATE INDEX idx_matches_initiative ON volunteer_initiative_matches(initiative_id, match_score DESC);
-CREATE INDEX idx_matches_score ON volunteer_initiative_matches(match_score DESC);
+CREATE INDEX idx_project_skills_project ON project_required_skills(project_id);
+CREATE INDEX idx_project_skills_skill ON project_required_skills(skill_id);
+CREATE INDEX idx_matches_volunteer ON volunteer_project_matches(volunteer_id, match_score DESC);
+CREATE INDEX idx_matches_project ON volunteer_project_matches(project_id, match_score DESC);
+CREATE INDEX idx_matches_score ON volunteer_project_matches(match_score DESC);
 CREATE INDEX idx_weight_overrides_volunteer ON volunteer_skill_weight_overrides(volunteer_id);
 CREATE INDEX idx_weight_overrides_admin ON volunteer_skill_weight_overrides(adjusted_by_admin_id);
 
@@ -113,8 +113,8 @@ INSERT INTO skill_taxonomy (skill_name) VALUES
 
 -- DOWN
 DROP TABLE IF EXISTS volunteer_skill_weight_overrides;
-DROP TABLE IF EXISTS volunteer_initiative_matches;
-DROP TABLE IF EXISTS initiative_required_skills;
+DROP TABLE IF EXISTS volunteer_project_matches;
+DROP TABLE IF EXISTS project_required_skills;
 DROP TABLE IF EXISTS volunteer_skills;
 DROP TABLE IF EXISTS skill_taxonomy;
 

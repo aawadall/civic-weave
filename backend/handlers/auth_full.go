@@ -109,6 +109,9 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
+	// Track if we need to rollback on failure
+	userCreated := true
+
 	// Geocode location if provided
 	var locationLat, locationLng *float64
 	if req.LocationAddress != "" {
@@ -122,6 +125,12 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		}
 	}
 
+	// Handle availability JSON (default to empty object if not provided)
+	availability := req.Availability
+	if len(availability) == 0 {
+		availability = json.RawMessage(`{}`)
+	}
+
 	// Create volunteer profile (regular registration always creates volunteers)
 	volunteer := &models.Volunteer{
 		UserID:          user.ID,
@@ -131,13 +140,24 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		LocationLng:     locationLng,
 		LocationAddress: req.LocationAddress,
 		Skills:          []string{}, // Legacy field - will be replaced by skill claims
-		Availability:    req.Availability,
+		Availability:    availability,
 		SkillsVisible:   req.SkillsVisible,
 		ConsentGiven:    req.ConsentGiven,
 	}
 
 	if err := h.VolunteerService.Create(volunteer); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create volunteer profile"})
+		// Log the actual error for debugging
+		log.Printf("❌ VOLUNTEER_CREATE_ERROR: %v", err)
+		log.Printf("❌ VOLUNTEER_CREATE_ERROR: Volunteer data: %+v", volunteer)
+
+		// Rollback: Delete the user we just created
+		if userCreated {
+			log.Printf("⚠️  Registration failed at volunteer creation, rolling back user: %s", user.Email)
+			if deleteErr := h.UserService.Delete(user.ID); deleteErr != nil {
+				log.Printf("❌ Failed to rollback user creation: %v", deleteErr)
+			}
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create volunteer profile", "details": err.Error()})
 		return
 	}
 
@@ -160,21 +180,26 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		}
 	}
 
-	// Generate verification token and send email
-	verificationToken := utils.GenerateRandomToken()
-	if err := h.createEmailVerificationToken(user.ID, verificationToken); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create verification token"})
-		return
-	}
-
-	// Send verification email
-	if err := h.EmailService.SendVerificationEmail(user.Email, verificationToken); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send verification email"})
-		return
+	// Generate verification token and send email (if enabled)
+	message := "User registered successfully."
+	if h.config.Features.EmailEnabled {
+		verificationToken := utils.GenerateRandomToken()
+		if err := h.createEmailVerificationToken(user.ID, verificationToken); err != nil {
+			log.Printf("Warning: Failed to create verification token: %v", err)
+			// Don't fail registration, just log the error
+		} else {
+			// Send verification email
+			if err := h.EmailService.SendVerificationEmail(user.Email, verificationToken); err != nil {
+				log.Printf("Warning: Failed to send verification email: %v", err)
+				// Don't fail registration, just log the error
+			} else {
+				message = "User registered successfully. Please check your email for verification."
+			}
+		}
 	}
 
 	c.JSON(http.StatusCreated, gin.H{
-		"message": "User registered successfully. Please check your email for verification.",
+		"message": message,
 		"user_id": user.ID,
 	})
 }
@@ -262,8 +287,8 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		log.Printf("✅ LOGIN: Password comparison successful")
 	}
 
-	// Check if email is verified
-	if !user.EmailVerified {
+	// Check if email is verified (skip check if email system is disabled)
+	if !user.EmailVerified && h.config.Features.EmailEnabled {
 		if gin.Mode() == gin.DebugMode {
 			log.Printf("❌ LOGIN: Email not verified for user: %s", user.Email)
 		}
@@ -271,7 +296,11 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 	if gin.Mode() == gin.DebugMode {
-		log.Printf("✅ LOGIN: Email verified")
+		if h.config.Features.EmailEnabled {
+			log.Printf("✅ LOGIN: Email verified")
+		} else {
+			log.Printf("⚠️  LOGIN: Email verification skipped (email system disabled)")
+		}
 	}
 
 	// Generate JWT token
@@ -294,7 +323,23 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	if gin.Mode() == gin.DebugMode {
 		log.Printf("👤 LOGIN: Getting user profile for role: %s", user.Role)
 	}
-	var userProfile interface{}
+
+	// Get user roles
+	rolesData, err := h.UserService.GetUserRoles(user.ID)
+	if err != nil {
+		if gin.Mode() == gin.DebugMode {
+			log.Printf("⚠️  LOGIN: Failed to get user roles: %v", err)
+		}
+		rolesData = nil
+	}
+
+	// Convert roles to string array
+	var roles []string
+	for _, role := range rolesData {
+		roles = append(roles, role.Name)
+	}
+
+	var userProfile map[string]interface{}
 	if user.Role == "volunteer" {
 		volunteer, err := h.VolunteerService.GetByUserID(user.ID)
 		if err != nil {
@@ -304,7 +349,16 @@ func (h *AuthHandler) Login(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get volunteer profile"})
 			return
 		}
-		userProfile = volunteer
+		userProfile = map[string]interface{}{
+			"id":               volunteer.ID,
+			"user_id":          volunteer.UserID,
+			"name":             volunteer.Name,
+			"phone":            volunteer.Phone,
+			"location_address": volunteer.LocationAddress,
+			"created_at":       volunteer.CreatedAt,
+			"role":             user.Role,
+			"roles":            roles,
+		}
 		if gin.Mode() == gin.DebugMode {
 			log.Printf("✅ LOGIN: Volunteer profile retrieved")
 		}
@@ -317,7 +371,14 @@ func (h *AuthHandler) Login(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get admin profile"})
 			return
 		}
-		userProfile = admin
+		userProfile = map[string]interface{}{
+			"id":         admin.ID,
+			"user_id":    admin.UserID,
+			"name":       admin.Name,
+			"created_at": admin.CreatedAt,
+			"role":       user.Role,
+			"roles":      roles,
+		}
 		if gin.Mode() == gin.DebugMode {
 			log.Printf("✅ LOGIN: Admin profile retrieved")
 		}
@@ -403,19 +464,51 @@ func (h *AuthHandler) GetProfile(c *gin.Context) {
 		return
 	}
 
-	// Get user profile based on role
-	var userProfile interface{}
-	var err error
-
-	if userCtx.Role == "volunteer" {
-		userProfile, err = h.VolunteerService.GetByUserID(userCtx.ID)
-	} else if userCtx.Role == "admin" {
-		userProfile, err = h.AdminService.GetByUserID(userCtx.ID)
+	// Get user roles
+	rolesData, err := h.UserService.GetUserRoles(userCtx.ID)
+	if err != nil {
+		rolesData = nil
 	}
 
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user profile"})
-		return
+	// Convert roles to string array
+	var roles []string
+	for _, role := range rolesData {
+		roles = append(roles, role.Name)
+	}
+
+	// Get user profile based on role
+	var userProfile map[string]interface{}
+
+	if userCtx.Role == "volunteer" {
+		volunteer, err := h.VolunteerService.GetByUserID(userCtx.ID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user profile"})
+			return
+		}
+		userProfile = map[string]interface{}{
+			"id":               volunteer.ID,
+			"user_id":          volunteer.UserID,
+			"name":             volunteer.Name,
+			"phone":            volunteer.Phone,
+			"location_address": volunteer.LocationAddress,
+			"created_at":       volunteer.CreatedAt,
+			"role":             userCtx.Role,
+			"roles":            roles,
+		}
+	} else if userCtx.Role == "admin" {
+		admin, err := h.AdminService.GetByUserID(userCtx.ID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user profile"})
+			return
+		}
+		userProfile = map[string]interface{}{
+			"id":         admin.ID,
+			"user_id":    admin.UserID,
+			"name":       admin.Name,
+			"created_at": admin.CreatedAt,
+			"role":       userCtx.Role,
+			"roles":      roles,
+		}
 	}
 
 	c.JSON(http.StatusOK, userProfile)

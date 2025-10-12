@@ -13,6 +13,12 @@ type Config struct {
 	Google    GoogleConfig
 	Geocoding GeocodingConfig
 	OpenAI    OpenAIConfig
+	Features  FeatureFlags
+}
+
+// FeatureFlags holds feature toggle settings
+type FeatureFlags struct {
+	EmailEnabled bool
 }
 
 // DatabaseConfig holds database connection settings
@@ -93,6 +99,9 @@ func Load() *Config {
 		OpenAI: OpenAIConfig{
 			APIKey:         getEnv("OPENAI_API_KEY", ""),
 			EmbeddingModel: getEnv("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small"),
+		},
+		Features: FeatureFlags{
+			EmailEnabled: getEnv("ENABLE_EMAIL", "true") == "true",
 		},
 	}
 }

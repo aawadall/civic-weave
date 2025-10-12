@@ -99,20 +99,28 @@ export default function RegisterPage() {
 
     setLoading(true)
     try {
-      await register({
+      const response = await register({
         email: formData.email,
         password: formData.password,
         name: formData.name,
         phone: formData.phone,
-        locationAddress: formData.locationAddress,
-        selectedSkills: formData.selectedSkills, // New chip-based skills
+        location_address: formData.locationAddress,
+        selected_skills: formData.selectedSkills, // New chip-based skills
         availability: formData.availability,
-        skillsVisible: formData.skillsVisible,
-        consentGiven: formData.consentGiven
+        skills_visible: formData.skillsVisible,
+        consent_given: formData.consentGiven
       })
       
-      showToast('Registration successful! Please check your email for verification.', 'success')
-      navigate('/verify-email', { state: { email: formData.email } })
+      // Check if email verification is required (based on backend message)
+      const requiresVerification = response.message?.includes('email for verification')
+      
+      if (requiresVerification) {
+        showToast('Registration successful! Please check your email for verification.', 'success')
+        navigate('/verify-email', { state: { email: formData.email } })
+      } else {
+        showToast('Registration successful! You can now login.', 'success')
+        navigate('/login', { state: { email: formData.email } })
+      }
     } catch (error) {
       showToast(error.message || 'Registration failed. Please try again.', 'error')
     } finally {

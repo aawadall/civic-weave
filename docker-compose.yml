@@ -35,7 +35,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     ports:
-      - "8080:8080"
+      - "8081:8080"
     environment:
       - DB_HOST=postgres
       - DB_PORT=5432
@@ -50,28 +50,25 @@ services:
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
       - NOMINATIM_BASE_URL=https://nominatim.openstreetmap.org
+      - ENABLE_EMAIL=false
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-    volumes:
-      - ./backend:/app
-    command: air -c .air.toml
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        - VITE_API_BASE_URL=http://localhost:8081/api
+        - VITE_GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
     ports:
-      - "3000:3000"
+      - "3001:80"
     environment:
-      - VITE_API_BASE_URL=http://localhost:8080
+      - VITE_API_BASE_URL=http://localhost:8081/api
       - VITE_GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-    command: npm run dev
 
 volumes:
   postgres_data:

@@ -1,37 +1,92 @@
 -- UP
 -- Rename Initiatives to Projects Migration
 
--- First, add new project-specific columns to initiatives table
-ALTER TABLE initiatives ADD COLUMN team_lead_id UUID REFERENCES users(id);
-ALTER TABLE initiatives ADD COLUMN project_status VARCHAR(20) DEFAULT 'draft' CHECK (project_status IN ('draft', 'recruiting', 'active', 'completed', 'archived'));
-
--- Rename the table from initiatives to projects
-ALTER TABLE initiatives RENAME TO projects;
+-- First, add new project-specific columns to initiatives table (if table exists)
+DO $$ 
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'initiatives') THEN
+        -- Add columns if they don't exist
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'initiatives' AND column_name = 'team_lead_id') THEN
+            ALTER TABLE initiatives ADD COLUMN team_lead_id UUID REFERENCES users(id);
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'initiatives' AND column_name = 'project_status') THEN
+            ALTER TABLE initiatives ADD COLUMN project_status VARCHAR(20) DEFAULT 'draft' CHECK (project_status IN ('draft', 'recruiting', 'active', 'completed', 'archived'));
+        END IF;
+        
+        -- Rename the table from initiatives to projects
+        ALTER TABLE initiatives RENAME TO projects;
+    END IF;
+END $$;
 
 -- Update the initiative_skill_requirements table name and references
-ALTER TABLE initiative_skill_requirements RENAME TO project_skill_requirements;
-ALTER TABLE project_skill_requirements RENAME COLUMN initiative_id TO project_id;
-ALTER TABLE project_skill_requirements DROP CONSTRAINT initiative_skill_requirements_initiative_id_fkey;
-ALTER TABLE project_skill_requirements ADD CONSTRAINT project_skill_requirements_project_id_fkey FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE;
+DO $$ 
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'initiative_skill_requirements') THEN
+        ALTER TABLE initiative_skill_requirements RENAME TO project_skill_requirements;
+        ALTER TABLE project_skill_requirements RENAME COLUMN initiative_id TO project_id;
+        
+        -- Drop constraint if it exists
+        IF EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'initiative_skill_requirements_initiative_id_fkey') THEN
+            ALTER TABLE project_skill_requirements DROP CONSTRAINT initiative_skill_requirements_initiative_id_fkey;
+        END IF;
+        
+        ALTER TABLE project_skill_requirements ADD CONSTRAINT project_skill_requirements_project_id_fkey FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE;
+    END IF;
+END $$;
 
 -- Update applications table references
-ALTER TABLE applications RENAME COLUMN initiative_id TO project_id;
-ALTER TABLE applications DROP CONSTRAINT applications_initiative_id_fkey;
-ALTER TABLE applications ADD CONSTRAINT applications_project_id_fkey FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE;
+DO $$ 
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'applications' AND column_name = 'initiative_id') THEN
+        ALTER TABLE applications RENAME COLUMN initiative_id TO project_id;
+        
+        IF EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'applications_initiative_id_fkey') THEN
+            ALTER TABLE applications DROP CONSTRAINT applications_initiative_id_fkey;
+        END IF;
+        
+        ALTER TABLE applications ADD CONSTRAINT applications_project_id_fkey FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE;
+    END IF;
+END $$;
 
 -- Update volunteer_ratings table references (from previous migration)
-ALTER TABLE volunteer_ratings RENAME COLUMN project_id TO project_id_temp;
-ALTER TABLE volunteer_ratings ADD COLUMN project_id UUID REFERENCES projects(id) ON DELETE SET NULL;
-UPDATE volunteer_ratings SET project_id = project_id_temp;
-ALTER TABLE volunteer_ratings DROP COLUMN project_id_temp;
+DO $$ 
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'volunteer_ratings') 
+       AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'volunteer_ratings' AND column_name = 'project_id') THEN
+        -- Column already exists with correct name, skip
+        NULL;
+    ELSIF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'volunteer_ratings') THEN
+        -- Table exists but might need the column added
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'volunteer_ratings' AND column_name = 'project_id') THEN
+            ALTER TABLE volunteer_ratings ADD COLUMN project_id UUID REFERENCES projects(id) ON DELETE SET NULL;
+        END IF;
+    END IF;
+END $$;
 
 -- Update project_team_members table references (from previous migration)
-ALTER TABLE project_team_members RENAME COLUMN project_id TO project_id_temp;
-ALTER TABLE project_team_members ADD COLUMN project_id UUID REFERENCES projects(id) ON DELETE CASCADE;
-UPDATE project_team_members SET project_id = project_id_temp;
-ALTER TABLE project_team_members DROP CONSTRAINT project_team_members_project_id_temp_fkey;
-ALTER TABLE project_team_members DROP COLUMN project_id_temp;
-ALTER TABLE project_team_members ADD CONSTRAINT project_team_members_project_id_fkey FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE;
+DO $$ 
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'project_team_members') THEN
+        -- Check if column needs renaming
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'project_team_members' AND column_name = 'project_id') 
+           AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'project_team_members' AND column_name = 'project_id_temp') THEN
+            -- Already has correct column, skip
+            NULL;
+        ELSE
+            -- Do the rename dance
+            ALTER TABLE project_team_members RENAME COLUMN project_id TO project_id_temp;
+            ALTER TABLE project_team_members ADD COLUMN project_id UUID REFERENCES projects(id) ON DELETE CASCADE;
+            UPDATE project_team_members SET project_id = project_id_temp;
+            
+            IF EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'project_team_members_project_id_temp_fkey') THEN
+                ALTER TABLE project_team_members DROP CONSTRAINT project_team_members_project_id_temp_fkey;
+            END IF;
+            
+            ALTER TABLE project_team_members DROP COLUMN project_id_temp;
+            ALTER TABLE project_team_members ADD CONSTRAINT project_team_members_project_id_fkey FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE;
+        END IF;
+    END IF;
+END $$;
 
 -- Update indexes
 DROP INDEX IF EXISTS idx_initiatives_location;
