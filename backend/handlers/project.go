@@ -499,3 +499,249 @@ func (h *ProjectHandler) AssignTeamLead(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "Team lead assigned successfully"})
 }
+
+// GetLogistics handles GET /api/projects/:id/logistics
+func (h *ProjectHandler) GetLogistics(c *gin.Context) {
+	projectIDStr := c.Param("id")
+	projectID, err := uuid.Parse(projectIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid project ID"})
+		return
+	}
+
+	// Get user context
+	userCtx, exists := middleware.GetUserFromContext(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found in context"})
+		return
+	}
+
+	// Check if user is project owner or admin
+	isTeamLead, err := h.service.IsTeamLead(projectID, userCtx.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check team lead status"})
+		return
+	}
+
+	if !userCtx.HasRole("admin") && !isTeamLead {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Only project team lead can view logistics"})
+		return
+	}
+
+	// Get project details
+	project, err := h.service.GetByID(projectID)
+	if err != nil || project == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
+		return
+	}
+
+	// Get team members
+	teamMembers, err := h.service.GetProjectTeamMembers(projectID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get team members"})
+		return
+	}
+
+	// Get pending applications
+	applicationService := models.NewApplicationService(h.service.GetDB())
+	applications, err := applicationService.GetApplicationsByProject(projectID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get applications"})
+		return
+	}
+
+	// Filter for pending applications
+	var pendingApplications []models.Application
+	for _, app := range applications {
+		if app.Status == "pending" {
+			pendingApplications = append(pendingApplications, app)
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"project":              project,
+		"team_members":         teamMembers,
+		"pending_applications": pendingApplications,
+	})
+}
+
+// UpdateLogisticsRequest represents logistics update request
+type UpdateLogisticsRequest struct {
+	BudgetTotal *float64 `json:"budget_total"`
+	BudgetSpent *float64 `json:"budget_spent"`
+}
+
+// UpdateLogistics handles PUT /api/projects/:id/logistics
+func (h *ProjectHandler) UpdateLogistics(c *gin.Context) {
+	projectIDStr := c.Param("id")
+	projectID, err := uuid.Parse(projectIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid project ID"})
+		return
+	}
+
+	var req UpdateLogisticsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Get user context
+	userCtx, exists := middleware.GetUserFromContext(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found in context"})
+		return
+	}
+
+	// Check if user is project owner or admin
+	isTeamLead, err := h.service.IsTeamLead(projectID, userCtx.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check team lead status"})
+		return
+	}
+
+	if !userCtx.HasRole("admin") && !isTeamLead {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Only project team lead can update logistics"})
+		return
+	}
+
+	// Get existing project
+	project, err := h.service.GetByID(projectID)
+	if err != nil || project == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
+		return
+	}
+
+	// Update budget fields
+	if req.BudgetTotal != nil {
+		project.BudgetTotal = req.BudgetTotal
+	}
+	if req.BudgetSpent != nil {
+		project.BudgetSpent = req.BudgetSpent
+	}
+
+	// Update project
+	if err := h.service.Update(project); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update logistics"})
+		return
+	}
+
+	c.JSON(http.StatusOK, project)
+}
+
+// ApproveVolunteerRequest represents volunteer approval request
+type ApproveVolunteerRequest struct {
+	ApplicationID uuid.UUID `json:"application_id" binding:"required"`
+	Approve       bool      `json:"approve"`
+}
+
+// ApproveVolunteer handles POST /api/projects/:id/approve-volunteer
+func (h *ProjectHandler) ApproveVolunteer(c *gin.Context) {
+	projectIDStr := c.Param("id")
+	projectID, err := uuid.Parse(projectIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid project ID"})
+		return
+	}
+
+	var req ApproveVolunteerRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Get user context
+	userCtx, exists := middleware.GetUserFromContext(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found in context"})
+		return
+	}
+
+	// Check if user is project owner or admin
+	isTeamLead, err := h.service.IsTeamLead(projectID, userCtx.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check team lead status"})
+		return
+	}
+
+	if !userCtx.HasRole("admin") && !isTeamLead {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Only project team lead can approve volunteers"})
+		return
+	}
+
+	// Get application
+	applicationService := models.NewApplicationService(h.service.GetDB())
+	application, err := applicationService.GetByID(req.ApplicationID)
+	if err != nil || application == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Application not found"})
+		return
+	}
+
+	// Verify application is for this project
+	if application.ProjectID != projectID {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Application does not belong to this project"})
+		return
+	}
+
+	// Update application status
+	if req.Approve {
+		application.Status = "accepted"
+		// Note: The database trigger will automatically add to project_team_members
+	} else {
+		application.Status = "rejected"
+	}
+
+	if err := applicationService.Update(application); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update application"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":     "Application processed successfully",
+		"application": application,
+	})
+}
+
+// RemoveVolunteer handles DELETE /api/projects/:id/volunteers/:volunteerId
+func (h *ProjectHandler) RemoveVolunteer(c *gin.Context) {
+	projectIDStr := c.Param("id")
+	projectID, err := uuid.Parse(projectIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid project ID"})
+		return
+	}
+
+	volunteerIDStr := c.Param("volunteerId")
+	volunteerID, err := uuid.Parse(volunteerIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid volunteer ID"})
+		return
+	}
+
+	// Get user context
+	userCtx, exists := middleware.GetUserFromContext(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found in context"})
+		return
+	}
+
+	// Check if user is project owner or admin
+	isTeamLead, err := h.service.IsTeamLead(projectID, userCtx.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check team lead status"})
+		return
+	}
+
+	if !userCtx.HasRole("admin") && !isTeamLead {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Only project team lead can remove volunteers"})
+		return
+	}
+
+	// Remove team member
+	if err := h.service.RemoveTeamMember(projectID, volunteerID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to remove volunteer"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Volunteer removed successfully"})
+}
