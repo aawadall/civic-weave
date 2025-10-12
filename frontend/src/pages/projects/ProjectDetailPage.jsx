@@ -2,9 +2,13 @@ import { useState, useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import api from '../../services/api'
+import RichTextEditor from '../../components/RichTextEditor'
+import ProjectTasksTab from './ProjectTasksTab'
+import ProjectMessagesTab from './ProjectMessagesTab'
+import ProjectLogisticsTab from './ProjectLogisticsTab'
 
 export default function ProjectDetailPage() {
-  const { id } = useParams()
+  const { id, tab } = useParams()
   const navigate = useNavigate()
   const { user, hasAnyRole, hasRole } = useAuth()
   const [project, setProject] = useState(null)
@@ -12,14 +16,23 @@ export default function ProjectDetailPage() {
   const [teamMembers, setTeamMembers] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [activeTab, setActiveTab] = useState('details')
+  const [activeTab, setActiveTab] = useState(tab || 'overview')
   const [applying, setApplying] = useState(false)
+  const [isTeamMember, setIsTeamMember] = useState(false)
+  const [volunteerProfile, setVolunteerProfile] = useState(null)
 
   useEffect(() => {
     if (id) {
       fetchProjectDetails()
+      checkTeamMembership()
     }
   }, [id])
+
+  useEffect(() => {
+    if (tab) {
+      setActiveTab(tab)
+    }
+  }, [tab])
 
   const fetchProjectDetails = async () => {
     try {
@@ -45,6 +58,26 @@ export default function ProjectDetailPage() {
       console.error('Error fetching project:', err)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const checkTeamMembership = async () => {
+    try {
+      // Get volunteer profile
+      const volResponse = await api.get('/volunteers')
+      const volunteers = volResponse.data.volunteers || []
+      const myVolunteer = volunteers.find(v => v.user_id === user?.id)
+      setVolunteerProfile(myVolunteer)
+
+      if (myVolunteer) {
+        // Check if user is in project team
+        const teamResponse = await api.get(`/projects/${id}/team-members`)
+        const members = teamResponse.data.team_members || []
+        const isMember = members.some(m => m.volunteer_id === myVolunteer.id && m.status === 'active')
+        setIsTeamMember(isMember)
+      }
+    } catch (err) {
+      console.warn('Could not check team membership:', err)
     }
   }
 
@@ -176,21 +209,21 @@ export default function ProjectDetailPage() {
         {/* Tabs */}
         <div className="bg-white rounded-lg shadow-sm border border-secondary-200">
           <div className="border-b border-secondary-200">
-            <nav className="flex space-x-8 px-6">
+            <nav className="flex space-x-8 px-6 overflow-x-auto">
               <button
-                onClick={() => setActiveTab('details')}
-                className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === 'details'
+                onClick={() => setActiveTab('overview')}
+                className={`py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
+                  activeTab === 'overview'
                     ? 'border-primary-500 text-primary-600'
                     : 'border-transparent text-secondary-500 hover:text-secondary-700'
                 }`}
               >
-                Details
+                Overview
               </button>
               {project.required_skills && project.required_skills.length > 0 && (
                 <button
                   onClick={() => setActiveTab('skills')}
-                  className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                  className={`py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
                     activeTab === 'skills'
                       ? 'border-primary-500 text-primary-600'
                       : 'border-transparent text-secondary-500 hover:text-secondary-700'
@@ -199,11 +232,45 @@ export default function ProjectDetailPage() {
                   Required Skills
                 </button>
               )}
+              {isTeamMember && (
+                <>
+                  <button
+                    onClick={() => setActiveTab('tasks')}
+                    className={`py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
+                      activeTab === 'tasks'
+                        ? 'border-primary-500 text-primary-600'
+                        : 'border-transparent text-secondary-500 hover:text-secondary-700'
+                    }`}
+                  >
+                    Tasks
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('messages')}
+                    className={`py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
+                      activeTab === 'messages'
+                        ? 'border-primary-500 text-primary-600'
+                        : 'border-transparent text-secondary-500 hover:text-secondary-700'
+                    }`}
+                  >
+                    Messages
+                  </button>
+                </>
+              )}
               {canManageProject() && (
                 <>
                   <button
+                    onClick={() => setActiveTab('logistics')}
+                    className={`py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
+                      activeTab === 'logistics'
+                        ? 'border-primary-500 text-primary-600'
+                        : 'border-transparent text-secondary-500 hover:text-secondary-700'
+                    }`}
+                  >
+                    Logistics
+                  </button>
+                  <button
                     onClick={() => setActiveTab('signups')}
-                    className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                    className={`py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
                       activeTab === 'signups'
                         ? 'border-primary-500 text-primary-600'
                         : 'border-transparent text-secondary-500 hover:text-secondary-700'
@@ -213,13 +280,13 @@ export default function ProjectDetailPage() {
                   </button>
                   <button
                     onClick={() => setActiveTab('team')}
-                    className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                    className={`py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
                       activeTab === 'team'
                         ? 'border-primary-500 text-primary-600'
                         : 'border-transparent text-secondary-500 hover:text-secondary-700'
                     }`}
                   >
-                    Team Members ({teamMembers.length})
+                    Team ({teamMembers.length})
                   </button>
                 </>
               )}
@@ -227,11 +294,15 @@ export default function ProjectDetailPage() {
           </div>
 
           <div className="p-6">
-            {activeTab === 'details' && (
+            {activeTab === 'overview' && (
               <div>
-                <h3 className="text-lg font-semibold text-secondary-900 mb-4">Project Details</h3>
+                <h3 className="text-lg font-semibold text-secondary-900 mb-4">Project Description</h3>
                 <div className="prose max-w-none">
-                  <p className="text-secondary-600 whitespace-pre-wrap">{project.description}</p>
+                  {project.content_json ? (
+                    <RichTextEditor value={project.content_json} readOnly={true} />
+                  ) : (
+                    <p className="text-secondary-600 whitespace-pre-wrap">{project.description}</p>
+                  )}
                 </div>
               </div>
             )}
@@ -247,6 +318,18 @@ export default function ProjectDetailPage() {
                   ))}
                 </div>
               </div>
+            )}
+
+            {activeTab === 'tasks' && isTeamMember && (
+              <ProjectTasksTab projectId={id} isProjectOwner={canManageProject()} />
+            )}
+
+            {activeTab === 'messages' && isTeamMember && (
+              <ProjectMessagesTab projectId={id} />
+            )}
+
+            {activeTab === 'logistics' && canManageProject() && (
+              <ProjectLogisticsTab projectId={id} />
             )}
 
             {activeTab === 'signups' && canManageProject() && (
