@@ -30,21 +30,25 @@ const (
 
 // Project represents a project (formerly initiative)
 type Project struct {
-	ID               uuid.UUID     `json:"id" db:"id"`
-	Title            string        `json:"title" db:"title"`
-	Description      string        `json:"description" db:"description"`
-	RequiredSkills   []string      `json:"required_skills" db:"required_skills"`
-	LocationLat      *float64      `json:"location_lat" db:"location_lat"`
-	LocationLng      *float64      `json:"location_lng" db:"location_lng"`
-	LocationAddress  string        `json:"location_address" db:"location_address"`
-	StartDate        *time.Time    `json:"start_date" db:"start_date"`
-	EndDate          *time.Time    `json:"end_date" db:"end_date"`
-	Status           string        `json:"status" db:"status"`
-	ProjectStatus    ProjectStatus `json:"project_status" db:"project_status"`
-	CreatedByAdminID uuid.UUID     `json:"created_by_admin_id" db:"created_by_admin_id"`
-	TeamLeadID       *uuid.UUID    `json:"team_lead_id" db:"team_lead_id"`
-	CreatedAt        time.Time     `json:"created_at" db:"created_at"`
-	UpdatedAt        time.Time     `json:"updated_at" db:"updated_at"`
+	ID               uuid.UUID              `json:"id" db:"id"`
+	Title            string                 `json:"title" db:"title"`
+	Description      string                 `json:"description" db:"description"`
+	ContentJSON      map[string]interface{} `json:"content_json,omitempty" db:"content_json"`
+	RequiredSkills   []string               `json:"required_skills" db:"required_skills"`
+	LocationLat      *float64               `json:"location_lat" db:"location_lat"`
+	LocationLng      *float64               `json:"location_lng" db:"location_lng"`
+	LocationAddress  string                 `json:"location_address" db:"location_address"`
+	StartDate        *time.Time             `json:"start_date" db:"start_date"`
+	EndDate          *time.Time             `json:"end_date" db:"end_date"`
+	Status           string                 `json:"status" db:"status"`
+	ProjectStatus    ProjectStatus          `json:"project_status" db:"project_status"`
+	CreatedByAdminID uuid.UUID              `json:"created_by_admin_id" db:"created_by_admin_id"`
+	TeamLeadID       *uuid.UUID             `json:"team_lead_id" db:"team_lead_id"`
+	BudgetTotal      *float64               `json:"budget_total,omitempty" db:"budget_total"`
+	BudgetSpent      *float64               `json:"budget_spent,omitempty" db:"budget_spent"`
+	Permissions      map[string]interface{} `json:"permissions,omitempty" db:"permissions"`
+	CreatedAt        time.Time              `json:"created_at" db:"created_at"`
+	UpdatedAt        time.Time              `json:"updated_at" db:"updated_at"`
 }
 
 // ProjectTeamMember represents a team member in a project
@@ -376,6 +380,21 @@ func (s *ProjectService) GetProjectSignups(projectID uuid.UUID) ([]Application, 
 // IsTeamLead checks if a user is the team lead for a project
 func (s *ProjectService) IsTeamLead(projectID, userID uuid.UUID) (bool, error) {
 	query := `SELECT COUNT(1) FROM projects WHERE id = $1 AND team_lead_id = $2`
+	var count int
+	err := s.db.QueryRow(query, projectID, userID).Scan(&count)
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
+// IsTeamMember checks if a user is an active team member of a project
+func (s *ProjectService) IsTeamMember(projectID, userID uuid.UUID) (bool, error) {
+	query := `
+		SELECT COUNT(1) 
+		FROM project_team_members ptm
+		JOIN volunteers v ON ptm.volunteer_id = v.id
+		WHERE ptm.project_id = $1 AND v.user_id = $2 AND ptm.status = 'active'`
 	var count int
 	err := s.db.QueryRow(query, projectID, userID).Scan(&count)
 	if err != nil {
