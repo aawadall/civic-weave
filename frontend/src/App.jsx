@@ -20,6 +20,7 @@ import AdminProfilePage from './pages/admin/AdminProfilePage'
 import ProjectsListPage from './pages/projects/ProjectsListPage'
 import ProjectDetailPage from './pages/projects/ProjectDetailPage'
 import CreateProjectPage from './pages/projects/CreateProjectPage'
+import MessageCenter from './pages/MessageCenter'
 // Volunteer pages
 import VolunteersPoolPage from './pages/volunteers/VolunteersPoolPage'
 import VolunteerScorecardPage from './pages/volunteers/VolunteerScorecardPage'
@@ -141,10 +142,19 @@ function App() {
                 } 
               />
               <Route 
-                path="projects/:id" 
+                path="projects/:id/:tab?" 
                 element={
                   <ProtectedRoute>
                     <ProjectDetailPage />
+                  </ProtectedRoute>
+                } 
+              />
+              {/* Message Center */}
+              <Route 
+                path="messages" 
+                element={
+                  <ProtectedRoute>
+                    <MessageCenter />
                   </ProtectedRoute>
                 } 
               />
