@@ -2,6 +2,7 @@ package models
 
 import (
 	"database/sql"
+	"log"
 	"time"
 
 	"github.com/google/uuid"
@@ -204,14 +205,19 @@ func (s *ProjectService) List(limit, offset int, status *string, skills []string
 		skillsJSON, _ = ToJSONArray(skills)
 	}
 
+	log.Printf("🔍 PROJECT_LIST_QUERY: Executing query with params - status=%v, skills=%v, limit=%d, offset=%d", status, skillsJSON, limit, offset)
+	
 	rows, err := s.db.Query(query, status, skillsJSON, limit, offset)
 	if err != nil {
+		log.Printf("❌ PROJECT_LIST_QUERY: Database query failed: %v", err)
 		return nil, err
 	}
 	defer rows.Close()
 
 	var projects []Project
+	rowCount := 0
 	for rows.Next() {
+		rowCount++
 		var project Project
 		var skillsJSON string
 		err := rows.Scan(&project.ID, &project.Title, &project.Description,
@@ -219,17 +225,20 @@ func (s *ProjectService) List(limit, offset int, status *string, skills []string
 			&project.StartDate, &project.EndDate, &project.Status, &project.ProjectStatus,
 			&project.CreatedByAdminID, &project.TeamLeadID, &project.CreatedAt, &project.UpdatedAt)
 		if err != nil {
+			log.Printf("❌ PROJECT_LIST_SCAN: Row %d scan failed: %v", rowCount, err)
 			return nil, err
 		}
 
 		// Parse required skills JSON
 		if err := ParseJSONArray(skillsJSON, &project.RequiredSkills); err != nil {
+			log.Printf("❌ PROJECT_LIST_PARSE: Failed to parse skills for project %s: %v", project.ID, err)
 			return nil, err
 		}
 
 		projects = append(projects, project)
 	}
 
+	log.Printf("✅ PROJECT_LIST_COMPLETE: Successfully processed %d projects", len(projects))
 	return projects, nil
 }
 

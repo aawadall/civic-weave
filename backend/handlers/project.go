@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -48,6 +49,8 @@ func (h *ProjectHandler) ListProjects(c *gin.Context) {
 		offset = 0
 	}
 
+	log.Printf("📋 LIST_PROJECTS: Fetching projects - limit=%d, offset=%d, status=%v, skills=%v", limit, offset, status, skillsParam)
+
 	// Get projects
 	var statusPtr *string
 	if status != "" {
@@ -55,10 +58,12 @@ func (h *ProjectHandler) ListProjects(c *gin.Context) {
 	}
 	projects, err := h.service.List(limit, offset, statusPtr, skillsParam)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get projects"})
+		log.Printf("❌ LIST_PROJECTS: Database error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get projects", "details": err.Error()})
 		return
 	}
 
+	log.Printf("✅ LIST_PROJECTS: Successfully fetched %d projects", len(projects))
 	c.JSON(http.StatusOK, gin.H{
 		"projects": projects,
 		"limit":    limit,
