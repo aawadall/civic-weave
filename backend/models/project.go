@@ -188,11 +188,11 @@ func (s *ProjectService) GetByIDWithDetails(id uuid.UUID) (*ProjectWithDetails, 
 
 // List retrieves projects with optional filtering
 func (s *ProjectService) List(limit, offset int, status *string, skills []string) ([]Project, error) {
+	// Use basic query for backward compatibility
 	query := `
 		SELECT id, title, description, required_skills, location_lat, location_lng, 
 		       location_address, start_date, end_date, status, project_status, 
-		       created_by_admin_id, team_lead_id, created_at, updated_at,
-		       content_json, budget_total, budget_spent, permissions
+		       created_by_admin_id, team_lead_id, created_at, updated_at
 		FROM projects
 		WHERE ($1 IS NULL OR status = $1 OR project_status = $1)
 		AND ($2 IS NULL OR required_skills && $2)
@@ -214,12 +214,10 @@ func (s *ProjectService) List(limit, offset int, status *string, skills []string
 	for rows.Next() {
 		var project Project
 		var skillsJSON string
-		var contentJSONBytes, permissionsBytes []byte
 		err := rows.Scan(&project.ID, &project.Title, &project.Description,
 			&skillsJSON, &project.LocationLat, &project.LocationLng, &project.LocationAddress,
 			&project.StartDate, &project.EndDate, &project.Status, &project.ProjectStatus,
-			&project.CreatedByAdminID, &project.TeamLeadID, &project.CreatedAt, &project.UpdatedAt,
-			&contentJSONBytes, &project.BudgetTotal, &project.BudgetSpent, &permissionsBytes)
+			&project.CreatedByAdminID, &project.TeamLeadID, &project.CreatedAt, &project.UpdatedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -227,20 +225,6 @@ func (s *ProjectService) List(limit, offset int, status *string, skills []string
 		// Parse required skills JSON
 		if err := ParseJSONArray(skillsJSON, &project.RequiredSkills); err != nil {
 			return nil, err
-		}
-
-		// Parse content_json if present
-		if len(contentJSONBytes) > 0 {
-			if err := ParseJSONMap(contentJSONBytes, &project.ContentJSON); err == nil {
-				// Successfully parsed
-			}
-		}
-
-		// Parse permissions if present
-		if len(permissionsBytes) > 0 {
-			if err := ParseJSONMap(permissionsBytes, &project.Permissions); err == nil {
-				// Successfully parsed
-			}
 		}
 
 		projects = append(projects, project)
