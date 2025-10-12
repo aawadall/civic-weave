@@ -30,13 +30,8 @@ func NewApplicationService(db *sql.DB) *ApplicationService {
 
 // Create creates a new application
 func (s *ApplicationService) Create(application *Application) error {
-	query := `
-		INSERT INTO applications (id, volunteer_id, project_id, status, admin_notes)
-		VALUES ($1, $2, $3, $4, $5)
-		RETURNING applied_at, updated_at`
-
 	application.ID = uuid.New()
-	return s.db.QueryRow(query, application.ID, application.VolunteerID,
+	return s.db.QueryRow(applicationCreateQuery, application.ID, application.VolunteerID,
 		application.ProjectID, application.Status, application.AdminNotes).
 		Scan(&application.AppliedAt, &application.UpdatedAt)
 }
@@ -44,11 +39,8 @@ func (s *ApplicationService) Create(application *Application) error {
 // GetByID retrieves an application by ID
 func (s *ApplicationService) GetByID(id uuid.UUID) (*Application, error) {
 	application := &Application{}
-	query := `
-		SELECT id, volunteer_id, project_id, status, applied_at, updated_at, admin_notes
-		FROM applications WHERE id = $1`
 
-	err := s.db.QueryRow(query, id).Scan(
+	err := s.db.QueryRow(applicationGetByIDQuery, id).Scan(
 		&application.ID, &application.VolunteerID, &application.ProjectID,
 		&application.Status, &application.AppliedAt, &application.UpdatedAt, &application.AdminNotes,
 	)
@@ -76,11 +68,8 @@ func (s *ApplicationService) GetByInitiativeAndVolunteer(initiativeID, volunteer
 // GetByVolunteerAndProject retrieves an application by volunteer and project IDs
 func (s *ApplicationService) GetByVolunteerAndProject(volunteerID, projectID uuid.UUID) (*Application, error) {
 	application := &Application{}
-	query := `
-		SELECT id, volunteer_id, project_id, status, applied_at, updated_at, admin_notes
-		FROM applications WHERE volunteer_id = $1 AND project_id = $2`
 
-	err := s.db.QueryRow(query, volunteerID, projectID).Scan(
+	err := s.db.QueryRow(applicationGetByVolunteerAndProjectQuery, volunteerID, projectID).Scan(
 		&application.ID, &application.VolunteerID, &application.ProjectID,
 		&application.Status, &application.AppliedAt, &application.UpdatedAt, &application.AdminNotes,
 	)
@@ -97,16 +86,7 @@ func (s *ApplicationService) GetByVolunteerAndProject(volunteerID, projectID uui
 
 // List retrieves applications with filtering
 func (s *ApplicationService) List(limit, offset int, volunteerID, initiativeID *uuid.UUID, status string) ([]*Application, error) {
-	query := `
-		SELECT id, volunteer_id, project_id, status, applied_at, updated_at, admin_notes
-		FROM applications 
-		WHERE ($1::uuid IS NULL OR volunteer_id = $1)
-		  AND ($2::uuid IS NULL OR project_id = $2)
-		  AND ($3 = '' OR status = $3)
-		ORDER BY applied_at DESC
-		LIMIT $4 OFFSET $5`
-
-	rows, err := s.db.Query(query, volunteerID, initiativeID, status, limit, offset)
+	rows, err := s.db.Query(applicationListQuery, volunteerID, initiativeID, status, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -130,32 +110,19 @@ func (s *ApplicationService) List(limit, offset int, volunteerID, initiativeID *
 
 // Update updates an application
 func (s *ApplicationService) Update(application *Application) error {
-	query := `
-		UPDATE applications 
-		SET status = $2, admin_notes = $3, updated_at = CURRENT_TIMESTAMP
-		WHERE id = $1
-		RETURNING updated_at`
-
-	return s.db.QueryRow(query, application.ID, application.Status, application.AdminNotes).
+	return s.db.QueryRow(applicationUpdateQuery, application.ID, application.Status, application.AdminNotes).
 		Scan(&application.UpdatedAt)
 }
 
 // Delete deletes an application
 func (s *ApplicationService) Delete(id uuid.UUID) error {
-	query := `DELETE FROM applications WHERE id = $1`
-	_, err := s.db.Exec(query, id)
+	_, err := s.db.Exec(applicationDeleteQuery, id)
 	return err
 }
 
 // GetApplicationsByProject retrieves applications for a specific project
 func (s *ApplicationService) GetApplicationsByProject(projectID uuid.UUID) ([]Application, error) {
-	query := `
-		SELECT id, volunteer_id, project_id, status, applied_at, updated_at, admin_notes
-		FROM applications 
-		WHERE project_id = $1
-		ORDER BY applied_at DESC`
-
-	rows, err := s.db.Query(query, projectID)
+	rows, err := s.db.Query(applicationGetByProjectQuery, projectID)
 	if err != nil {
 		return nil, err
 	}

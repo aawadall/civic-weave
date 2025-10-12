@@ -86,20 +86,13 @@ func NewProjectService(db *sql.DB) *ProjectService {
 
 // Create creates a new project
 func (s *ProjectService) Create(project *Project) error {
-	query := `
-		INSERT INTO projects (id, title, description, required_skills, location_lat, location_lng, 
-		                     location_address, start_date, end_date, status, project_status, 
-		                     created_by_admin_id, team_lead_id)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-		RETURNING created_at, updated_at`
-
 	project.ID = uuid.New()
 	skillsJSON, err := ToJSONArray(project.RequiredSkills)
 	if err != nil {
 		return err
 	}
 
-	return s.db.QueryRow(query, project.ID, project.Title, project.Description, skillsJSON,
+	return s.db.QueryRow(projectCreateQuery, project.ID, project.Title, project.Description, skillsJSON,
 		project.LocationLat, project.LocationLng, project.LocationAddress, project.StartDate,
 		project.EndDate, project.Status, project.ProjectStatus, project.CreatedByAdminID,
 		project.TeamLeadID).Scan(&project.CreatedAt, &project.UpdatedAt)
@@ -109,13 +102,8 @@ func (s *ProjectService) Create(project *Project) error {
 func (s *ProjectService) GetByID(id uuid.UUID) (*Project, error) {
 	project := &Project{}
 	var skillsJSON string
-	query := `
-		SELECT id, title, description, required_skills, location_lat, location_lng, 
-		       location_address, start_date, end_date, status, project_status, 
-		       created_by_admin_id, team_lead_id, created_at, updated_at
-		FROM projects WHERE id = $1`
 
-	err := s.db.QueryRow(query, id).Scan(&project.ID, &project.Title, &project.Description,
+	err := s.db.QueryRow(projectGetByIDQuery, id).Scan(&project.ID, &project.Title, &project.Description,
 		&skillsJSON, &project.LocationLat, &project.LocationLng, &project.LocationAddress,
 		&project.StartDate, &project.EndDate, &project.Status, &project.ProjectStatus,
 		&project.CreatedByAdminID, &project.TeamLeadID, &project.CreatedAt, &project.UpdatedAt)
@@ -195,29 +183,12 @@ func (s *ProjectService) List(limit, offset int, status *string, skills []string
 
 	if len(skills) > 0 {
 		// Query with skills filter
-		query = `
-			SELECT id, title, description, required_skills, location_lat, location_lng, 
-			       location_address, start_date, end_date, status, project_status, 
-			       created_by_admin_id, team_lead_id, created_at, updated_at
-			FROM projects
-			WHERE ($1::text IS NULL OR status = $1 OR project_status::text = $1)
-			AND required_skills && $2::jsonb
-			ORDER BY created_at DESC
-			LIMIT $3 OFFSET $4`
-		
+		query = projectListWithSkillsQuery
 		skillsJSON, _ := ToJSONArray(skills)
 		args = []interface{}{status, skillsJSON, limit, offset}
 	} else {
 		// Query without skills filter
-		query = `
-			SELECT id, title, description, required_skills, location_lat, location_lng, 
-			       location_address, start_date, end_date, status, project_status, 
-			       created_by_admin_id, team_lead_id, created_at, updated_at
-			FROM projects
-			WHERE ($1::text IS NULL OR status = $1 OR project_status::text = $1)
-			ORDER BY created_at DESC
-			LIMIT $2 OFFSET $3`
-		
+		query = projectListQuery
 		args = []interface{}{status, limit, offset}
 	}
 
@@ -260,16 +231,7 @@ func (s *ProjectService) List(limit, offset int, status *string, skills []string
 
 // ListByTeamLead retrieves projects for a specific team lead
 func (s *ProjectService) ListByTeamLead(teamLeadID uuid.UUID, limit, offset int) ([]Project, error) {
-	query := `
-		SELECT id, title, description, required_skills, location_lat, location_lng, 
-		       location_address, start_date, end_date, status, project_status, 
-		       created_by_admin_id, team_lead_id, created_at, updated_at
-		FROM projects
-		WHERE team_lead_id = $1
-		ORDER BY created_at DESC
-		LIMIT $2 OFFSET $3`
-
-	rows, err := s.db.Query(query, teamLeadID, limit, offset)
+	rows, err := s.db.Query(projectListByTeamLeadQuery, teamLeadID, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -300,20 +262,12 @@ func (s *ProjectService) ListByTeamLead(teamLeadID uuid.UUID, limit, offset int)
 
 // Update updates a project
 func (s *ProjectService) Update(project *Project) error {
-	query := `
-		UPDATE projects 
-		SET title = $2, description = $3, required_skills = $4, location_lat = $5, 
-		    location_lng = $6, location_address = $7, start_date = $8, end_date = $9, 
-		    status = $10, project_status = $11, team_lead_id = $12, updated_at = CURRENT_TIMESTAMP
-		WHERE id = $1
-		RETURNING updated_at`
-
 	skillsJSON, err := ToJSONArray(project.RequiredSkills)
 	if err != nil {
 		return err
 	}
 
-	return s.db.QueryRow(query, project.ID, project.Title, project.Description, skillsJSON,
+	return s.db.QueryRow(projectUpdateQuery, project.ID, project.Title, project.Description, skillsJSON,
 		project.LocationLat, project.LocationLng, project.LocationAddress, project.StartDate,
 		project.EndDate, project.Status, project.ProjectStatus, project.TeamLeadID).
 		Scan(&project.UpdatedAt)
@@ -321,20 +275,13 @@ func (s *ProjectService) Update(project *Project) error {
 
 // Delete deletes a project
 func (s *ProjectService) Delete(id uuid.UUID) error {
-	query := `DELETE FROM projects WHERE id = $1`
-	_, err := s.db.Exec(query, id)
+	_, err := s.db.Exec(projectDeleteQuery, id)
 	return err
 }
 
 // GetProjectTeamMembers retrieves team members for a project
 func (s *ProjectService) GetProjectTeamMembers(projectID uuid.UUID) ([]ProjectTeamMember, error) {
-	query := `
-		SELECT id, project_id, volunteer_id, joined_at, status, created_at, updated_at
-		FROM project_team_members 
-		WHERE project_id = $1
-		ORDER BY joined_at`
-
-	rows, err := s.db.Query(query, projectID)
+	rows, err := s.db.Query(projectGetTeamMembersQuery, projectID)
 	if err != nil {
 		return nil, err
 	}
@@ -356,24 +303,13 @@ func (s *ProjectService) GetProjectTeamMembers(projectID uuid.UUID) ([]ProjectTe
 
 // AddTeamMember adds a volunteer to a project team
 func (s *ProjectService) AddTeamMember(projectID, volunteerID uuid.UUID, status TeamMemberStatus) error {
-	query := `
-		INSERT INTO project_team_members (id, project_id, volunteer_id, status)
-		VALUES ($1, $2, $3, $4)
-		ON CONFLICT (project_id, volunteer_id) DO UPDATE SET 
-		status = EXCLUDED.status, updated_at = CURRENT_TIMESTAMP`
-
-	_, err := s.db.Exec(query, uuid.New(), projectID, volunteerID, status)
+	_, err := s.db.Exec(projectAddTeamMemberQuery, uuid.New(), projectID, volunteerID, status)
 	return err
 }
 
 // UpdateTeamMemberStatus updates a team member's status
 func (s *ProjectService) UpdateTeamMemberStatus(projectID, volunteerID uuid.UUID, status TeamMemberStatus) error {
-	query := `
-		UPDATE project_team_members 
-		SET status = $3, updated_at = CURRENT_TIMESTAMP
-		WHERE project_id = $1 AND volunteer_id = $2`
-
-	result, err := s.db.Exec(query, projectID, volunteerID, status)
+	result, err := s.db.Exec(projectUpdateTeamMemberStatusQuery, projectID, volunteerID, status)
 	if err != nil {
 		return err
 	}
@@ -392,8 +328,7 @@ func (s *ProjectService) UpdateTeamMemberStatus(projectID, volunteerID uuid.UUID
 
 // RemoveTeamMember removes a volunteer from a project team
 func (s *ProjectService) RemoveTeamMember(projectID, volunteerID uuid.UUID) error {
-	query := `DELETE FROM project_team_members WHERE project_id = $1 AND volunteer_id = $2`
-	_, err := s.db.Exec(query, projectID, volunteerID)
+	_, err := s.db.Exec(projectRemoveTeamMemberQuery, projectID, volunteerID)
 	return err
 }
 
@@ -405,9 +340,8 @@ func (s *ProjectService) GetProjectSignups(projectID uuid.UUID) ([]Application, 
 
 // IsTeamLead checks if a user is the team lead for a project
 func (s *ProjectService) IsTeamLead(projectID, userID uuid.UUID) (bool, error) {
-	query := `SELECT COUNT(1) FROM projects WHERE id = $1 AND team_lead_id = $2`
 	var count int
-	err := s.db.QueryRow(query, projectID, userID).Scan(&count)
+	err := s.db.QueryRow(projectIsTeamLeadQuery, projectID, userID).Scan(&count)
 	if err != nil {
 		return false, err
 	}
@@ -416,13 +350,8 @@ func (s *ProjectService) IsTeamLead(projectID, userID uuid.UUID) (bool, error) {
 
 // IsTeamMember checks if a user is an active team member of a project
 func (s *ProjectService) IsTeamMember(projectID, userID uuid.UUID) (bool, error) {
-	query := `
-		SELECT COUNT(1) 
-		FROM project_team_members ptm
-		JOIN volunteers v ON ptm.volunteer_id = v.id
-		WHERE ptm.project_id = $1 AND v.user_id = $2 AND ptm.status = 'active'`
 	var count int
-	err := s.db.QueryRow(query, projectID, userID).Scan(&count)
+	err := s.db.QueryRow(projectIsTeamMemberQuery, projectID, userID).Scan(&count)
 	if err != nil {
 		return false, err
 	}
@@ -431,12 +360,7 @@ func (s *ProjectService) IsTeamMember(projectID, userID uuid.UUID) (bool, error)
 
 // AssignTeamLead assigns a team lead to a project
 func (s *ProjectService) AssignTeamLead(projectID, teamLeadID uuid.UUID) error {
-	query := `
-		UPDATE projects 
-		SET team_lead_id = $2, updated_at = CURRENT_TIMESTAMP
-		WHERE id = $1`
-
-	result, err := s.db.Exec(query, projectID, teamLeadID)
+	result, err := s.db.Exec(projectAssignTeamLeadQuery, projectID, teamLeadID)
 	if err != nil {
 		return err
 	}
@@ -455,15 +379,7 @@ func (s *ProjectService) AssignTeamLead(projectID, teamLeadID uuid.UUID) error {
 
 // GetActiveProjects retrieves projects that are currently active
 func (s *ProjectService) GetActiveProjects() ([]Project, error) {
-	query := `
-		SELECT id, title, description, required_skills, location_lat, location_lng, 
-		       location_address, start_date, end_date, status, project_status, 
-		       created_by_admin_id, team_lead_id, created_at, updated_at
-		FROM projects
-		WHERE project_status IN ('recruiting', 'active')
-		ORDER BY created_at DESC`
-
-	rows, err := s.db.Query(query)
+	rows, err := s.db.Query(projectGetActiveProjectsQuery)
 	if err != nil {
 		return nil, err
 	}

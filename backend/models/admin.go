@@ -27,24 +27,16 @@ func NewAdminService(db *sql.DB) *AdminService {
 
 // Create creates a new admin
 func (s *AdminService) Create(admin *Admin) error {
-	query := `
-		INSERT INTO admins (id, user_id, name)
-		VALUES ($1, $2, $3)
-		RETURNING created_at`
-
 	admin.ID = uuid.New()
-	return s.db.QueryRow(query, admin.ID, admin.UserID, admin.Name).
+	return s.db.QueryRow(adminCreateQuery, admin.ID, admin.UserID, admin.Name).
 		Scan(&admin.CreatedAt)
 }
 
 // GetByID retrieves an admin by ID
 func (s *AdminService) GetByID(id uuid.UUID) (*Admin, error) {
 	admin := &Admin{}
-	query := `
-		SELECT id, user_id, name, created_at
-		FROM admins WHERE id = $1`
 
-	err := s.db.QueryRow(query, id).Scan(
+	err := s.db.QueryRow(adminGetByIDQuery, id).Scan(
 		&admin.ID, &admin.UserID, &admin.Name, &admin.CreatedAt,
 	)
 
@@ -61,11 +53,8 @@ func (s *AdminService) GetByID(id uuid.UUID) (*Admin, error) {
 // GetByUserID retrieves an admin by user ID
 func (s *AdminService) GetByUserID(userID uuid.UUID) (*Admin, error) {
 	admin := &Admin{}
-	query := `
-		SELECT id, user_id, name, created_at
-		FROM admins WHERE user_id = $1`
 
-	err := s.db.QueryRow(query, userID).Scan(
+	err := s.db.QueryRow(adminGetByUserIDQuery, userID).Scan(
 		&admin.ID, &admin.UserID, &admin.Name, &admin.CreatedAt,
 	)
 
@@ -81,12 +70,7 @@ func (s *AdminService) GetByUserID(userID uuid.UUID) (*Admin, error) {
 
 // List retrieves all admins
 func (s *AdminService) List() ([]*Admin, error) {
-	query := `
-		SELECT id, user_id, name, created_at
-		FROM admins 
-		ORDER BY created_at DESC`
-
-	rows, err := s.db.Query(query)
+	rows, err := s.db.Query(adminListQuery)
 	if err != nil {
 		return nil, err
 	}
@@ -109,18 +93,12 @@ func (s *AdminService) List() ([]*Admin, error) {
 
 // Update updates an admin
 func (s *AdminService) Update(admin *Admin) error {
-	query := `
-		UPDATE admins 
-		SET name = $2
-		WHERE id = $1`
-
-	_, err := s.db.Exec(query, admin.ID, admin.Name)
+	_, err := s.db.Exec(adminUpdateQuery, admin.ID, admin.Name)
 	return err
 }
 
 // Delete deletes an admin
 func (s *AdminService) Delete(id uuid.UUID) error {
-	query := `DELETE FROM admins WHERE id = $1`
-	_, err := s.db.Exec(query, id)
+	_, err := s.db.Exec(adminDeleteQuery, id)
 	return err
 }

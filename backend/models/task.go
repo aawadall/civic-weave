@@ -68,19 +68,13 @@ func NewTaskService(db *sql.DB) *TaskService {
 
 // Create creates a new task
 func (s *TaskService) Create(task *ProjectTask) error {
-	query := `
-		INSERT INTO project_tasks (id, project_id, title, description, assignee_id, 
-		                          created_by_id, status, priority, due_date, labels)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-		RETURNING created_at, updated_at`
-
 	task.ID = uuid.New()
 	labelsJSON, err := ToJSONArray(task.Labels)
 	if err != nil {
 		return err
 	}
 
-	return s.db.QueryRow(query, task.ID, task.ProjectID, task.Title, task.Description,
+	return s.db.QueryRow(taskCreateQuery, task.ID, task.ProjectID, task.Title, task.Description,
 		task.AssigneeID, task.CreatedByID, task.Status, task.Priority, task.DueDate, labelsJSON).
 		Scan(&task.CreatedAt, &task.UpdatedAt)
 }
@@ -90,12 +84,7 @@ func (s *TaskService) GetByID(id uuid.UUID) (*ProjectTask, error) {
 	task := &ProjectTask{}
 	var labelsJSON string
 
-	query := `
-		SELECT id, project_id, title, description, assignee_id, created_by_id, 
-		       status, priority, due_date, labels, created_at, updated_at
-		FROM project_tasks WHERE id = $1`
-
-	err := s.db.QueryRow(query, id).Scan(
+	err := s.db.QueryRow(taskGetByIDQuery, id).Scan(
 		&task.ID, &task.ProjectID, &task.Title, &task.Description, &task.AssigneeID,
 		&task.CreatedByID, &task.Status, &task.Priority, &task.DueDate, &labelsJSON,
 		&task.CreatedAt, &task.UpdatedAt,
@@ -124,33 +113,11 @@ func (s *TaskService) ListByProject(projectID uuid.UUID, userID *uuid.UUID, isPr
 
 	if isProjectOwner || userID == nil {
 		// Project owner or admin sees all tasks
-		query = `
-			SELECT id, project_id, title, description, assignee_id, created_by_id, 
-			       status, priority, due_date, labels, created_at, updated_at
-			FROM project_tasks 
-			WHERE project_id = $1
-			ORDER BY 
-				CASE priority 
-					WHEN 'high' THEN 1 
-					WHEN 'medium' THEN 2 
-					WHEN 'low' THEN 3 
-				END,
-				created_at DESC`
+		query = taskListByProjectOwnerQuery
 		args = []interface{}{projectID}
 	} else {
 		// Regular team member only sees their assigned tasks
-		query = `
-			SELECT id, project_id, title, description, assignee_id, created_by_id, 
-			       status, priority, due_date, labels, created_at, updated_at
-			FROM project_tasks 
-			WHERE project_id = $1 AND (assignee_id = $2 OR assignee_id IS NULL)
-			ORDER BY 
-				CASE priority 
-					WHEN 'high' THEN 1 
-					WHEN 'medium' THEN 2 
-					WHEN 'low' THEN 3 
-				END,
-				created_at DESC`
+		query = taskListByProjectMemberQuery
 		args = []interface{}{projectID, userID}
 	}
 
@@ -186,20 +153,7 @@ func (s *TaskService) ListByProject(projectID uuid.UUID, userID *uuid.UUID, isPr
 
 // ListUnassignedByProject retrieves unassigned tasks for self-assignment
 func (s *TaskService) ListUnassignedByProject(projectID uuid.UUID) ([]ProjectTask, error) {
-	query := `
-		SELECT id, project_id, title, description, assignee_id, created_by_id, 
-		       status, priority, due_date, labels, created_at, updated_at
-		FROM project_tasks 
-		WHERE project_id = $1 AND assignee_id IS NULL AND status != 'done'
-		ORDER BY 
-			CASE priority 
-				WHEN 'high' THEN 1 
-				WHEN 'medium' THEN 2 
-				WHEN 'low' THEN 3 
-			END,
-			created_at DESC`
-
-	rows, err := s.db.Query(query, projectID)
+	rows, err := s.db.Query(taskListUnassignedByProjectQuery, projectID)
 	if err != nil {
 		return nil, err
 	}
@@ -231,25 +185,7 @@ func (s *TaskService) ListUnassignedByProject(projectID uuid.UUID) ([]ProjectTas
 
 // ListByAssignee retrieves tasks assigned to a specific volunteer
 func (s *TaskService) ListByAssignee(assigneeID uuid.UUID) ([]ProjectTask, error) {
-	query := `
-		SELECT id, project_id, title, description, assignee_id, created_by_id, 
-		       status, priority, due_date, labels, created_at, updated_at
-		FROM project_tasks 
-		WHERE assignee_id = $1
-		ORDER BY 
-			CASE status 
-				WHEN 'in_progress' THEN 1 
-				WHEN 'todo' THEN 2 
-				WHEN 'done' THEN 3 
-			END,
-			CASE priority 
-				WHEN 'high' THEN 1 
-				WHEN 'medium' THEN 2 
-				WHEN 'low' THEN 3 
-			END,
-			due_date ASC NULLS LAST`
-
-	rows, err := s.db.Query(query, assigneeID)
+	rows, err := s.db.Query(taskListByAssigneeQuery, assigneeID)
 	if err != nil {
 		return nil, err
 	}
@@ -281,30 +217,18 @@ func (s *TaskService) ListByAssignee(assigneeID uuid.UUID) ([]ProjectTask, error
 
 // Update updates a task
 func (s *TaskService) Update(task *ProjectTask) error {
-	query := `
-		UPDATE project_tasks 
-		SET title = $2, description = $3, assignee_id = $4, status = $5, 
-		    priority = $6, due_date = $7, labels = $8, updated_at = CURRENT_TIMESTAMP
-		WHERE id = $1
-		RETURNING updated_at`
-
 	labelsJSON, err := ToJSONArray(task.Labels)
 	if err != nil {
 		return err
 	}
 
-	return s.db.QueryRow(query, task.ID, task.Title, task.Description, task.AssigneeID,
+	return s.db.QueryRow(taskUpdateQuery, task.ID, task.Title, task.Description, task.AssigneeID,
 		task.Status, task.Priority, task.DueDate, labelsJSON).Scan(&task.UpdatedAt)
 }
 
 // UpdateStatus updates only the status of a task
 func (s *TaskService) UpdateStatus(taskID uuid.UUID, status TaskStatus) error {
-	query := `
-		UPDATE project_tasks 
-		SET status = $2, updated_at = CURRENT_TIMESTAMP
-		WHERE id = $1`
-
-	result, err := s.db.Exec(query, taskID, status)
+	result, err := s.db.Exec(taskUpdateStatusQuery, taskID, status)
 	if err != nil {
 		return err
 	}
@@ -323,12 +247,7 @@ func (s *TaskService) UpdateStatus(taskID uuid.UUID, status TaskStatus) error {
 
 // AssignToVolunteer assigns a task to a volunteer
 func (s *TaskService) AssignToVolunteer(taskID, volunteerID uuid.UUID) error {
-	query := `
-		UPDATE project_tasks 
-		SET assignee_id = $2, updated_at = CURRENT_TIMESTAMP
-		WHERE id = $1`
-
-	result, err := s.db.Exec(query, taskID, volunteerID)
+	result, err := s.db.Exec(taskAssignToVolunteerQuery, taskID, volunteerID)
 	if err != nil {
 		return err
 	}
@@ -347,8 +266,7 @@ func (s *TaskService) AssignToVolunteer(taskID, volunteerID uuid.UUID) error {
 
 // Delete deletes a task
 func (s *TaskService) Delete(id uuid.UUID) error {
-	query := `DELETE FROM project_tasks WHERE id = $1`
-	result, err := s.db.Exec(query, id)
+	result, err := s.db.Exec(taskDeleteQuery, id)
 	if err != nil {
 		return err
 	}
@@ -367,25 +285,14 @@ func (s *TaskService) Delete(id uuid.UUID) error {
 
 // AddUpdate adds a progress update to a task
 func (s *TaskService) AddUpdate(update *TaskUpdate) error {
-	query := `
-		INSERT INTO task_updates (id, task_id, volunteer_id, update_text)
-		VALUES ($1, $2, $3, $4)
-		RETURNING created_at`
-
 	update.ID = uuid.New()
-	return s.db.QueryRow(query, update.ID, update.TaskID, update.VolunteerID, update.UpdateText).
+	return s.db.QueryRow(taskAddUpdateQuery, update.ID, update.TaskID, update.VolunteerID, update.UpdateText).
 		Scan(&update.CreatedAt)
 }
 
 // GetTaskUpdates retrieves all updates for a task
 func (s *TaskService) GetTaskUpdates(taskID uuid.UUID) ([]TaskUpdate, error) {
-	query := `
-		SELECT id, task_id, volunteer_id, update_text, created_at
-		FROM task_updates
-		WHERE task_id = $1
-		ORDER BY created_at DESC`
-
-	rows, err := s.db.Query(query, taskID)
+	rows, err := s.db.Query(taskGetUpdatesQuery, taskID)
 	if err != nil {
 		return nil, err
 	}
