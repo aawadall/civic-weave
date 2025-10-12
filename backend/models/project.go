@@ -465,3 +465,8 @@ func (s *ProjectService) GetActiveProjects() ([]Project, error) {
 
 	return projects, nil
 }
+
+// GetDB returns the database connection (needed for creating other services)
+func (s *ProjectService) GetDB() *sql.DB {
+	return s.db
+}
