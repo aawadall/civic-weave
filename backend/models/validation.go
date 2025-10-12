@@ -252,3 +252,11 @@ func ParseJSONArray(jsonStr string, target *[]string) error {
 	}
 	return json.Unmarshal([]byte(jsonStr), target)
 }
+
+// ParseJSONMap parses a JSONB byte array into a map[string]interface{}
+func ParseJSONMap(jsonBytes []byte, target *map[string]interface{}) error {
+	if len(jsonBytes) == 0 {
+		return nil
+	}
+	return json.Unmarshal(jsonBytes, target)
+}
