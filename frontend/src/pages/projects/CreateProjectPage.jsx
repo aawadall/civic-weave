@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import api from '../../services/api'
+import RichTextEditor from '../../components/RichTextEditor'
 
 export default function CreateProjectPage() {
   const navigate = useNavigate()
@@ -15,6 +16,7 @@ export default function CreateProjectPage() {
     end_date: '',
     status: 'draft'
   })
+  const [contentJson, setContentJson] = useState(null)
   const [newSkill, setNewSkill] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -65,7 +67,11 @@ export default function CreateProjectPage() {
     setError(null)
 
     try {
-      const response = await api.post('/projects', formData)
+      const projectData = {
+        ...formData,
+        content_json: contentJson
+      }
+      const response = await api.post('/projects', projectData)
       navigate(`/projects/${response.data.id}`)
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to create project')
@@ -119,16 +125,14 @@ export default function CreateProjectPage() {
               <label htmlFor="description" className="block text-sm font-medium text-secondary-900 mb-2">
                 Project Description *
               </label>
-              <textarea
-                id="description"
-                name="description"
-                value={formData.description}
-                onChange={handleInputChange}
-                required
-                rows={6}
-                className="w-full px-4 py-2 border border-secondary-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                placeholder="Describe the project, its goals, and what volunteers will be doing"
+              <RichTextEditor
+                value={contentJson}
+                onChange={setContentJson}
+                placeholder="Describe the project, its goals, and what volunteers will be doing. Use the toolbar to format text, add headings, lists, and images."
               />
+              <p className="text-xs text-secondary-500 mt-2">
+                Use the rich text editor to format your project description with headings, lists, and images.
+              </p>
             </div>
 
             {/* Required Skills */}
