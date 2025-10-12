@@ -105,6 +105,26 @@ func (h *VolunteerHandler) UpdateVolunteer(c *gin.Context) {
 		return
 	}
 
+	// Get user context
+	userCtx, exists := middleware.GetUserFromContext(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found in context"})
+		return
+	}
+
+	// Get the volunteer being updated
+	existingVolunteer, err := h.service.GetByID(id)
+	if err != nil || existingVolunteer == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Volunteer not found"})
+		return
+	}
+
+	// Check permission: user can only update their own profile (unless admin)
+	if existingVolunteer.UserID != userCtx.ID && !userCtx.HasRole("admin") {
+		c.JSON(http.StatusForbidden, gin.H{"error": "You can only update your own profile"})
+		return
+	}
+
 	var volunteer models.Volunteer
 	if err := c.ShouldBindJSON(&volunteer); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -115,6 +135,62 @@ func (h *VolunteerHandler) UpdateVolunteer(c *gin.Context) {
 
 	if err := h.service.Update(&volunteer); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update volunteer"})
+		return
+	}
+
+	c.JSON(http.StatusOK, volunteer)
+}
+
+// UpdateMyProfile handles PUT /api/volunteers/me/profile
+func (h *VolunteerHandler) UpdateMyProfile(c *gin.Context) {
+	// Get user context
+	userCtx, exists := middleware.GetUserFromContext(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found in context"})
+		return
+	}
+
+	// Get current volunteer profile
+	volunteer, err := h.service.GetByUserID(userCtx.ID)
+	if err != nil || volunteer == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Volunteer profile not found"})
+		return
+	}
+
+	// Bind update request
+	type UpdateProfileRequest struct {
+		Name            string  `json:"name"`
+		Phone           string  `json:"phone"`
+		LocationAddress string  `json:"location_address"`
+		LocationLat     *float64 `json:"location_lat"`
+		LocationLng     *float64 `json:"location_lng"`
+	}
+
+	var req UpdateProfileRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Update only the allowed fields
+	if req.Name != "" {
+		volunteer.Name = req.Name
+	}
+	if req.Phone != "" {
+		volunteer.Phone = req.Phone
+	}
+	if req.LocationAddress != "" {
+		volunteer.LocationAddress = req.LocationAddress
+	}
+	if req.LocationLat != nil {
+		volunteer.LocationLat = req.LocationLat
+	}
+	if req.LocationLng != nil {
+		volunteer.LocationLng = req.LocationLng
+	}
+
+	if err := h.service.Update(volunteer); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update profile"})
 		return
 	}
 
