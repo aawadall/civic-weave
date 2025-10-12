@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"civicweave/backend/config"
+	"civicweave/backend/middleware"
 	"civicweave/backend/models"
 
 	"github.com/gin-gonic/gin"
