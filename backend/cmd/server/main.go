@@ -86,6 +86,8 @@ func main() {
 	var campaignHandler *handlers.CampaignHandler
 	var skillHandler *handlers.SkillHandler
 	var skillMatchingHandler *handlers.SkillMatchingHandler
+	var taskHandler *handlers.TaskHandler
+	var messageHandler *handlers.MessageHandler
 
 	if userService != nil && volunteerService != nil && adminService != nil && oauthAccountService != nil {
 		authHandler = handlers.NewAuthHandler(
@@ -168,6 +170,15 @@ func main() {
 		// adminSetupHandler = handlers.NewAdminSetupHandler(userService, adminService, emailService)  // Disabled for security
 	}
 
+	// Initialize task and message handlers
+	if db != nil && projectService != nil && volunteerService != nil {
+		taskService := models.NewTaskService(db)
+		taskHandler = handlers.NewTaskHandler(taskService, projectService, volunteerService)
+		
+		messageService := models.NewMessageService(db)
+		messageHandler = handlers.NewMessageHandler(messageService, projectService)
+	}
+
 	// Setup Gin router
 	router := gin.Default()
 
@@ -215,20 +226,54 @@ func main() {
 			protected.PUT("/ratings/:id", volunteerRatingHandler.UpdateRating)
 			protected.DELETE("/ratings/:id", volunteerRatingHandler.DeleteRating)
 
-			// Project routes (renamed from initiatives)
-			protected.GET("/projects", projectHandler.ListProjects)
-			protected.POST("/projects", middleware.RequireAnyRole("team_lead", "admin"), projectHandler.CreateProject)
-			protected.GET("/projects/:id", projectHandler.GetProject)
-			protected.GET("/projects/:id/details", projectHandler.GetProjectWithDetails)
-			protected.PUT("/projects/:id", middleware.RequireAnyRole("team_lead", "admin"), projectHandler.UpdateProject)
-			protected.DELETE("/projects/:id", middleware.RequireRole("admin"), projectHandler.DeleteProject)
+		// Project routes (renamed from initiatives)
+		protected.GET("/projects", projectHandler.ListProjects)
+		protected.POST("/projects", middleware.RequireAnyRole("team_lead", "admin"), projectHandler.CreateProject)
+		protected.GET("/projects/:id", projectHandler.GetProject)
+		protected.GET("/projects/:id/details", projectHandler.GetProjectWithDetails)
+		protected.PUT("/projects/:id", middleware.RequireAnyRole("team_lead", "admin"), projectHandler.UpdateProject)
+		protected.DELETE("/projects/:id", middleware.RequireRole("admin"), projectHandler.DeleteProject)
 
-			// Project team management routes
-			protected.GET("/projects/:id/signups", projectHandler.GetProjectSignups)
-			protected.GET("/projects/:id/team-members", projectHandler.GetProjectTeamMembers)
-			protected.POST("/projects/:id/team-members", projectHandler.AddTeamMember)
-			protected.PUT("/projects/:id/team-members/:volunteerId", projectHandler.UpdateTeamMemberStatus)
-			protected.PUT("/projects/:id/team-lead", middleware.RequireRole("admin"), projectHandler.AssignTeamLead)
+		// Project team management routes
+		protected.GET("/projects/:id/signups", projectHandler.GetProjectSignups)
+		protected.GET("/projects/:id/team-members", projectHandler.GetProjectTeamMembers)
+		protected.POST("/projects/:id/team-members", projectHandler.AddTeamMember)
+		protected.PUT("/projects/:id/team-members/:volunteerId", projectHandler.UpdateTeamMemberStatus)
+		protected.PUT("/projects/:id/team-lead", middleware.RequireRole("admin"), projectHandler.AssignTeamLead)
+
+		// Project logistics routes
+		if projectHandler != nil {
+			protected.GET("/projects/:id/logistics", projectHandler.GetLogistics)
+			protected.PUT("/projects/:id/logistics", projectHandler.UpdateLogistics)
+			protected.POST("/projects/:id/approve-volunteer", projectHandler.ApproveVolunteer)
+			protected.DELETE("/projects/:id/volunteers/:volunteerId", projectHandler.RemoveVolunteer)
+		}
+
+		// Project task routes
+		if taskHandler != nil {
+			protected.GET("/projects/:id/tasks", taskHandler.ListTasks)
+			protected.GET("/projects/:id/tasks/unassigned", taskHandler.ListUnassignedTasks)
+			protected.POST("/projects/:id/tasks", taskHandler.CreateTask)
+			protected.GET("/tasks/:id", taskHandler.GetTask)
+			protected.PUT("/tasks/:id", taskHandler.UpdateTask)
+			protected.DELETE("/tasks/:id", taskHandler.DeleteTask)
+			protected.POST("/tasks/:id/assign", taskHandler.SelfAssignTask)
+			protected.POST("/tasks/:id/updates", taskHandler.AddTaskUpdate)
+		}
+
+		// Project message routes
+		if messageHandler != nil {
+			protected.GET("/projects/:id/messages", messageHandler.ListMessages)
+			protected.GET("/projects/:id/messages/recent", messageHandler.GetRecentMessages)
+			protected.GET("/projects/:id/messages/new", messageHandler.GetNewMessages)
+			protected.POST("/projects/:id/messages", messageHandler.SendMessage)
+			protected.POST("/projects/:id/messages/read-all", messageHandler.MarkAllAsRead)
+			protected.GET("/projects/:id/messages/unread-count", messageHandler.GetUnreadCount)
+			protected.PUT("/messages/:id", messageHandler.EditMessage)
+			protected.DELETE("/messages/:id", messageHandler.DeleteMessage)
+			protected.POST("/messages/:id/read", messageHandler.MarkMessageAsRead)
+			protected.GET("/messages/unread-counts", messageHandler.GetAllUnreadCounts)
+		}
 
 			// Application routes
 			protected.GET("/applications", applicationHandler.ListApplications)
