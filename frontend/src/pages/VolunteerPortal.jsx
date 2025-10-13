@@ -34,8 +34,8 @@ export default function VolunteerPortal() {
       const params = new URLSearchParams()
       if (statusFilter) params.append('status', statusFilter)
       
-      const response = await api.get(`/initiatives?${params.toString()}`)
-      setInitiatives(response.data.initiatives || [])
+      const response = await api.get(`/projects?${params.toString()}`)
+      setInitiatives(response.data.projects || [])
     } catch (error) {
       showToast('Failed to load initiatives', 'error')
     } finally {
@@ -46,7 +46,7 @@ export default function VolunteerPortal() {
   const fetchAppliedInitiatives = async () => {
     try {
       const response = await api.get('/applications')
-      const appliedIds = new Set(response.data.applications?.map(app => app.initiative_id) || [])
+      const appliedIds = new Set(response.data.applications?.map(app => app.project_id) || [])
       setAppliedInitiatives(appliedIds)
     } catch (error) {
       // Silently fail - applications might not be implemented yet
@@ -56,7 +56,7 @@ export default function VolunteerPortal() {
   const handleApply = async (initiativeId) => {
     try {
       await api.post('/applications', {
-        initiative_id: initiativeId,
+        project_id: initiativeId,
         volunteer_id: user.id
       })
       

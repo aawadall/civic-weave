@@ -113,7 +113,7 @@ export default function CreateInitiativePage() {
 
     setLoading(true)
     try {
-      await api.post('/initiatives', formData)
+      await api.post('/projects', formData)
       showToast('Initiative created successfully!', 'success')
       navigate('/admin')
     } catch (error) {

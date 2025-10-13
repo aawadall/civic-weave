@@ -89,19 +89,26 @@ type CreateProjectRequest struct {
 func (h *ProjectHandler) CreateProject(c *gin.Context) {
 	var req CreateProjectRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Printf("❌ CREATE_PROJECT: JSON binding error: %v", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
+	log.Printf("📝 CREATE_PROJECT: Request data - Title=%s, Description length=%d, Skills=%v", req.Title, len(req.Description), req.RequiredSkills)
+
 	// Get user ID from JWT context
 	userCtx, exists := middleware.GetUserFromContext(c)
 	if !exists {
+		log.Printf("❌ CREATE_PROJECT: User not found in context")
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found in context"})
 		return
 	}
 
+	log.Printf("👤 CREATE_PROJECT: User=%s, Roles=%v", userCtx.ID, userCtx.Roles)
+
 	// Check if user has permission to create projects (team_lead or admin)
 	if !userCtx.HasAnyRole("team_lead", "admin") {
+		log.Printf("❌ CREATE_PROJECT: Insufficient permissions for user %s", userCtx.ID)
 		c.JSON(http.StatusForbidden, gin.H{"error": "Insufficient permissions to create projects"})
 		return
 	}
@@ -167,11 +174,14 @@ func (h *ProjectHandler) CreateProject(c *gin.Context) {
 		TeamLeadID:       teamLeadID,
 	}
 
+	log.Printf("💾 CREATE_PROJECT: Attempting to save project to database")
 	if err := h.service.Create(project); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create project"})
+		log.Printf("❌ CREATE_PROJECT: Database error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create project", "details": err.Error()})
 		return
 	}
 
+	log.Printf("✅ CREATE_PROJECT: Successfully created project ID=%s", project.ID)
 	c.JSON(http.StatusCreated, project)
 }
 
