@@ -100,8 +100,9 @@ for secret in "${SECRETS[@]}"; do
         # Convert secret name to env var format (jwt-secret -> JWT_SECRET)
         env_var=$(echo "$secret" | tr '[:lower:]' '[:upper:]' | tr '-' '_')
         
-        # Write to .env file
+        # Write both formats to .env file (for Docker builds and Terraform)
         echo "${env_var}=${value}" >> "$ENV_FILE"
+        echo "TF_VAR_${env_var,,}=${value}" >> "$ENV_FILE"  # Lowercase for TF_VAR
         
         echo -e "${GREEN}✓${NC}"
     else
@@ -109,14 +110,20 @@ for secret in "${SECRETS[@]}"; do
     fi
 done
 
-# Add additional static environment variables for backend
+# Add additional static environment variables
+echo "" >> "$ENV_FILE"
+echo "# Static Configuration Variables" >> "$ENV_FILE"
+
 if [[ "$ENV_FILE" == "backend/.env" ]]; then
-    echo "" >> "$ENV_FILE"
     echo "# Database Configuration (Local Development)" >> "$ENV_FILE"
     echo "DB_HOST=localhost" >> "$ENV_FILE"
     echo "DB_PORT=5432" >> "$ENV_FILE"
     echo "DB_NAME=civicweave" >> "$ENV_FILE"
     echo "DB_USER=civicweave" >> "$ENV_FILE"
+    echo "DB_SSLMODE=disable" >> "$ENV_FILE"
+    echo "" >> "$ENV_FILE"
+    echo "# Feature Flags" >> "$ENV_FILE"
+    echo "ENABLE_EMAIL=false" >> "$ENV_FILE"
     echo "" >> "$ENV_FILE"
     echo "# Redis Configuration (Local Development)" >> "$ENV_FILE"
     echo "REDIS_HOST=localhost" >> "$ENV_FILE"
@@ -128,23 +135,21 @@ if [[ "$ENV_FILE" == "backend/.env" ]]; then
     echo "ADMIN_EMAIL=admin@civicweave.com" >> "$ENV_FILE"
     echo "ADMIN_NAME=System Administrator" >> "$ENV_FILE"
     echo "OPENAI_EMBEDDING_MODEL=text-embedding-3-small" >> "$ENV_FILE"
-fi
-
-# Add Terraform variable format if terraform directory
-if [[ "$ENV_FILE" == "infrastructure/terraform/.env" ]]; then
-    # Convert to TF_VAR_ format
-    sed -i 's/^JWT_SECRET=/TF_VAR_jwt_secret=/' "$ENV_FILE"
-    sed -i 's/^MAILGUN_API_KEY=/TF_VAR_mailgun_api_key=/' "$ENV_FILE"
-    sed -i 's/^MAILGUN_DOMAIN=/TF_VAR_mailgun_domain=/' "$ENV_FILE"
-    sed -i 's/^GOOGLE_CLIENT_ID=/TF_VAR_google_client_id=/' "$ENV_FILE"
-    sed -i 's/^GOOGLE_CLIENT_SECRET=/TF_VAR_google_client_secret=/' "$ENV_FILE"
-    sed -i 's/^DB_PASSWORD=/TF_VAR_db_password=/' "$ENV_FILE"
-    sed -i 's/^ADMIN_PASSWORD=/TF_VAR_admin_password=/' "$ENV_FILE"
-    sed -i 's/^OPENAI_API_KEY=/TF_VAR_openai_api_key=/' "$ENV_FILE"
-    
-    echo "" >> "$ENV_FILE"
-    echo "# Additional Terraform Variables" >> "$ENV_FILE"
+elif [[ "$ENV_FILE" == "infrastructure/terraform/.env" ]] || [[ "$ENV_FILE" == ".env" ]]; then
+    echo "# For Terraform and Docker builds" >> "$ENV_FILE"
     echo "TF_VAR_project_id=$PROJECT_ID" >> "$ENV_FILE"
+    echo "" >> "$ENV_FILE"
+    echo "# Static configuration (for Docker builds)" >> "$ENV_FILE"
+    echo "DB_HOST=localhost" >> "$ENV_FILE"
+    echo "DB_PORT=5432" >> "$ENV_FILE"
+    echo "DB_NAME=civicweave" >> "$ENV_FILE"
+    echo "DB_USER=civicweave" >> "$ENV_FILE"
+    echo "DB_SSLMODE=disable" >> "$ENV_FILE"
+    echo "ENABLE_EMAIL=false" >> "$ENV_FILE"
+    echo "REDIS_HOST=localhost" >> "$ENV_FILE"
+    echo "REDIS_PORT=6379" >> "$ENV_FILE"
+    echo "NOMINATIM_BASE_URL=https://nominatim.openstreetmap.org" >> "$ENV_FILE"
+    echo "OPENAI_EMBEDDING_MODEL=text-embedding-3-small" >> "$ENV_FILE"
 fi
 
 echo ""

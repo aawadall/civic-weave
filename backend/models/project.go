@@ -31,25 +31,26 @@ const (
 
 // Project represents a project (formerly initiative)
 type Project struct {
-	ID               uuid.UUID              `json:"id" db:"id"`
-	Title            string                 `json:"title" db:"title"`
-	Description      string                 `json:"description" db:"description"`
-	ContentJSON      map[string]interface{} `json:"content_json,omitempty" db:"content_json"`
-	RequiredSkills   []string               `json:"required_skills" db:"required_skills"`
-	LocationLat      *float64               `json:"location_lat" db:"location_lat"`
-	LocationLng      *float64               `json:"location_lng" db:"location_lng"`
-	LocationAddress  string                 `json:"location_address" db:"location_address"`
-	StartDate        *time.Time             `json:"start_date" db:"start_date"`
-	EndDate          *time.Time             `json:"end_date" db:"end_date"`
-	Status           string                 `json:"status" db:"status"`
-	ProjectStatus    ProjectStatus          `json:"project_status" db:"project_status"`
-	CreatedByAdminID uuid.UUID              `json:"created_by_admin_id" db:"created_by_admin_id"`
-	TeamLeadID       *uuid.UUID             `json:"team_lead_id" db:"team_lead_id"`
-	BudgetTotal      *float64               `json:"budget_total,omitempty" db:"budget_total"`
-	BudgetSpent      *float64               `json:"budget_spent,omitempty" db:"budget_spent"`
-	Permissions      map[string]interface{} `json:"permissions,omitempty" db:"permissions"`
-	CreatedAt        time.Time              `json:"created_at" db:"created_at"`
-	UpdatedAt        time.Time              `json:"updated_at" db:"updated_at"`
+	ID                uuid.UUID              `json:"id" db:"id"`
+	Title             string                 `json:"title" db:"title"`
+	Description       string                 `json:"description" db:"description"`
+	ContentJSON       map[string]interface{} `json:"content_json,omitempty" db:"content_json"`
+	RequiredSkills    []string               `json:"required_skills" db:"required_skills"`
+	LocationLat       *float64               `json:"location_lat" db:"location_lat"`
+	LocationLng       *float64               `json:"location_lng" db:"location_lng"`
+	LocationAddress   string                 `json:"location_address" db:"location_address"`
+	StartDate         *time.Time             `json:"start_date" db:"start_date"`
+	EndDate           *time.Time             `json:"end_date" db:"end_date"`
+	Status            string                 `json:"status" db:"status"`
+	ProjectStatus     ProjectStatus          `json:"project_status" db:"project_status"`
+	CreatedByAdminID  uuid.UUID              `json:"created_by_admin_id" db:"created_by_admin_id"`
+	TeamLeadID        *uuid.UUID             `json:"team_lead_id" db:"team_lead_id"`
+	BudgetTotal       *float64               `json:"budget_total,omitempty" db:"budget_total"`
+	BudgetSpent       *float64               `json:"budget_spent,omitempty" db:"budget_spent"`
+	Permissions       map[string]interface{} `json:"permissions,omitempty" db:"permissions"`
+	AutoNotifyMatches bool                   `json:"auto_notify_matches" db:"auto_notify_matches"`
+	CreatedAt         time.Time              `json:"created_at" db:"created_at"`
+	UpdatedAt         time.Time              `json:"updated_at" db:"updated_at"`
 }
 
 // ProjectTeamMember represents a team member in a project
@@ -95,7 +96,7 @@ func (s *ProjectService) Create(project *Project) error {
 	return s.db.QueryRow(projectCreateQuery, project.ID, project.Title, project.Description, skillsJSON,
 		project.LocationLat, project.LocationLng, project.LocationAddress, project.StartDate,
 		project.EndDate, project.Status, project.ProjectStatus, project.CreatedByAdminID,
-		project.TeamLeadID).Scan(&project.CreatedAt, &project.UpdatedAt)
+		project.TeamLeadID, project.AutoNotifyMatches).Scan(&project.CreatedAt, &project.UpdatedAt)
 }
 
 // GetByID retrieves a project by ID
@@ -106,7 +107,7 @@ func (s *ProjectService) GetByID(id uuid.UUID) (*Project, error) {
 	err := s.db.QueryRow(projectGetByIDQuery, id).Scan(&project.ID, &project.Title, &project.Description,
 		&skillsJSON, &project.LocationLat, &project.LocationLng, &project.LocationAddress,
 		&project.StartDate, &project.EndDate, &project.Status, &project.ProjectStatus,
-		&project.CreatedByAdminID, &project.TeamLeadID, &project.CreatedAt, &project.UpdatedAt)
+		&project.CreatedByAdminID, &project.TeamLeadID, &project.AutoNotifyMatches, &project.CreatedAt, &project.UpdatedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
@@ -210,7 +211,7 @@ func (s *ProjectService) List(limit, offset int, status *string, skills []string
 		err := rows.Scan(&project.ID, &project.Title, &project.Description,
 			&skillsJSON, &project.LocationLat, &project.LocationLng, &project.LocationAddress,
 			&project.StartDate, &project.EndDate, &project.Status, &project.ProjectStatus,
-			&project.CreatedByAdminID, &project.TeamLeadID, &project.CreatedAt, &project.UpdatedAt)
+			&project.CreatedByAdminID, &project.TeamLeadID, &project.AutoNotifyMatches, &project.CreatedAt, &project.UpdatedAt)
 		if err != nil {
 			log.Printf("❌ PROJECT_LIST_SCAN: Row %d scan failed: %v", rowCount, err)
 			return nil, err
@@ -244,7 +245,7 @@ func (s *ProjectService) ListByTeamLead(teamLeadID uuid.UUID, limit, offset int)
 		err := rows.Scan(&project.ID, &project.Title, &project.Description,
 			&skillsJSON, &project.LocationLat, &project.LocationLng, &project.LocationAddress,
 			&project.StartDate, &project.EndDate, &project.Status, &project.ProjectStatus,
-			&project.CreatedByAdminID, &project.TeamLeadID, &project.CreatedAt, &project.UpdatedAt)
+			&project.CreatedByAdminID, &project.TeamLeadID, &project.AutoNotifyMatches, &project.CreatedAt, &project.UpdatedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -269,7 +270,7 @@ func (s *ProjectService) Update(project *Project) error {
 
 	return s.db.QueryRow(projectUpdateQuery, project.ID, project.Title, project.Description, skillsJSON,
 		project.LocationLat, project.LocationLng, project.LocationAddress, project.StartDate,
-		project.EndDate, project.Status, project.ProjectStatus, project.TeamLeadID).
+		project.EndDate, project.Status, project.ProjectStatus, project.TeamLeadID, project.AutoNotifyMatches).
 		Scan(&project.UpdatedAt)
 }
 
@@ -392,7 +393,7 @@ func (s *ProjectService) GetActiveProjects() ([]Project, error) {
 		err := rows.Scan(&project.ID, &project.Title, &project.Description,
 			&skillsJSON, &project.LocationLat, &project.LocationLng, &project.LocationAddress,
 			&project.StartDate, &project.EndDate, &project.Status, &project.ProjectStatus,
-			&project.CreatedByAdminID, &project.TeamLeadID, &project.CreatedAt, &project.UpdatedAt)
+			&project.CreatedByAdminID, &project.TeamLeadID, &project.AutoNotifyMatches, &project.CreatedAt, &project.UpdatedAt)
 		if err != nil {
 			return nil, err
 		}

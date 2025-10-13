@@ -100,8 +100,8 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	user := &models.User{
 		Email:         req.Email,
 		PasswordHash:  string(hashedPassword),
-		EmailVerified: false,
-		Role:          "volunteer", // Default role for regular registration
+		EmailVerified: !h.config.Features.EmailEnabled, // Auto-verify when email system is disabled
+		Role:          "volunteer",                     // Default role for regular registration
 	}
 
 	if err := h.UserService.Create(user); err != nil {

@@ -28,6 +28,7 @@ type DatabaseConfig struct {
 	Name     string
 	User     string
 	Password string
+	SSLMode  string
 }
 
 // RedisConfig holds Redis connection settings
@@ -75,6 +76,7 @@ func Load() *Config {
 			Name:     getEnv("DB_NAME", "civicweave"),
 			User:     getEnv("DB_USER", "civicweave"),
 			Password: getEnv("DB_PASSWORD", "civicweave_dev"),
+			SSLMode:  getEnv("DB_SSLMODE", "disable"),
 		},
 		Redis: RedisConfig{
 			Host:     getEnv("REDIS_HOST", "localhost"),

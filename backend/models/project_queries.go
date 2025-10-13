@@ -5,20 +5,20 @@ const (
 	projectCreateQuery = `
 		INSERT INTO projects (id, title, description, required_skills, location_lat, location_lng, 
 		                     location_address, start_date, end_date, status, project_status, 
-		                     created_by_admin_id, team_lead_id)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+		                     created_by_admin_id, team_lead_id, auto_notify_matches)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 		RETURNING created_at, updated_at`
 
 	projectGetByIDQuery = `
 		SELECT id, title, description, required_skills, location_lat, location_lng, 
 		       location_address, start_date, end_date, status, project_status, 
-		       created_by_admin_id, team_lead_id, created_at, updated_at
+		       created_by_admin_id, team_lead_id, auto_notify_matches, created_at, updated_at
 		FROM projects WHERE id = $1`
 
 	projectListWithSkillsQuery = `
 		SELECT id, title, description, required_skills, location_lat, location_lng, 
 		       location_address, start_date, end_date, status, project_status, 
-		       created_by_admin_id, team_lead_id, created_at, updated_at
+		       created_by_admin_id, team_lead_id, auto_notify_matches, created_at, updated_at
 		FROM projects
 		WHERE ($1::text IS NULL OR status = $1 OR project_status::text = $1)
 		AND required_skills && $2::jsonb
@@ -28,7 +28,7 @@ const (
 	projectListQuery = `
 		SELECT id, title, description, required_skills, location_lat, location_lng, 
 		       location_address, start_date, end_date, status, project_status, 
-		       created_by_admin_id, team_lead_id, created_at, updated_at
+		       created_by_admin_id, team_lead_id, auto_notify_matches, created_at, updated_at
 		FROM projects
 		WHERE ($1::text IS NULL OR status = $1 OR project_status::text = $1)
 		ORDER BY created_at DESC
@@ -37,7 +37,7 @@ const (
 	projectListByTeamLeadQuery = `
 		SELECT id, title, description, required_skills, location_lat, location_lng, 
 		       location_address, start_date, end_date, status, project_status, 
-		       created_by_admin_id, team_lead_id, created_at, updated_at
+		       created_by_admin_id, team_lead_id, auto_notify_matches, created_at, updated_at
 		FROM projects
 		WHERE team_lead_id = $1
 		ORDER BY created_at DESC
@@ -47,7 +47,8 @@ const (
 		UPDATE projects 
 		SET title = $2, description = $3, required_skills = $4, location_lat = $5, 
 		    location_lng = $6, location_address = $7, start_date = $8, end_date = $9, 
-		    status = $10, project_status = $11, team_lead_id = $12, updated_at = CURRENT_TIMESTAMP
+		    status = $10, project_status = $11, team_lead_id = $12, auto_notify_matches = $13, 
+		    updated_at = CURRENT_TIMESTAMP
 		WHERE id = $1
 		RETURNING updated_at`
 
@@ -88,7 +89,7 @@ const (
 	projectGetActiveProjectsQuery = `
 		SELECT id, title, description, required_skills, location_lat, location_lng, 
 		       location_address, start_date, end_date, status, project_status, 
-		       created_by_admin_id, team_lead_id, created_at, updated_at
+		       created_by_admin_id, team_lead_id, auto_notify_matches, created_at, updated_at
 		FROM projects
 		WHERE project_status IN ('recruiting', 'active')
 		ORDER BY created_at DESC`

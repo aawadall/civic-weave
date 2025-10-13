@@ -14,8 +14,8 @@ import (
 // Connect establishes a connection to PostgreSQL
 func Connect(cfg config.DatabaseConfig) (*sql.DB, error) {
 	dsn := fmt.Sprintf(
-		"host=%s port=%s dbname=%s user=%s password=%s sslmode=require",
-		cfg.Host, cfg.Port, cfg.Name, cfg.User, cfg.Password,
+		"host=%s port=%s dbname=%s user=%s password=%s sslmode=%s",
+		cfg.Host, cfg.Port, cfg.Name, cfg.User, cfg.Password, cfg.SSLMode,
 	)
 
 	db, err := sql.Open("postgres", dsn)

@@ -34,4 +34,9 @@ api.interceptors.response.use(
   }
 )
 
+// API functions
+export const getUnreadMessageCounts = () => {
+  return api.get('/messages/unread-counts')
+}
+
 export default api

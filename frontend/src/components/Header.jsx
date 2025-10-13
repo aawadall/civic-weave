@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import MessagesIcon from './MessagesIcon'
 
 export default function Header() {
   const { user, logout, isAuthenticated, hasAnyRole, hasRole } = useAuth()
@@ -73,6 +74,7 @@ export default function Header() {
           <div className="flex items-center space-x-4">
             {isAuthenticated ? (
               <div className="flex items-center space-x-4">
+                <MessagesIcon />
                 <div className="flex flex-col">
                   <span className="text-sm text-secondary-700">
                     Welcome, {user?.name || user?.email}

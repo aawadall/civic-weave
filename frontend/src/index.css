@@ -6,6 +6,72 @@
   html {
     font-family: 'Inter', system-ui, sans-serif;
   }
+  
+  /* TipTap Editor Styles */
+  .ProseMirror {
+    outline: none;
+  }
+  
+  .ProseMirror p {
+    margin: 0.5em 0;
+  }
+  
+  .ProseMirror h1 {
+    font-size: 2em;
+    font-weight: bold;
+    margin: 0.5em 0;
+  }
+  
+  .ProseMirror h2 {
+    font-size: 1.5em;
+    font-weight: bold;
+    margin: 0.5em 0;
+  }
+  
+  .ProseMirror h3 {
+    font-size: 1.25em;
+    font-weight: bold;
+    margin: 0.5em 0;
+  }
+  
+  .ProseMirror ul,
+  .ProseMirror ol {
+    padding-left: 2em;
+    margin: 0.5em 0;
+  }
+  
+  .ProseMirror li {
+    margin: 0.25em 0;
+  }
+  
+  .ProseMirror strong {
+    font-weight: bold;
+  }
+  
+  .ProseMirror em {
+    font-style: italic;
+  }
+  
+  .ProseMirror img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 0.5em;
+    margin: 1em 0;
+  }
+  
+  .ProseMirror hr {
+    border: none;
+    border-top: 2px solid #e5e7eb;
+    margin: 2em 0;
+  }
+  
+  .ProseMirror p.is-editor-empty:first-child::before {
+    content: attr(data-placeholder);
+    float: left;
+    color: #adb5bd;
+    pointer-events: none;
+    height: 0;
+  }
 }
 
 @layer components {

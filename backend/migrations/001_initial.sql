@@ -3,7 +3,7 @@
 
 -- Enable required extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE EXTENSION IF NOT EXISTS "postgis";
+-- CREATE EXTENSION IF NOT EXISTS "postgis";  -- Commented out for local dev without PostGIS
 
 -- Users table (unified authentication)
 CREATE TABLE users (
@@ -103,10 +103,10 @@ CREATE TABLE applications (
 CREATE INDEX idx_users_email ON users(email);
 CREATE INDEX idx_users_role ON users(role);
 CREATE INDEX idx_volunteers_skills ON volunteers USING GIN (skills);
-CREATE INDEX idx_volunteers_location ON volunteers USING GIST (ST_Point(location_lng, location_lat));
+-- CREATE INDEX idx_volunteers_location ON volunteers USING GIST (ST_Point(location_lng, location_lat));  -- Requires PostGIS
 CREATE INDEX idx_initiatives_required_skills ON initiatives USING GIN (required_skills);
 CREATE INDEX idx_initiatives_status ON initiatives(status);
-CREATE INDEX idx_initiatives_location ON initiatives USING GIST (ST_Point(location_lng, location_lat));
+-- CREATE INDEX idx_initiatives_location ON initiatives USING GIST (ST_Point(location_lng, location_lat));  -- Requires PostGIS
 CREATE INDEX idx_applications_volunteer_id ON applications(volunteer_id);
 CREATE INDEX idx_applications_initiative_id ON applications(initiative_id);
 CREATE INDEX idx_applications_status ON applications(status);
@@ -116,10 +116,10 @@ CREATE INDEX idx_applications_status ON applications(status);
 DROP INDEX IF EXISTS idx_applications_status;
 DROP INDEX IF EXISTS idx_applications_initiative_id;
 DROP INDEX IF EXISTS idx_applications_volunteer_id;
-DROP INDEX IF EXISTS idx_initiatives_location;
+-- DROP INDEX IF EXISTS idx_initiatives_location;  -- Commented out (PostGIS)
 DROP INDEX IF EXISTS idx_initiatives_status;
 DROP INDEX IF EXISTS idx_initiatives_required_skills;
-DROP INDEX IF EXISTS idx_volunteers_location;
+-- DROP INDEX IF EXISTS idx_volunteers_location;  -- Commented out (PostGIS)
 DROP INDEX IF EXISTS idx_volunteers_skills;
 DROP INDEX IF EXISTS idx_users_role;
 DROP INDEX IF EXISTS idx_users_email;

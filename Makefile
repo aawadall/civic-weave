@@ -1,4 +1,4 @@
-.PHONY: dev-up dev-down db-migrate db-seed test lint clean fetch-secrets setup-gcp deploy-infra deploy-app build-dev build-push build-push-prod help
+.PHONY: dev-up dev-down db-migrate db-seed test lint clean fetch-secrets setup-gcp deploy-infra deploy-app configure-cloud-run build-dev build-push build-push-prod help
 
 # Development commands
 dev-up:
@@ -52,6 +52,27 @@ deploy-infra:
 	cd infrastructure/terraform && \
 	if [ -f .env ]; then export $$(cat .env | grep -v '^#' | xargs); fi && \
 	terraform init && terraform apply
+
+configure-cloud-run:
+	@echo "⚙️  Configuring Cloud Run environment variables..."
+	@echo ""
+	@echo "🔍 Discovering Cloud SQL instance..."
+	$(eval CLOUD_SQL_CONNECTION := $(shell gcloud sql instances list --format="value(connectionName)" --filter="name:civicweave-postgres" --limit=1))
+	@if [ -z "$(CLOUD_SQL_CONNECTION)" ]; then \
+		echo "❌ Error: Could not find Cloud SQL instance 'civicweave-postgres'"; \
+		exit 1; \
+	fi
+	@echo "✅ Found: $(CLOUD_SQL_CONNECTION)"
+	@echo ""
+	@echo "🔐 Configuring backend with secrets and environment variables..."
+	gcloud run services update civicweave-backend \
+		--region=us-central1 \
+		--add-cloudsql-instances=$(CLOUD_SQL_CONNECTION) \
+		--set-secrets="JWT_SECRET=jwt-secret:latest,DB_PASSWORD=db-password:latest,MAILGUN_API_KEY=mailgun-api-key:latest,MAILGUN_DOMAIN=mailgun-domain:latest,GOOGLE_CLIENT_ID=google-client-id:latest,GOOGLE_CLIENT_SECRET=google-client-secret:latest,OPENAI_API_KEY=openai-api-key:latest" \
+		--set-env-vars="DB_HOST=/cloudsql/$(CLOUD_SQL_CONNECTION),DB_PORT=5432,DB_NAME=civicweave,DB_USER=civicweave,DB_SSLMODE=disable,ENABLE_EMAIL=false,NOMINATIM_BASE_URL=https://nominatim.openstreetmap.org,OPENAI_EMBEDDING_MODEL=text-embedding-3-small" \
+		--quiet
+	@echo ""
+	@echo "✅ Cloud Run configuration complete!"
 
 deploy-app:
 	@echo "🚀 Deploying to Cloud Run..."
@@ -119,11 +140,12 @@ help:
 	@echo "  lint          - Run linters"
 	@echo ""
 	@echo "Production Deployment:"
-	@echo "  fetch-secrets - Fetch secrets from GCP Secret Manager"
-	@echo "  setup-gcp     - Set up new GCP project (run once)"
-	@echo "  deploy-infra  - Deploy infrastructure to GCP"
-	@echo "  build-push    - Build and push container images to production"
-	@echo "  deploy-app    - Deploy applications to GCP Cloud Run"
+	@echo "  fetch-secrets      - Fetch secrets from GCP Secret Manager"
+	@echo "  setup-gcp          - Set up new GCP project (run once)"
+	@echo "  deploy-infra       - Deploy infrastructure to GCP"
+	@echo "  configure-cloud-run - Configure Cloud Run env vars (run once after setup)"
+	@echo "  build-push         - Build and push container images to production"
+	@echo "  deploy-app         - Deploy applications to GCP Cloud Run"
 	@echo ""
 	@echo "Cleanup:"
 	@echo "  clean         - Clean up containers and volumes"

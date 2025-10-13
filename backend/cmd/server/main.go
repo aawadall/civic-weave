@@ -16,6 +16,17 @@ import (
 	"github.com/joho/godotenv"
 )
 
+// maskPassword masks a password for logging
+func maskPassword(password string) string {
+	if password == "" {
+		return "(empty)"
+	}
+	if len(password) <= 4 {
+		return "***"
+	}
+	return password[:2] + "***" + password[len(password)-2:]
+}
+
 func main() {
 	// Load environment variables
 	if err := godotenv.Load(); err != nil {
@@ -25,16 +36,32 @@ func main() {
 	// Load configuration
 	cfg := config.Load()
 
+	// Log database configuration (without password)
+	log.Printf("🔧 Database Configuration:")
+	log.Printf("   Host: %s", cfg.Database.Host)
+	log.Printf("   Port: %s", cfg.Database.Port)
+	log.Printf("   Name: %s", cfg.Database.Name)
+	log.Printf("   User: %s", cfg.Database.User)
+	log.Printf("   SSLMode: %s", cfg.Database.SSLMode)
+	log.Printf("   Password: %s", maskPassword(cfg.Database.Password))
+
 	// Initialize database
+	log.Println("🔌 Attempting to connect to database...")
 	db, err := database.Connect(cfg.Database)
 	if err != nil {
-		log.Printf("Warning: Failed to connect to database: %v", err)
-		log.Println("Starting server without database connection...")
+		log.Printf("❌ CRITICAL ERROR: Failed to connect to database: %v", err)
+		log.Println("⚠️  WARNING: Starting server WITHOUT database connection - ALL ROUTES WILL FAIL!")
+		log.Printf("🔍 Connection string used: host=%s port=%s dbname=%s user=%s sslmode=%s",
+			cfg.Database.Host, cfg.Database.Port, cfg.Database.Name, cfg.Database.User, cfg.Database.SSLMode)
 		db = nil
 	} else {
+		log.Println("✅ Successfully connected to database")
 		// Run migrations
+		log.Println("🔄 Running database migrations...")
 		if err := database.Migrate(db); err != nil {
-			log.Printf("Warning: Failed to run migrations: %v", err)
+			log.Printf("⚠️  Warning: Failed to run migrations: %v", err)
+		} else {
+			log.Println("✅ Database migrations completed")
 		}
 	}
 
@@ -89,6 +116,7 @@ func main() {
 	var taskHandler *handlers.TaskHandler
 	var messageHandler *handlers.MessageHandler
 
+	log.Println("🔧 Initializing handlers...")
 	if userService != nil && volunteerService != nil && adminService != nil && oauthAccountService != nil {
 		authHandler = handlers.NewAuthHandler(
 			userService,
@@ -107,6 +135,9 @@ func main() {
 			emailService,
 			cfg,
 		)
+		log.Println("✅ Auth handlers initialized")
+	} else {
+		log.Println("❌ CRITICAL: Auth handlers NOT initialized (database connection failed)")
 	}
 	if volunteerService != nil {
 		volunteerHandler = handlers.NewVolunteerHandler(volunteerService, cfg)
@@ -185,7 +216,15 @@ func main() {
 	// CORS middleware
 	router.Use(middleware.CORS())
 
+	// Log handler status before registering routes
+	log.Println("📋 Handler Status:")
+	log.Printf("   authHandler: %v", authHandler != nil)
+	log.Printf("   projectHandler: %v", projectHandler != nil)
+	log.Printf("   volunteerHandler: %v", volunteerHandler != nil)
+	log.Printf("   messageHandler: %v", messageHandler != nil)
+
 	// API routes
+	log.Println("🛣️  Registering API routes...")
 	api := router.Group("/api")
 	{
 		// Public routes
@@ -195,6 +234,9 @@ func main() {
 				auth.POST("/register", middleware.RegistrationRateLimiter(), authHandler.Register)
 				auth.POST("/login", middleware.LoginRateLimiter(), authHandler.Login)
 				auth.POST("/verify-email", authHandler.VerifyEmail)
+				log.Println("✅ Auth routes registered")
+			} else {
+				log.Println("❌ CRITICAL: Auth routes NOT registered (authHandler is nil)")
 				// auth.POST("/forgot-password", authHandler.ForgotPassword)
 				// auth.POST("/reset-password", authHandler.ResetPassword)
 			}
@@ -389,7 +431,16 @@ func main() {
 		port = "8080"
 	}
 
-	log.Printf("Server starting on port %s", port)
+	log.Println("==========================================")
+	if authHandler != nil {
+		log.Println("✅ Server ready with FULL functionality")
+	} else {
+		log.Println("⚠️  Server starting with LIMITED functionality (DATABASE CONNECTION FAILED)")
+		log.Println("⚠️  Auth routes will return 404 - FIX DATABASE CONNECTION!")
+	}
+	log.Printf("🚀 Server starting on port %s", port)
+	log.Println("==========================================")
+
 	if err := router.Run(":" + port); err != nil {
 		log.Fatal("Failed to start server:", err)
 	}
