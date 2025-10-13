@@ -10,6 +10,10 @@ import psycopg2
 import numpy as np
 from datetime import datetime
 from typing import Dict, List, Tuple
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Add the backend directory to the path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -99,21 +103,21 @@ def calculate_coverage_score(volunteer_weights: Dict[int, float], project_skill_
     return total_weight / len(project_skill_ids)
 
 def recalculate_all_matches(conn):
-    """Recalculate all volunteer-initiative matches."""
+    """Recalculate all volunteer-project matches."""
     cursor = conn.cursor()
     
     print(f"Starting match calculation at {datetime.now()}")
     
-    # Get all active initiatives with their required skills
+    # Get all active/recruiting projects with their required skills
     cursor.execute("""
-        SELECT i.id, array_agg(irs.skill_id) as required_skills
-        FROM initiatives i
-        JOIN initiative_required_skills irs ON i.id = irs.initiative_id
-        WHERE i.status = 'active'
-        GROUP BY i.id
+        SELECT p.id, array_agg(prs.skill_id) as required_skills
+        FROM projects p
+        JOIN project_required_skills prs ON p.id = prs.project_id
+        WHERE p.project_status IN ('recruiting', 'active')
+        GROUP BY p.id
     """)
-    initiatives = cursor.fetchall()
-    print(f"Found {len(initiatives)} active initiatives")
+    projects = cursor.fetchall()
+    print(f"Found {len(projects)} recruiting/active projects")
     
     # Get all volunteers with their skill weights
     cursor.execute("""
@@ -134,10 +138,10 @@ def recalculate_all_matches(conn):
     
     # Calculate matches for all combinations
     matches = []
-    total_combinations = len(initiatives) * len(volunteer_skills)
+    total_combinations = len(projects) * len(volunteer_skills)
     processed = 0
     
-    for initiative_id, required_skills in initiatives:
+    for project_id, required_skills in projects:
         for volunteer_id, skills in volunteer_skills.items():
             # Calculate all similarity metrics
             cosine_score, matched_ids, matched_count = calculate_cosine_similarity(
@@ -152,7 +156,7 @@ def recalculate_all_matches(conn):
                 jaccard = matched_count / len(required_skills)
                 
                 matches.append((
-                    volunteer_id, initiative_id, cosine_score, jaccard,
+                    volunteer_id, project_id, cosine_score, jaccard,
                     matched_ids, matched_count, datetime.now()
                 ))
             
@@ -164,12 +168,12 @@ def recalculate_all_matches(conn):
     
     # Clear old matches and insert new ones
     print("Clearing old matches...")
-    cursor.execute("TRUNCATE volunteer_initiative_matches")
+    cursor.execute("TRUNCATE volunteer_project_matches")
     
     print("Inserting new matches...")
     cursor.executemany("""
-        INSERT INTO volunteer_initiative_matches 
-        (volunteer_id, initiative_id, match_score, jaccard_index, 
+        INSERT INTO volunteer_project_matches 
+        (volunteer_id, project_id, match_score, jaccard_index, 
          matched_skill_ids, matched_skill_count, calculated_at)
         VALUES (%s, %s, %s, %s, %s, %s, %s)
     """, matches)
@@ -182,14 +186,14 @@ def get_match_statistics(conn):
     cursor = conn.cursor()
     
     # Basic counts
-    cursor.execute("SELECT COUNT(*) FROM volunteer_initiative_matches")
+    cursor.execute("SELECT COUNT(*) FROM volunteer_project_matches")
     total_matches = cursor.fetchone()[0]
     
-    cursor.execute("SELECT COUNT(DISTINCT volunteer_id) FROM volunteer_initiative_matches")
+    cursor.execute("SELECT COUNT(DISTINCT volunteer_id) FROM volunteer_project_matches")
     volunteers_with_matches = cursor.fetchone()[0]
     
-    cursor.execute("SELECT COUNT(DISTINCT initiative_id) FROM volunteer_initiative_matches")
-    initiatives_with_matches = cursor.fetchone()[0]
+    cursor.execute("SELECT COUNT(DISTINCT project_id) FROM volunteer_project_matches")
+    projects_with_matches = cursor.fetchone()[0]
     
     # Score distribution
     cursor.execute("""
@@ -198,21 +202,24 @@ def get_match_statistics(conn):
             AVG(match_score) as avg_score,
             MIN(match_score) as min_score,
             MAX(match_score) as max_score
-        FROM volunteer_initiative_matches
+        FROM volunteer_project_matches
     """)
     stats = cursor.fetchone()
     
     print(f"\n=== Match Statistics ===")
     print(f"Total matches: {total_matches}")
     print(f"Volunteers with matches: {volunteers_with_matches}")
-    print(f"Initiatives with matches: {initiatives_with_matches}")
-    print(f"Average match score: {stats[1]:.3f}")
-    print(f"Score range: {stats[2]:.3f} - {stats[3]:.3f}")
+    print(f"Projects with matches: {projects_with_matches}")
+    if total_matches > 0:
+        print(f"Average match score: {stats[1]:.3f}")
+        print(f"Score range: {stats[2]:.3f} - {stats[3]:.3f}")
+    else:
+        print(f"No matches calculated yet")
 
 def main():
     """Main function to run the match calculation job."""
     try:
-        print("=== Volunteer-Initiative Match Calculator ===")
+        print("=== Volunteer-Project Match Calculator ===")
         print(f"Started at {datetime.now()}")
         
         # Connect to database

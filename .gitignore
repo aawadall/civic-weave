@@ -49,3 +49,17 @@ tmp/
 temp/
 *.tmp
 *.temp
+
+# Python
+*.pyc
+*.pyo
+*.pyd
+*.pyw
+*.pyz
+*.pywz
+*.pyzw
+*.pyzwz
+*.pyzwzw
+*.pyzwzwzw
+**/pip*
+**/venv*

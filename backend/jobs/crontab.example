@@ -1,0 +1,88 @@
+# CivicWeave Batch Jobs Crontab Configuration
+# 
+# To install these cron jobs:
+# 1. Edit this file and replace /path/to/CivicWeave with your actual path
+# 2. Run: crontab crontab.example
+#
+# To view current cron jobs: crontab -l
+# To edit cron jobs: crontab -e
+
+# Set up environment variables
+SHELL=/bin/bash
+PATH=/usr/local/bin:/usr/bin:/bin
+HOME=/home/yourusername
+
+# ============================================================================
+# CIVICWEAVE BATCH JOBS
+# ============================================================================
+
+# Calculate volunteer-project match scores
+# Runs every hour at minute 0
+0 * * * * cd /path/to/CivicWeave/backend && python3 jobs/calculate_matches.py >> /var/log/civicweave/calculate_matches.log 2>&1
+
+# Notify top candidates about project matches
+# Runs daily at 9:00 AM
+0 9 * * * cd /path/to/CivicWeave/backend && ./jobs/run_daily_matching.sh >> /var/log/civicweave/notify_matches.log 2>&1
+
+# Optional: Clean up old notification records (keep last 90 days)
+# Runs weekly on Sunday at 2:00 AM
+0 2 * * 0 psql -U postgres -d civicweave -c "DELETE FROM candidate_notifications WHERE notified_at < NOW() - INTERVAL '90 days'" >> /var/log/civicweave/cleanup.log 2>&1
+
+# ============================================================================
+# LOG ROTATION (optional)
+# ============================================================================
+# You should also set up log rotation for the log files
+# Create /etc/logrotate.d/civicweave with:
+#
+# /var/log/civicweave/*.log {
+#     daily
+#     missingok
+#     rotate 30
+#     compress
+#     delaycompress
+#     notifempty
+#     create 0640 yourusername yourusername
+#     sharedscripts
+# }
+
+# ============================================================================
+# ALTERNATIVE SCHEDULES
+# ============================================================================
+
+# More frequent matching (every 30 minutes):
+# */30 * * * * cd /path/to/CivicWeave/backend && python3 jobs/calculate_matches.py >> /var/log/civicweave/calculate_matches.log 2>&1
+
+# Notifications twice daily (9 AM and 6 PM):
+# 0 9,18 * * * cd /path/to/CivicWeave/backend && ./jobs/run_daily_matching.sh >> /var/log/civicweave/notify_matches.log 2>&1
+
+# Only notify on weekdays:
+# 0 9 * * 1-5 cd /path/to/CivicWeave/backend && ./jobs/run_daily_matching.sh >> /var/log/civicweave/notify_matches.log 2>&1
+
+# ============================================================================
+# MONITORING
+# ============================================================================
+
+# Optional: Send email alert if log contains errors
+# Runs every hour at minute 30
+# 30 * * * * grep -i "error" /var/log/civicweave/notify_matches.log | tail -10 | mail -s "CivicWeave Job Errors" admin@example.com
+
+# ============================================================================
+# NOTES
+# ============================================================================
+# 
+# Cron syntax: minute hour day month weekday command
+# 
+# Examples:
+# 0 * * * *    - Every hour at minute 0
+# 0 9 * * *    - Every day at 9:00 AM
+# 0 9 * * 1    - Every Monday at 9:00 AM
+# 0 9,18 * * * - Every day at 9:00 AM and 6:00 PM
+# */30 * * * * - Every 30 minutes
+# 0 2 * * 0    - Every Sunday at 2:00 AM
+#
+# Make sure to:
+# 1. Create log directory: sudo mkdir -p /var/log/civicweave
+# 2. Set permissions: sudo chown yourusername:yourusername /var/log/civicweave
+# 3. Verify cron service is running: sudo service cron status
+# 4. Check cron logs: grep CRON /var/log/syslog
+

@@ -22,6 +22,16 @@ db-seed:
 db-backfill-skills:
 	cd backend && go run scripts/backfill_skill_vectors.go
 
+# Batch jobs
+job-calculate-matches:
+	cd backend && venv/bin/python jobs/calculate_matches.py
+
+job-notify-matches:
+	cd backend && ./jobs/run_daily_matching.sh
+
+job-setup-python:
+	cd backend && python3 -m venv venv && venv/bin/pip install psycopg2-binary python-dotenv numpy
+
 db-reset:
 	docker-compose down -v
 	docker-compose up -d postgres
@@ -130,10 +140,15 @@ help:
 	@echo "  build-dev     - Build Docker images for local testing"
 	@echo ""
 	@echo "Database:"
-	@echo "  db-migrate    - Run database migrations"
-	@echo "  db-seed       - Seed initial data"
+	@echo "  db-migrate         - Run database migrations"
+	@echo "  db-seed            - Seed initial data"
 	@echo "  db-backfill-skills - Convert existing JSONB skills to vector claims"
-	@echo "  db-reset      - Reset database with fresh data"
+	@echo "  db-reset           - Reset database with fresh data"
+	@echo ""
+	@echo "Batch Jobs:"
+	@echo "  job-setup-python      - Set up Python environment for batch jobs"
+	@echo "  job-calculate-matches - Calculate volunteer-project match scores"
+	@echo "  job-notify-matches    - Notify top candidates about project matches"
 	@echo ""
 	@echo "Testing:"
 	@echo "  test          - Run tests"

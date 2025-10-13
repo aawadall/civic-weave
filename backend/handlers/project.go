@@ -217,6 +217,27 @@ func (h *ProjectHandler) UpdateProject(c *gin.Context) {
 		return
 	}
 
+	// Get user context
+	userCtx, exists := middleware.GetUserFromContext(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found in context"})
+		return
+	}
+
+	// Check if user is admin or team lead for this project
+	isTeamLead, err := h.service.IsTeamLead(id, userCtx.ID)
+	if err != nil {
+		log.Printf("❌ UPDATE_PROJECT: Failed to check team lead status: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check permissions"})
+		return
+	}
+
+	if !userCtx.HasRole("admin") && !isTeamLead {
+		log.Printf("❌ UPDATE_PROJECT: User %s is not authorized to edit project %s", userCtx.ID, id)
+		c.JSON(http.StatusForbidden, gin.H{"error": "Only project team lead or admin can edit this project"})
+		return
+	}
+
 	var project models.Project
 	if err := c.ShouldBindJSON(&project); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -225,11 +246,14 @@ func (h *ProjectHandler) UpdateProject(c *gin.Context) {
 
 	project.ID = id
 
+	log.Printf("📝 UPDATE_PROJECT: User %s updating project %s", userCtx.ID, id)
 	if err := h.service.Update(&project); err != nil {
+		log.Printf("❌ UPDATE_PROJECT: Failed to update project: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update project"})
 		return
 	}
 
+	log.Printf("✅ UPDATE_PROJECT: Successfully updated project %s", id)
 	c.JSON(http.StatusOK, project)
 }
 
