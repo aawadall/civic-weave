@@ -91,24 +91,34 @@ func RequireRole(requiredRole string) gin.HandlerFunc {
 // RequireAnyRole middleware checks if user has any of the specified roles
 func RequireAnyRole(requiredRoles ...string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		userRoles, exists := c.Get("user_roles")
-		if !exists {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "User roles not found"})
-			c.Abort()
-			return
-		}
-
-		roles := userRoles.([]string)
 		hasRole := false
-		for _, requiredRole := range requiredRoles {
-			for _, userRole := range roles {
-				if userRole == requiredRole {
-					hasRole = true
-					break
+		
+		// Check new RBAC system first
+		if userRoles, exists := c.Get("user_roles"); exists && userRoles != nil {
+			if roles, ok := userRoles.([]string); ok && len(roles) > 0 {
+				for _, requiredRole := range requiredRoles {
+					for _, userRole := range roles {
+						if userRole == requiredRole {
+							hasRole = true
+							break
+						}
+					}
+					if hasRole {
+						break
+					}
 				}
 			}
-			if hasRole {
-				break
+		}
+		
+		// Fallback to legacy role system
+		if !hasRole {
+			if userRole, exists := c.Get("user_role"); exists && userRole != nil {
+				for _, requiredRole := range requiredRoles {
+					if userRole.(string) == requiredRole {
+						hasRole = true
+						break
+					}
+				}
 			}
 		}
 

@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"net/http"
-	"strconv"
 
 	"civicweave/backend/config"
 	"civicweave/backend/middleware"
@@ -15,13 +14,15 @@ import (
 // RoleHandler handles role-related requests
 type RoleHandler struct {
 	roleService *models.RoleService
+	userService *models.UserService
 	config      *config.Config
 }
 
 // NewRoleHandler creates a new role handler
-func NewRoleHandler(roleService *models.RoleService, config *config.Config) *RoleHandler {
+func NewRoleHandler(roleService *models.RoleService, userService *models.UserService, config *config.Config) *RoleHandler {
 	return &RoleHandler{
 		roleService: roleService,
+		userService: userService,
 		config:      config,
 	}
 }
@@ -245,23 +246,33 @@ func (h *RoleHandler) ListUsersWithRole(c *gin.Context) {
 
 // ListAllUsers handles GET /api/admin/users
 func (h *RoleHandler) ListAllUsers(c *gin.Context) {
-	// Get query parameters
-	limitStr := c.DefaultQuery("limit", "20")
-	offsetStr := c.DefaultQuery("offset", "0")
-
-	limit, err := strconv.Atoi(limitStr)
-	if err != nil || limit < 1 || limit > 100 {
-		limit = 20
+	// Get all users
+	users, err := h.userService.ListAllUsers()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get users"})
+		return
 	}
 
-	offset, err := strconv.Atoi(offsetStr)
-	if err != nil || offset < 0 {
-		offset = 0
+	// Get roles for each user
+	type UserWithRoles struct {
+		models.User
+		Roles []models.Role `json:"roles"`
 	}
 
-	// For now, we'll need to implement this in the UserService
-	// This is a placeholder - you'll need to add this method to UserService
-	c.JSON(http.StatusNotImplemented, gin.H{"error": "Not implemented yet"})
+	var usersWithRoles []UserWithRoles
+	for _, user := range users {
+		roles, err := h.roleService.GetUserRoles(user.ID)
+		if err != nil {
+			// Log error but continue
+			roles = []models.Role{}
+		}
+		usersWithRoles = append(usersWithRoles, UserWithRoles{
+			User:  user,
+			Roles: roles,
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{"users": usersWithRoles})
 }
 
 // GetUserRoleAssignments handles GET /api/admin/users/:id/role-assignments

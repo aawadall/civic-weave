@@ -104,18 +104,33 @@ export function AuthProvider({ children }) {
 
   // Helper functions for role checking
   const hasRole = (roleName) => {
-    if (!user?.roles) return false
-    return user.roles.includes(roleName)
+    // Check new RBAC system first
+    if (user?.roles && Array.isArray(user.roles)) {
+      return user.roles.includes(roleName)
+    }
+    // Fallback to legacy role system
+    if (user?.role === roleName) {
+      return true
+    }
+    return false
   }
 
   const hasAnyRole = (...roleNames) => {
-    if (!user?.roles) return false
-    return roleNames.some(role => user.roles.includes(role))
+    // Check new RBAC system first
+    if (user?.roles && Array.isArray(user.roles)) {
+      return roleNames.some(role => user.roles.includes(role))
+    }
+    // Fallback to legacy role system
+    return roleNames.includes(user?.role)
   }
 
   const hasAllRoles = (...roleNames) => {
-    if (!user?.roles) return false
-    return roleNames.every(role => user.roles.includes(role))
+    // Check new RBAC system first
+    if (user?.roles && Array.isArray(user.roles)) {
+      return roleNames.every(role => user.roles.includes(role))
+    }
+    // Fallback to legacy role system (can only have one role)
+    return roleNames.length === 1 && user?.role === roleNames[0]
   }
 
   const value = {

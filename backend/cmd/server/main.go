@@ -153,8 +153,8 @@ func main() {
 	}
 
 	// Initialize new handlers
-	if roleService != nil {
-		roleHandler = handlers.NewRoleHandler(roleService, cfg)
+	if roleService != nil && userService != nil {
+		roleHandler = handlers.NewRoleHandler(roleService, userService, cfg)
 	}
 	if volunteerRatingService != nil && volunteerService != nil {
 		volunteerRatingHandler = handlers.NewVolunteerRatingHandler(volunteerRatingService, volunteerService, cfg)
@@ -356,19 +356,19 @@ func main() {
 
 		// Role management routes (admin only)
 		if roleHandler != nil {
-			protected.GET("/admin/roles", roleHandler.ListRoles)
-			protected.POST("/admin/roles", roleHandler.CreateRole)
-			protected.GET("/admin/roles/:id", roleHandler.GetRoleByID)
-			protected.PUT("/admin/roles/:id", roleHandler.UpdateRole)
-			protected.DELETE("/admin/roles/:id", roleHandler.DeleteRole)
-			protected.GET("/admin/roles/:id/users", roleHandler.ListUsersWithRole)
+			protected.GET("/admin/roles", middleware.RequireRole("admin"), roleHandler.ListRoles)
+			protected.POST("/admin/roles", middleware.RequireRole("admin"), roleHandler.CreateRole)
+			protected.GET("/admin/roles/:id", middleware.RequireRole("admin"), roleHandler.GetRoleByID)
+			protected.PUT("/admin/roles/:id", middleware.RequireRole("admin"), roleHandler.UpdateRole)
+			protected.DELETE("/admin/roles/:id", middleware.RequireRole("admin"), roleHandler.DeleteRole)
+			protected.GET("/admin/roles/:id/users", middleware.RequireRole("admin"), roleHandler.ListUsersWithRole)
 
 			// User role assignment routes
-			protected.GET("/admin/users", roleHandler.ListAllUsers)
-			protected.GET("/admin/users/:id/roles", roleHandler.GetUserRoles)
-			protected.POST("/admin/users/:id/roles", roleHandler.AssignRoleToUser)
-			protected.DELETE("/admin/users/:id/roles/:roleId", roleHandler.RevokeRoleFromUser)
-			protected.GET("/admin/users/:id/role-assignments", roleHandler.GetUserRoleAssignments)
+			protected.GET("/admin/users", middleware.RequireRole("admin"), roleHandler.ListAllUsers)
+			protected.GET("/admin/users/:id/roles", middleware.RequireRole("admin"), roleHandler.GetUserRoles)
+			protected.POST("/admin/users/:id/roles", middleware.RequireRole("admin"), roleHandler.AssignRoleToUser)
+			protected.DELETE("/admin/users/:id/roles/:roleId", middleware.RequireRole("admin"), roleHandler.RevokeRoleFromUser)
+			protected.GET("/admin/users/:id/role-assignments", middleware.RequireRole("admin"), roleHandler.GetUserRoleAssignments)
 		}
 	}
 

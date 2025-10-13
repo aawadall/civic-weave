@@ -16,7 +16,7 @@ export default function HomePage() {
               <span className="text-primary-200">Create Impact</span>
             </h1>
             <p className="text-xl text-primary-100 mb-8 max-w-3xl mx-auto">
-              CivicWeave connects passionate volunteers with meaningful civic initiatives. 
+              CivicWeave connects passionate volunteers with meaningful civic projects. 
               Join our community and make a real difference in your neighborhood.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -82,7 +82,7 @@ export default function HomePage() {
                 Make an Impact
               </h3>
               <p className="text-secondary-600">
-                Contribute to meaningful civic initiatives and track your impact 
+                Contribute to meaningful civic projects and track your impact 
                 in your community.
               </p>
             </div>

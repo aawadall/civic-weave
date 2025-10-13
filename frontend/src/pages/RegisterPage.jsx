@@ -289,7 +289,7 @@ export default function RegisterPage() {
                   className="mt-1 rounded border-secondary-300 text-primary-600 focus:ring-primary-500"
                 />
                 <span className="text-sm text-secondary-700">
-                  Make my skills visible to initiative organizers for better matching
+                  Make my skills visible to project organizers for better matching
                   <span className="block text-xs text-secondary-500 mt-1">
                     You can change this later in your profile
                   </span>

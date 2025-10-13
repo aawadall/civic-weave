@@ -1,8 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import api from '../../services/api'
-import RichTextEditor from '../../components/RichTextEditor'
 
 export default function CreateProjectPage() {
   const navigate = useNavigate()
@@ -16,10 +15,48 @@ export default function CreateProjectPage() {
     end_date: '',
     status: 'draft'
   })
-  const [contentJson, setContentJson] = useState(null)
   const [newSkill, setNewSkill] = useState('')
+  const [availableSkills, setAvailableSkills] = useState([])
+  const [filteredSkills, setFilteredSkills] = useState([])
+  const [showSkillDropdown, setShowSkillDropdown] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+
+  // Load available skills on component mount
+  useEffect(() => {
+    fetchSkills()
+  }, [])
+
+  const fetchSkills = async () => {
+    try {
+      const response = await api.get('/skills/taxonomy')
+      console.log('Skills response:', response.data)
+      console.log('First skill:', response.data.skills?.[0])
+      setAvailableSkills(response.data.skills || [])
+    } catch (err) {
+      console.error('Failed to fetch skills:', err)
+    }
+  }
+
+  // Filter skills based on input
+  useEffect(() => {
+    if (newSkill.trim()) {
+      const filtered = availableSkills.filter(skill => {
+        if (!skill) return false
+        // Handle different possible skill structures
+        const skillName = skill.name || skill.skill_name || skill.title || skill
+        if (typeof skillName === 'string') {
+          return skillName.toLowerCase().includes(newSkill.toLowerCase())
+        }
+        return false
+      }).slice(0, 10) // Limit to 10 suggestions
+      setFilteredSkills(filtered)
+      setShowSkillDropdown(filtered.length > 0)
+    } else {
+      setFilteredSkills([])
+      setShowSkillDropdown(false)
+    }
+  }, [newSkill, availableSkills])
 
   // Check if user has permission to create projects
   if (!hasAnyRole('team_lead', 'admin')) {
@@ -51,7 +88,19 @@ export default function CreateProjectPage() {
         required_skills: [...prev.required_skills, newSkill.trim()]
       }))
       setNewSkill('')
+      setShowSkillDropdown(false)
     }
+  }
+
+  const handleSelectSkill = (skillName) => {
+    if (!formData.required_skills.includes(skillName)) {
+      setFormData(prev => ({
+        ...prev,
+        required_skills: [...prev.required_skills, skillName]
+      }))
+    }
+    setNewSkill('')
+    setShowSkillDropdown(false)
   }
 
   const handleRemoveSkill = (skillToRemove) => {
@@ -68,9 +117,9 @@ export default function CreateProjectPage() {
 
     try {
       const projectData = {
-        ...formData,
-        content_json: contentJson
+        ...formData
       }
+      console.log('Submitting project data:', projectData)
       const response = await api.post('/projects', projectData)
       navigate(`/projects/${response.data.id}`)
     } catch (err) {
@@ -125,13 +174,18 @@ export default function CreateProjectPage() {
               <label htmlFor="description" className="block text-sm font-medium text-secondary-900 mb-2">
                 Project Description *
               </label>
-              <RichTextEditor
-                value={contentJson}
-                onChange={setContentJson}
-                placeholder="Describe the project, its goals, and what volunteers will be doing. Use the toolbar to format text, add headings, lists, and images."
+              <textarea
+                id="description"
+                name="description"
+                value={formData.description}
+                onChange={handleInputChange}
+                required
+                rows={6}
+                className="w-full px-4 py-2 border border-secondary-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                placeholder="Describe the project, its goals, and what volunteers will be doing..."
               />
               <p className="text-xs text-secondary-500 mt-2">
-                Use the rich text editor to format your project description with headings, lists, and images.
+                Describe the project goals and what volunteers will be doing.
               </p>
             </div>
 
@@ -140,22 +194,47 @@ export default function CreateProjectPage() {
               <label className="block text-sm font-medium text-secondary-900 mb-2">
                 Required Skills
               </label>
-              <div className="flex gap-2 mb-3">
-                <input
-                  type="text"
-                  value={newSkill}
-                  onChange={(e) => setNewSkill(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddSkill())}
-                  className="flex-1 px-4 py-2 border border-secondary-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                  placeholder="Add a required skill"
-                />
-                <button
-                  type="button"
-                  onClick={handleAddSkill}
-                  className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
-                >
-                  Add
-                </button>
+              <div className="relative">
+                <div className="flex gap-2 mb-3">
+                  <input
+                    type="text"
+                    value={newSkill}
+                    onChange={(e) => setNewSkill(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddSkill())}
+                    onFocus={() => newSkill.trim() && setShowSkillDropdown(true)}
+                    onBlur={() => setTimeout(() => setShowSkillDropdown(false), 200)}
+                    className="flex-1 px-4 py-2 border border-secondary-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    placeholder="Search and add required skills"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddSkill}
+                    className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+                  >
+                    Add
+                  </button>
+                </div>
+                
+                {/* Skills dropdown */}
+                {showSkillDropdown && filteredSkills.length > 0 && (
+                  <div className="absolute z-10 w-full bg-white border border-secondary-300 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                    {filteredSkills.map((skill) => (
+                      <button
+                        key={skill.id}
+                        type="button"
+                        onClick={() => {
+                          const skillName = skill.name || skill.skill_name || skill.title || skill
+                          if (typeof skillName === 'string') {
+                            handleSelectSkill(skillName)
+                          }
+                        }}
+                        className="w-full px-4 py-2 text-left hover:bg-secondary-50 focus:bg-secondary-50 focus:outline-none"
+                      >
+                        {skill.name || skill.skill_name || skill.title || skill}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
               {formData.required_skills.length > 0 && (
                 <div className="flex flex-wrap gap-2">

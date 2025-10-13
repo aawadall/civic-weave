@@ -32,7 +32,7 @@ export default function VolunteerDashboard() {
             Hours Volunteered
           </h3>
           <p className="text-secondary-600 text-sm mb-4">
-            Total hours contributed to community initiatives.
+            Total hours contributed to community projects.
           </p>
           <div className="text-2xl font-bold text-primary-600">0</div>
           <p className="text-sm text-secondary-500">Hours this year</p>
@@ -43,7 +43,7 @@ export default function VolunteerDashboard() {
             Available Opportunities
           </h3>
           <p className="text-secondary-600 text-sm mb-4">
-            New initiatives matching your skills and interests.
+            New projects matching your skills and interests.
           </p>
           <div className="text-2xl font-bold text-primary-600">0</div>
           <p className="text-sm text-secondary-500">Recommended matches</p>

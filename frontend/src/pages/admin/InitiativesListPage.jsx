@@ -26,8 +26,8 @@ export default function InitiativesListPage() {
       const params = new URLSearchParams()
       if (statusFilter) params.append('status', statusFilter)
       
-      const response = await api.get(`/initiatives?${params.toString()}`)
-      setInitiatives(response.data.initiatives || [])
+      const response = await api.get(`/projects?${params.toString()}`)
+      setInitiatives(response.data.projects || [])
     } catch (error) {
       showToast('Failed to load initiatives', 'error')
     } finally {
@@ -41,7 +41,7 @@ export default function InitiativesListPage() {
     }
 
     try {
-      await api.delete(`/initiatives/${id}`)
+      await api.delete(`/projects/${id}`)
       showToast('Initiative deleted successfully', 'success')
       fetchInitiatives()
     } catch (error) {

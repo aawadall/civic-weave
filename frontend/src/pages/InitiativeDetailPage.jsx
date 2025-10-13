@@ -31,7 +31,7 @@ export default function InitiativeDetailPage() {
   const fetchInitiative = async () => {
     try {
       setLoading(true)
-      const response = await api.get(`/initiatives/${id}`)
+      const response = await api.get(`/projects/${id}`)
       setInitiative(response.data)
     } catch (error) {
       showToast('Failed to load initiative details', 'error')
@@ -46,7 +46,7 @@ export default function InitiativeDetailPage() {
       const response = await api.get('/applications')
       const applications = response.data.applications || []
       const userApplication = applications.find(app => 
-        app.initiative_id === id && app.volunteer_id === user.id
+        app.project_id === id && app.volunteer_id === user.id
       )
       setHasApplied(!!userApplication)
     } catch (error) {
@@ -64,7 +64,7 @@ export default function InitiativeDetailPage() {
     try {
       setApplying(true)
       await api.post('/applications', {
-        initiative_id: id,
+        project_id: id,
         volunteer_id: user.id
       })
       
