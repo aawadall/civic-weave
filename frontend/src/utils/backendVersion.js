@@ -1,4 +1,4 @@
-import { API_BASE_URL } from './api.js'
+import { API_BASE_URL } from '../api.js'
 
 let cachedBackendVersion = null
 let lastFetchTime = 0

@@ -30,7 +30,7 @@ func getVersionFromFile() string {
 	if version := os.Getenv("VERSION"); version != "" {
 		return version
 	}
-	
+
 	// Try to read from VERSION file
 	if data, err := os.ReadFile("VERSION"); err == nil {
 		version := strings.TrimSpace(string(data))
@@ -38,7 +38,7 @@ func getVersionFromFile() string {
 			return version
 		}
 	}
-	
+
 	// Fallback to default
 	return "1.0.0"
 }
@@ -49,12 +49,12 @@ func incrementVersion(version string) string {
 	if len(parts) < 3 {
 		return "1.0.1"
 	}
-	
+
 	patch, err := strconv.Atoi(parts[2])
 	if err != nil {
 		return "1.0.1"
 	}
-	
+
 	parts[2] = strconv.Itoa(patch + 1)
 	return strings.Join(parts, ".")
 }
