@@ -10,7 +10,7 @@ import (
 
 // Version information
 var (
-	Version   = getVersionFromFile()
+	Version   = getEnvOrDefault("VERSION", getVersionFromFile())
 	BuildTime = time.Now().Format("2006-01-02T15:04:05Z")
 	GitCommit = getEnvOrDefault("GIT_COMMIT", "unknown")
 	BuildEnv  = getEnvOrDefault("BUILD_ENV", "development")

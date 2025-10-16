@@ -16,7 +16,7 @@ export default function AppFooter() {
     <footer className="bg-gray-50 border-t border-gray-200 py-4 px-6">
       <div className="max-w-7xl mx-auto flex justify-between items-center text-sm text-gray-600">
         <div>
-          © 2024 CivicWeave. All rights reserved.
+          © {new Date().getFullYear()} CivicWeave. All rights reserved.
         </div>
         <div className="text-xs space-y-1">
           <div>FE: {combinedVersion?.frontend?.version || 'loading...'}</div>
