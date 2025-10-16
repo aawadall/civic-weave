@@ -246,8 +246,8 @@ func (h *RoleHandler) ListUsersWithRole(c *gin.Context) {
 
 // ListAllUsers handles GET /api/admin/users
 func (h *RoleHandler) ListAllUsers(c *gin.Context) {
-	// Get all users
-	users, err := h.userService.ListAllUsers()
+	// Get all users with names
+	users, err := h.userService.ListAllUsersWithNames()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get users"})
 		return
@@ -255,7 +255,7 @@ func (h *RoleHandler) ListAllUsers(c *gin.Context) {
 
 	// Get roles for each user
 	type UserWithRoles struct {
-		models.User
+		models.UserWithName
 		Roles []models.Role `json:"roles"`
 	}
 
@@ -267,8 +267,8 @@ func (h *RoleHandler) ListAllUsers(c *gin.Context) {
 			roles = []models.Role{}
 		}
 		usersWithRoles = append(usersWithRoles, UserWithRoles{
-			User:  user,
-			Roles: roles,
+			UserWithName: user,
+			Roles:        roles,
 		})
 	}
 
