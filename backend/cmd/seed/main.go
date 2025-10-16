@@ -67,11 +67,9 @@ func main() {
 	existingUser, _ := userService.GetByEmail(adminEmail)
 	if existingUser != nil {
 		log.Println("Admin user already exists, skipping user creation")
-		// Migrate existing users to new role system
-		migrateExistingUsers(userService, roleService)
 		return
 	}
-	
+
 	// Hash password
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(adminPassword), bcrypt.DefaultCost)
 	if err != nil {
@@ -82,12 +80,20 @@ func main() {
 	user := &models.User{
 		Email:         adminEmail,
 		PasswordHash:  string(hashedPassword),
-		EmailVerified: true,    // Skip verification for seeded admin
-		Role:          "admin", // Keep for backward compatibility
+		EmailVerified: true, // Skip verification for seeded admin
 	}
 
 	if err := userService.Create(user); err != nil {
 		log.Fatal("Failed to create admin user:", err)
+	}
+
+	// Assign admin role
+	adminRole, err := roleService.GetByName("admin")
+	if err != nil {
+		log.Fatal("Failed to get admin role:", err)
+	}
+	if err := roleService.AssignRoleToUser(user.ID, adminRole.ID, nil); err != nil {
+		log.Fatal("Failed to assign admin role:", err)
 	}
 
 	// Create admin profile
@@ -102,49 +108,4 @@ func main() {
 
 	log.Printf("✅ Seeded admin user: %s", adminEmail)
 	log.Println("⚠️  IMPORTANT: Change the admin password after first login!")
-
-	// Migrate existing users to new role system
-	migrateExistingUsers(userService, roleService)
-}
-
-func migrateExistingUsers(userService *models.UserService, roleService *models.RoleService) {
-	log.Println("🔄 Migrating existing users to new role system...")
-
-	// Get all users with old role system
-	users, err := userService.ListAllUsers()
-	if err != nil {
-		log.Printf("Failed to get users for migration: %v", err)
-		return
-	}
-
-	for _, user := range users {
-		// Check if user already has roles assigned
-		userRoles, err := roleService.GetUserRoles(user.ID)
-		if err != nil {
-			log.Printf("Failed to get roles for user %s: %v", user.Email, err)
-			continue
-		}
-
-		// If user already has roles, skip
-		if len(userRoles) > 0 {
-			log.Printf("User %s already has roles assigned, skipping", user.Email)
-			continue
-		}
-
-		// Get the role by name from the old system
-		role, err := roleService.GetByName(user.Role)
-		if err != nil {
-			log.Printf("Failed to find role %s for user %s: %v", user.Role, user.Email, err)
-			continue
-		}
-
-		// Assign the role to the user
-		if err := roleService.AssignRoleToUser(user.ID, role.ID, nil); err != nil {
-			log.Printf("Failed to assign role %s to user %s: %v", user.Role, user.Email, err)
-		} else {
-			log.Printf("✅ Migrated user %s to role %s", user.Email, user.Role)
-		}
-	}
-
-	log.Println("✅ User migration completed")
 }

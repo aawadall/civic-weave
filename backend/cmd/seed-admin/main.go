@@ -58,13 +58,22 @@ func main() {
 		Email:         email,
 		PasswordHash:  hashedPassword,
 		EmailVerified: true, // Admin is pre-verified
-		Role:          "admin",
 	}
 
 	// Insert user
 	userService := models.NewUserService(db)
 	if err := userService.Create(user); err != nil {
 		log.Printf("User might already exist: %v", err)
+	}
+
+	// Assign admin role
+	roleService := models.NewRoleService(db)
+	adminRole, err := roleService.GetByName("admin")
+	if err != nil {
+		log.Fatal("Failed to get admin role:", err)
+	}
+	if err := roleService.AssignRoleToUser(user.ID, adminRole.ID, nil); err != nil {
+		log.Printf("Failed to assign admin role: %v", err)
 	}
 
 	// Create admin profile

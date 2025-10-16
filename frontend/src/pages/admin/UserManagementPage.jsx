@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import api from '../../services/api'
 
@@ -12,7 +12,6 @@ export default function UserManagementPage() {
   const [selectedUser, setSelectedUser] = useState(null)
   const [showRoleModal, setShowRoleModal] = useState(false)
   const [userRoles, setUserRoles] = useState([])
-  const [availableRoles, setAvailableRoles] = useState([])
 
   useEffect(() => {
     fetchUsers()
@@ -45,13 +44,19 @@ export default function UserManagementPage() {
     try {
       const response = await api.get(`/admin/users/${userId}/roles`)
       setUserRoles(response.data.roles || [])
-      setAvailableRoles(roles.filter(role => 
-        !response.data.roles.some(userRole => userRole.id === role.id)
-      ))
     } catch (err) {
       console.error('Error fetching user roles:', err)
     }
   }
+
+  const availableRoles = useMemo(() => {
+    if (!selectedUser) {
+      return []
+    }
+
+    const assignedRoleIds = new Set(userRoles.map(role => role.id))
+    return roles.filter(role => !assignedRoleIds.has(role.id))
+  }, [roles, userRoles, selectedUser])
 
   const handleAssignRole = async (userId, roleId) => {
     try {

@@ -23,6 +23,7 @@ type GoogleOAuthHandler struct {
 	VolunteerService    *models.VolunteerService
 	AdminService        *models.AdminService
 	OAuthAccountService *models.OAuthAccountService
+	RoleService         *models.RoleService
 	EmailService        *services.EmailService
 	config              *config.Config
 }
@@ -33,6 +34,7 @@ func NewGoogleOAuthHandler(
 	volunteerService *models.VolunteerService,
 	adminService *models.AdminService,
 	oauthAccountService *models.OAuthAccountService,
+	roleService *models.RoleService,
 	emailService *services.EmailService,
 	config *config.Config,
 ) *GoogleOAuthHandler {
@@ -41,6 +43,7 @@ func NewGoogleOAuthHandler(
 		VolunteerService:    volunteerService,
 		AdminService:        adminService,
 		OAuthAccountService: oauthAccountService,
+		RoleService:         roleService,
 		EmailService:        emailService,
 		config:              config,
 	}
@@ -118,16 +121,34 @@ func (h *GoogleOAuthHandler) GoogleAuth(c *gin.Context) {
 		return
 	}
 
-	// Get user profile based on role
+	// Get user roles
+	rolesData, err := h.UserService.GetUserRoles(user.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user roles"})
+		return
+	}
+
+	// Check which role to use for profile
 	var userProfile interface{}
-	if user.Role == "volunteer" {
+	hasVolunteerRole := false
+	hasAdminRole := false
+	for _, role := range rolesData {
+		if role.Name == "volunteer" {
+			hasVolunteerRole = true
+		}
+		if role.Name == "admin" {
+			hasAdminRole = true
+		}
+	}
+
+	if hasVolunteerRole {
 		volunteer, err := h.VolunteerService.GetByUserID(user.ID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get volunteer profile"})
 			return
 		}
 		userProfile = volunteer
-	} else if user.Role == "admin" {
+	} else if hasAdminRole {
 		admin, err := h.AdminService.GetByUserID(user.ID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get admin profile"})
@@ -199,10 +220,22 @@ func (h *GoogleOAuthHandler) createUserFromGoogle(googleUser *GoogleUserInfo) (*
 		Email:         googleUser.Email,
 		PasswordHash:  "", // No password for OAuth users
 		EmailVerified: googleUser.EmailVerified,
-		Role:          "volunteer",
 	}
 
 	if err := h.UserService.Create(user); err != nil {
+		return nil, err
+	}
+
+	// Assign volunteer role (default for Google OAuth users)
+	volunteerRole, err := h.RoleService.GetByName("volunteer")
+	if err != nil {
+		// Rollback user creation
+		h.UserService.Delete(user.ID)
+		return nil, err
+	}
+	if err := h.RoleService.AssignRoleToUser(user.ID, volunteerRole.ID, nil); err != nil {
+		// Rollback user creation
+		h.UserService.Delete(user.ID)
 		return nil, err
 	}
 
@@ -230,12 +263,12 @@ func base64URLDecode(str string) ([]byte, error) {
 	// Replace URL-safe base64 characters
 	str = strings.ReplaceAll(str, "-", "+")
 	str = strings.ReplaceAll(str, "_", "/")
-	
+
 	// Add padding if needed
 	for len(str)%4 != 0 {
 		str += "="
 	}
-	
+
 	return base64.StdEncoding.DecodeString(str)
 }
 

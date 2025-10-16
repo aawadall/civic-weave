@@ -25,10 +25,10 @@ export default function ProtectedRoute({
   let hasRequiredRole = true
 
   if (requiredRole) {
-    // Legacy single role check
-    hasRequiredRole = user?.role === requiredRole || hasRole(requiredRole)
+    // Single role check
+    hasRequiredRole = hasRole(requiredRole)
   } else if (requiredRoles && requiredRoles.length > 0) {
-    // New multi-role support
+    // Multi-role support
     if (requireAllRoles) {
       hasRequiredRole = hasAllRoles(...requiredRoles)
     } else {

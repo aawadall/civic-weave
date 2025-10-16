@@ -1,22 +1,30 @@
 -- UP
 -- Migrate from single role column to many-to-many user_roles relationship
 
--- Step 1: Migrate existing role data to user_roles table
+-- Step 1: Migrate existing role data to user_roles table (only if role column exists)
 -- For each user with an old 'role' value, assign them the corresponding role from the roles table
-INSERT INTO user_roles (user_id, role_id, assigned_at)
-SELECT 
-    u.id AS user_id,
-    r.id AS role_id,
-    u.created_at AS assigned_at
-FROM users u
-INNER JOIN roles r ON r.name = u.role
-WHERE u.role IS NOT NULL
-ON CONFLICT (user_id, role_id) DO NOTHING;
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT FROM information_schema.columns 
+        WHERE table_name = 'users' AND column_name = 'role'
+    ) THEN
+        INSERT INTO user_roles (user_id, role_id, assigned_at)
+        SELECT 
+            u.id AS user_id,
+            r.id AS role_id,
+            u.created_at AS assigned_at
+        FROM users u
+        INNER JOIN roles r ON r.name = u.role
+        WHERE u.role IS NOT NULL
+        ON CONFLICT (user_id, role_id) DO NOTHING;
+    END IF;
+END $$;
 
--- Step 2: Drop the index on the old role column
+-- Step 2: Drop the index on the old role column (if it exists)
 DROP INDEX IF EXISTS idx_users_role;
 
--- Step 3: Drop the old role column from users table
+-- Step 3: Drop the old role column from users table (if it exists)
 ALTER TABLE users DROP COLUMN IF EXISTS role;
 
 -- DOWN

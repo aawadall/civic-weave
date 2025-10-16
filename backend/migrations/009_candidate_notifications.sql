@@ -25,3 +25,5 @@ DROP INDEX IF EXISTS idx_candidate_notifications_volunteer_id;
 DROP INDEX IF EXISTS idx_candidate_notifications_project_id;
 DROP TABLE IF EXISTS candidate_notifications;
 
+
+

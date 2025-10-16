@@ -13,7 +13,6 @@ type User struct {
 	Email         string    `json:"email" db:"email"`
 	PasswordHash  string    `json:"-" db:"password_hash"`
 	EmailVerified bool      `json:"email_verified" db:"email_verified"`
-	Role          string    `json:"role" db:"role"` // Deprecated: kept for backward compatibility
 	CreatedAt     time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt     time.Time `json:"updated_at" db:"updated_at"`
 }
@@ -45,7 +44,7 @@ func (s *UserService) Create(user *User) error {
 	user.Email = SanitizeString(user.Email)
 
 	user.ID = uuid.New()
-	return s.db.QueryRow(userCreateQuery, user.ID, user.Email, user.PasswordHash, user.EmailVerified, user.Role).
+	return s.db.QueryRow(userCreateQuery, user.ID, user.Email, user.PasswordHash, user.EmailVerified).
 		Scan(&user.CreatedAt, &user.UpdatedAt)
 }
 
@@ -55,7 +54,7 @@ func (s *UserService) GetByID(id uuid.UUID) (*User, error) {
 
 	err := s.db.QueryRow(userGetByIDQuery, id).Scan(
 		&user.ID, &user.Email, &user.PasswordHash, &user.EmailVerified,
-		&user.Role, &user.CreatedAt, &user.UpdatedAt,
+		&user.CreatedAt, &user.UpdatedAt,
 	)
 
 	if err != nil {
@@ -74,7 +73,7 @@ func (s *UserService) GetByEmail(email string) (*User, error) {
 
 	err := s.db.QueryRow(userGetByEmailQuery, email).Scan(
 		&user.ID, &user.Email, &user.PasswordHash, &user.EmailVerified,
-		&user.Role, &user.CreatedAt, &user.UpdatedAt,
+		&user.CreatedAt, &user.UpdatedAt,
 	)
 
 	if err != nil {
@@ -89,7 +88,7 @@ func (s *UserService) GetByEmail(email string) (*User, error) {
 
 // Update updates a user
 func (s *UserService) Update(user *User) error {
-	return s.db.QueryRow(userUpdateQuery, user.ID, user.Email, user.PasswordHash, user.EmailVerified, user.Role).
+	return s.db.QueryRow(userUpdateQuery, user.ID, user.Email, user.PasswordHash, user.EmailVerified).
 		Scan(&user.UpdatedAt)
 }
 
@@ -155,7 +154,7 @@ func (s *UserService) ListAllUsers() ([]User, error) {
 	var users []User
 	for rows.Next() {
 		var user User
-		err := rows.Scan(&user.ID, &user.Email, &user.PasswordHash, &user.EmailVerified, &user.Role, &user.CreatedAt, &user.UpdatedAt)
+		err := rows.Scan(&user.ID, &user.Email, &user.PasswordHash, &user.EmailVerified, &user.CreatedAt, &user.UpdatedAt)
 		if err != nil {
 			return nil, err
 		}
