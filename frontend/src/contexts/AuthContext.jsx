@@ -104,33 +104,24 @@ export function AuthProvider({ children }) {
 
   // Helper functions for role checking
   const hasRole = (roleName) => {
-    // Check new RBAC system first
-    if (user?.roles && Array.isArray(user.roles)) {
-      return user.roles.includes(roleName)
+    if (!user?.roles || !Array.isArray(user.roles)) {
+      return false
     }
-    // Fallback to legacy role system
-    if (user?.role === roleName) {
-      return true
-    }
-    return false
+    return user.roles.includes(roleName)
   }
 
   const hasAnyRole = (...roleNames) => {
-    // Check new RBAC system first
-    if (user?.roles && Array.isArray(user.roles)) {
-      return roleNames.some(role => user.roles.includes(role))
+    if (!user?.roles || !Array.isArray(user.roles)) {
+      return false
     }
-    // Fallback to legacy role system
-    return roleNames.includes(user?.role)
+    return roleNames.some(role => user.roles.includes(role))
   }
 
   const hasAllRoles = (...roleNames) => {
-    // Check new RBAC system first
-    if (user?.roles && Array.isArray(user.roles)) {
-      return roleNames.every(role => user.roles.includes(role))
+    if (!user?.roles || !Array.isArray(user.roles)) {
+      return false
     }
-    // Fallback to legacy role system (can only have one role)
-    return roleNames.length === 1 && user?.role === roleNames[0]
+    return roleNames.every(role => user.roles.includes(role))
   }
 
   const value = {
@@ -142,16 +133,15 @@ export function AuthProvider({ children }) {
     logout,
     verifyEmail,
     isAuthenticated: !!token && !!user,
-    // Legacy role checks (for backward compatibility)
-    isAdmin: user?.role === 'admin' || hasRole('admin'),
-    isVolunteer: user?.role === 'volunteer' || hasRole('volunteer'),
-    // New multi-role support
+    // Role checks using many-to-many system
+    isAdmin: hasRole('admin'),
+    isVolunteer: hasRole('volunteer'),
+    isTeamLead: hasRole('team_lead'),
+    isCampaignManager: hasRole('campaign_manager'),
+    // Multi-role support functions
     hasRole,
     hasAnyRole,
-    hasAllRoles,
-    // Specific role checks
-    isTeamLead: hasRole('team_lead'),
-    isCampaignManager: hasRole('campaign_manager')
+    hasAllRoles
   }
 
   return (

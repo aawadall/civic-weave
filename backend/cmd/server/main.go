@@ -117,12 +117,13 @@ func main() {
 	var messageHandler *handlers.MessageHandler
 
 	log.Println("🔧 Initializing handlers...")
-	if userService != nil && volunteerService != nil && adminService != nil && oauthAccountService != nil {
+	if userService != nil && volunteerService != nil && adminService != nil && oauthAccountService != nil && roleService != nil {
 		authHandler = handlers.NewAuthHandler(
 			userService,
 			volunteerService,
 			adminService,
 			oauthAccountService,
+			roleService,
 			emailService,
 			geocodingService,
 			cfg,
@@ -132,6 +133,7 @@ func main() {
 			volunteerService,
 			adminService,
 			oauthAccountService,
+			roleService,
 			emailService,
 			cfg,
 		)

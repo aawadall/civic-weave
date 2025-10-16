@@ -30,3 +30,5 @@ python3 jobs/notify_project_matches.py
 
 echo "Daily candidate notification job completed at $(date)"
 
+
+

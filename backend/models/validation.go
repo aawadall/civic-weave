@@ -36,10 +36,6 @@ func ValidateUser(user *User) error {
 		}
 	}
 
-	if err := ValidateRole(user.Role); err != nil {
-		return err
-	}
-
 	return nil
 }
 

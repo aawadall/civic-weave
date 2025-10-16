@@ -16,8 +16,7 @@ import (
 type Claims struct {
 	UserID uuid.UUID `json:"user_id"`
 	Email  string    `json:"email"`
-	Role   string    `json:"role"`  // Deprecated: kept for backward compatibility
-	Roles  []string  `json:"roles"` // New: multiple roles support
+	Roles  []string  `json:"roles"`
 	jwt.RegisteredClaims
 }
 
@@ -76,8 +75,7 @@ func AuthRequired(jwtSecret string) gin.HandlerFunc {
 		// Set user context
 		c.Set("user_id", claims.UserID)
 		c.Set("user_email", claims.Email)
-		c.Set("user_role", claims.Role)   // Deprecated: kept for backward compatibility
-		c.Set("user_roles", claims.Roles) // New: multiple roles support
+		c.Set("user_roles", claims.Roles)
 
 		c.Next()
 	}
@@ -91,34 +89,30 @@ func RequireRole(requiredRole string) gin.HandlerFunc {
 // RequireAnyRole middleware checks if user has any of the specified roles
 func RequireAnyRole(requiredRoles ...string) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		userRoles, exists := c.Get("user_roles")
+		if !exists || userRoles == nil {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Insufficient permissions"})
+			c.Abort()
+			return
+		}
+
+		roles, ok := userRoles.([]string)
+		if !ok || len(roles) == 0 {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Insufficient permissions"})
+			c.Abort()
+			return
+		}
+
 		hasRole := false
-		
-		// Check new RBAC system first
-		if userRoles, exists := c.Get("user_roles"); exists && userRoles != nil {
-			if roles, ok := userRoles.([]string); ok && len(roles) > 0 {
-				for _, requiredRole := range requiredRoles {
-					for _, userRole := range roles {
-						if userRole == requiredRole {
-							hasRole = true
-							break
-						}
-					}
-					if hasRole {
-						break
-					}
+		for _, requiredRole := range requiredRoles {
+			for _, userRole := range roles {
+				if userRole == requiredRole {
+					hasRole = true
+					break
 				}
 			}
-		}
-		
-		// Fallback to legacy role system
-		if !hasRole {
-			if userRole, exists := c.Get("user_role"); exists && userRole != nil {
-				for _, requiredRole := range requiredRoles {
-					if userRole.(string) == requiredRole {
-						hasRole = true
-						break
-					}
-				}
+			if hasRole {
+				break
 			}
 		}
 
@@ -193,8 +187,7 @@ func OptionalAuth(jwtSecret string) gin.HandlerFunc {
 		// Set user context if token is valid
 		c.Set("user_id", claims.UserID)
 		c.Set("user_email", claims.Email)
-		c.Set("user_role", claims.Role)   // Deprecated: kept for backward compatibility
-		c.Set("user_roles", claims.Roles) // New: multiple roles support
+		c.Set("user_roles", claims.Roles)
 
 		c.Next()
 	}
@@ -205,8 +198,7 @@ func GenerateJWT(user *models.User, userService *models.UserService, jwtSecret s
 	// Get user roles
 	roles, err := userService.GetUserRoles(user.ID)
 	if err != nil {
-		// Fallback to single role if roles service not available
-		roles = []models.Role{{Name: user.Role}}
+		return "", err
 	}
 
 	var roleNames []string
@@ -214,11 +206,15 @@ func GenerateJWT(user *models.User, userService *models.UserService, jwtSecret s
 		roleNames = append(roleNames, role.Name)
 	}
 
+	// If no roles found, this is an error condition
+	if len(roleNames) == 0 {
+		return "", jwt.ErrTokenInvalidClaims
+	}
+
 	claims := &Claims{
 		UserID: user.ID,
 		Email:  user.Email,
-		Role:   user.Role, // Deprecated: kept for backward compatibility
-		Roles:  roleNames, // New: multiple roles support
+		Roles:  roleNames,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)), // 24 hours
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -240,8 +236,7 @@ func GetUserFromContext(c *gin.Context) (*UserContext, bool) {
 	}
 
 	email, _ := c.Get("user_email")
-	role, _ := c.Get("user_role")   // Deprecated
-	roles, _ := c.Get("user_roles") // New
+	roles, _ := c.Get("user_roles")
 
 	var rolesList []string
 	if roles != nil {
@@ -251,8 +246,7 @@ func GetUserFromContext(c *gin.Context) (*UserContext, bool) {
 	return &UserContext{
 		ID:    userID.(uuid.UUID),
 		Email: email.(string),
-		Role:  role.(string), // Deprecated
-		Roles: rolesList,     // New
+		Roles: rolesList,
 	}, true
 }
 
@@ -260,8 +254,7 @@ func GetUserFromContext(c *gin.Context) (*UserContext, bool) {
 type UserContext struct {
 	ID    uuid.UUID
 	Email string
-	Role  string   // Deprecated: kept for backward compatibility
-	Roles []string // New: multiple roles support
+	Roles []string
 }
 
 // HasRole checks if user has a specific role

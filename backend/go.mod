@@ -1,8 +1,6 @@
 module civicweave/backend
 
-go 1.24.0
-
-toolchain go1.24.8
+go 1.23
 
 require (
 	github.com/gin-gonic/gin v1.9.1

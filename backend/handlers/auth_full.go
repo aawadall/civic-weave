@@ -23,6 +23,7 @@ type AuthHandler struct {
 	VolunteerService    *models.VolunteerService
 	AdminService        *models.AdminService
 	OAuthAccountService *models.OAuthAccountService
+	RoleService         *models.RoleService
 	EmailService        *services.EmailService
 	GeocodingService    *utils.GeocodingService
 	config              *config.Config
@@ -34,6 +35,7 @@ func NewAuthHandler(
 	volunteerService *models.VolunteerService,
 	adminService *models.AdminService,
 	oauthAccountService *models.OAuthAccountService,
+	roleService *models.RoleService,
 	emailService *services.EmailService,
 	geocodingService *utils.GeocodingService,
 	config *config.Config,
@@ -43,6 +45,7 @@ func NewAuthHandler(
 		VolunteerService:    volunteerService,
 		AdminService:        adminService,
 		OAuthAccountService: oauthAccountService,
+		RoleService:         roleService,
 		EmailService:        emailService,
 		GeocodingService:    geocodingService,
 		config:              config,
@@ -101,11 +104,25 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		Email:         req.Email,
 		PasswordHash:  string(hashedPassword),
 		EmailVerified: !h.config.Features.EmailEnabled, // Auto-verify when email system is disabled
-		Role:          "volunteer",                     // Default role for regular registration
 	}
 
 	if err := h.UserService.Create(user); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user"})
+		return
+	}
+
+	// Assign volunteer role (default for regular registration)
+	volunteerRole, err := h.RoleService.GetByName("volunteer")
+	if err != nil {
+		// Rollback user creation
+		h.UserService.Delete(user.ID)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get volunteer role"})
+		return
+	}
+	if err := h.RoleService.AssignRoleToUser(user.ID, volunteerRole.ID, nil); err != nil {
+		// Rollback user creation
+		h.UserService.Delete(user.ID)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to assign volunteer role"})
 		return
 	}
 
@@ -259,7 +276,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	}
 
 	if gin.Mode() == gin.DebugMode {
-		log.Printf("✅ LOGIN: User found - ID: %s, Role: %s, EmailVerified: %v", user.ID, user.Role, user.EmailVerified)
+		log.Printf("✅ LOGIN: User found - ID: %s, EmailVerified: %v", user.ID, user.EmailVerified)
 		log.Printf("🔑 LOGIN: Password hash present: %v", len(user.PasswordHash) > 0)
 	}
 
@@ -321,7 +338,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 	// Get user profile based on role
 	if gin.Mode() == gin.DebugMode {
-		log.Printf("👤 LOGIN: Getting user profile for role: %s", user.Role)
+		log.Printf("👤 LOGIN: Getting user profile")
 	}
 
 	// Get user roles
@@ -330,17 +347,26 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		if gin.Mode() == gin.DebugMode {
 			log.Printf("⚠️  LOGIN: Failed to get user roles: %v", err)
 		}
-		rolesData = nil
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user roles"})
+		return
 	}
 
 	// Convert roles to string array
 	var roles []string
+	hasVolunteerRole := false
+	hasAdminRole := false
 	for _, role := range rolesData {
 		roles = append(roles, role.Name)
+		if role.Name == "volunteer" {
+			hasVolunteerRole = true
+		}
+		if role.Name == "admin" {
+			hasAdminRole = true
+		}
 	}
 
 	var userProfile map[string]interface{}
-	if user.Role == "volunteer" {
+	if hasVolunteerRole {
 		volunteer, err := h.VolunteerService.GetByUserID(user.ID)
 		if err != nil {
 			if gin.Mode() == gin.DebugMode {
@@ -356,13 +382,12 @@ func (h *AuthHandler) Login(c *gin.Context) {
 			"phone":            volunteer.Phone,
 			"location_address": volunteer.LocationAddress,
 			"created_at":       volunteer.CreatedAt,
-			"role":             user.Role,
 			"roles":            roles,
 		}
 		if gin.Mode() == gin.DebugMode {
 			log.Printf("✅ LOGIN: Volunteer profile retrieved")
 		}
-	} else if user.Role == "admin" {
+	} else if hasAdminRole {
 		admin, err := h.AdminService.GetByUserID(user.ID)
 		if err != nil {
 			if gin.Mode() == gin.DebugMode {
@@ -376,7 +401,6 @@ func (h *AuthHandler) Login(c *gin.Context) {
 			"user_id":    admin.UserID,
 			"name":       admin.Name,
 			"created_at": admin.CreatedAt,
-			"role":       user.Role,
 			"roles":      roles,
 		}
 		if gin.Mode() == gin.DebugMode {
@@ -476,10 +500,10 @@ func (h *AuthHandler) GetProfile(c *gin.Context) {
 		roles = append(roles, role.Name)
 	}
 
-	// Get user profile based on role
+	// Get user profile based on roles
 	var userProfile map[string]interface{}
 
-	if userCtx.Role == "volunteer" {
+	if userCtx.HasRole("volunteer") {
 		volunteer, err := h.VolunteerService.GetByUserID(userCtx.ID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user profile"})
@@ -492,10 +516,9 @@ func (h *AuthHandler) GetProfile(c *gin.Context) {
 			"phone":            volunteer.Phone,
 			"location_address": volunteer.LocationAddress,
 			"created_at":       volunteer.CreatedAt,
-			"role":             userCtx.Role,
 			"roles":            roles,
 		}
-	} else if userCtx.Role == "admin" {
+	} else if userCtx.HasRole("admin") {
 		admin, err := h.AdminService.GetByUserID(userCtx.ID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user profile"})
@@ -506,7 +529,6 @@ func (h *AuthHandler) GetProfile(c *gin.Context) {
 			"user_id":    admin.UserID,
 			"name":       admin.Name,
 			"created_at": admin.CreatedAt,
-			"role":       userCtx.Role,
 			"roles":      roles,
 		}
 	}

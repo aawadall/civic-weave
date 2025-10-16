@@ -6,7 +6,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- CREATE EXTENSION IF NOT EXISTS "postgis";  -- Commented out for local dev without PostGIS
 
 -- Users table (unified authentication)
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     email VARCHAR(255) UNIQUE NOT NULL,
     password_hash VARCHAR(255), -- nullable for OAuth-only users
@@ -17,7 +17,7 @@ CREATE TABLE users (
 );
 
 -- OAuth accounts table (Google OAuth linking)
-CREATE TABLE oauth_accounts (
+CREATE TABLE IF NOT EXISTS oauth_accounts (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     provider VARCHAR(50) NOT NULL,
@@ -29,7 +29,7 @@ CREATE TABLE oauth_accounts (
 );
 
 -- Email verification tokens table
-CREATE TABLE email_verification_tokens (
+CREATE TABLE IF NOT EXISTS email_verification_tokens (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     token VARCHAR(255) UNIQUE NOT NULL,
@@ -38,7 +38,7 @@ CREATE TABLE email_verification_tokens (
 );
 
 -- Password reset tokens table
-CREATE TABLE password_reset_tokens (
+CREATE TABLE IF NOT EXISTS password_reset_tokens (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     token VARCHAR(255) UNIQUE NOT NULL,
@@ -47,7 +47,7 @@ CREATE TABLE password_reset_tokens (
 );
 
 -- Volunteers table
-CREATE TABLE volunteers (
+CREATE TABLE IF NOT EXISTS volunteers (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
@@ -63,7 +63,7 @@ CREATE TABLE volunteers (
 );
 
 -- Admins table
-CREATE TABLE admins (
+CREATE TABLE IF NOT EXISTS admins (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
@@ -71,7 +71,7 @@ CREATE TABLE admins (
 );
 
 -- Initiatives table
-CREATE TABLE initiatives (
+CREATE TABLE IF NOT EXISTS initiatives (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     title VARCHAR(255) NOT NULL,
     description TEXT,
@@ -88,7 +88,7 @@ CREATE TABLE initiatives (
 );
 
 -- Applications table
-CREATE TABLE applications (
+CREATE TABLE IF NOT EXISTS applications (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     volunteer_id UUID NOT NULL REFERENCES volunteers(id) ON DELETE CASCADE,
     initiative_id UUID NOT NULL REFERENCES initiatives(id) ON DELETE CASCADE,
@@ -100,16 +100,16 @@ CREATE TABLE applications (
 );
 
 -- Indexes for performance
-CREATE INDEX idx_users_email ON users(email);
-CREATE INDEX idx_users_role ON users(role);
-CREATE INDEX idx_volunteers_skills ON volunteers USING GIN (skills);
--- CREATE INDEX idx_volunteers_location ON volunteers USING GIST (ST_Point(location_lng, location_lat));  -- Requires PostGIS
-CREATE INDEX idx_initiatives_required_skills ON initiatives USING GIN (required_skills);
-CREATE INDEX idx_initiatives_status ON initiatives(status);
--- CREATE INDEX idx_initiatives_location ON initiatives USING GIST (ST_Point(location_lng, location_lat));  -- Requires PostGIS
-CREATE INDEX idx_applications_volunteer_id ON applications(volunteer_id);
-CREATE INDEX idx_applications_initiative_id ON applications(initiative_id);
-CREATE INDEX idx_applications_status ON applications(status);
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
+CREATE INDEX IF NOT EXISTS idx_volunteers_skills ON volunteers USING GIN (skills);
+-- CREATE INDEX IF NOT EXISTS idx_volunteers_location ON volunteers USING GIST (ST_Point(location_lng, location_lat));  -- Requires PostGIS
+CREATE INDEX IF NOT EXISTS idx_initiatives_required_skills ON initiatives USING GIN (required_skills);
+CREATE INDEX IF NOT EXISTS idx_initiatives_status ON initiatives(status);
+-- CREATE INDEX IF NOT EXISTS idx_initiatives_location ON initiatives USING GIST (ST_Point(location_lng, location_lat));  -- Requires PostGIS
+CREATE INDEX IF NOT EXISTS idx_applications_volunteer_id ON applications(volunteer_id);
+CREATE INDEX IF NOT EXISTS idx_applications_initiative_id ON applications(initiative_id);
+CREATE INDEX IF NOT EXISTS idx_applications_status ON applications(status);
 
 -- DOWN
 -- Drop all tables in reverse order

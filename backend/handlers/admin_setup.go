@@ -16,14 +16,16 @@ import (
 type AdminSetupHandler struct {
 	userService  *models.UserService
 	adminService *models.AdminService
+	roleService  *models.RoleService
 	emailService *services.EmailService
 }
 
 // NewAdminSetupHandler creates a new AdminSetupHandler
-func NewAdminSetupHandler(userService *models.UserService, adminService *models.AdminService, emailService *services.EmailService) *AdminSetupHandler {
+func NewAdminSetupHandler(userService *models.UserService, adminService *models.AdminService, roleService *models.RoleService, emailService *services.EmailService) *AdminSetupHandler {
 	return &AdminSetupHandler{
 		userService:  userService,
 		adminService: adminService,
+		roleService:  roleService,
 		emailService: emailService,
 	}
 }
@@ -99,11 +101,25 @@ func (h *AdminSetupHandler) CreateAdmin(c *gin.Context) {
 		Email:         req.Email,
 		PasswordHash:  string(hashedPassword),
 		EmailVerified: true, // Skip email verification
-		Role:          "admin",
 	}
 
 	if err := h.userService.Create(user); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user"})
+		return
+	}
+
+	// Assign admin role
+	adminRole, err := h.roleService.GetByName("admin")
+	if err != nil {
+		// Rollback user creation
+		h.userService.Delete(user.ID)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get admin role"})
+		return
+	}
+	if err := h.roleService.AssignRoleToUser(user.ID, adminRole.ID, nil); err != nil {
+		// Rollback user creation
+		h.userService.Delete(user.ID)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to assign admin role"})
 		return
 	}
 

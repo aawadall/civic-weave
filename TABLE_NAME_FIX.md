@@ -79,3 +79,5 @@ SELECT * FROM volunteer_project_matches LIMIT 5;
 
 ✅ **FIXED** - All files now use correct table names matching the database schema.
 
+
+
