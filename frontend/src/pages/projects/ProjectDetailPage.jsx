@@ -22,6 +22,8 @@ export default function ProjectDetailPage() {
   const [applying, setApplying] = useState(false)
   const [isTeamMember, setIsTeamMember] = useState(false)
   const [volunteerProfile, setVolunteerProfile] = useState(null)
+  const [availableTeamLeads, setAvailableTeamLeads] = useState([])
+  const [showTeamLeadModal, setShowTeamLeadModal] = useState(false)
 
   useEffect(() => {
     if (id) {
@@ -147,6 +149,57 @@ export default function ProjectDetailPage() {
     }
   }
 
+  const fetchAvailableTeamLeads = async () => {
+    try {
+      // Get users with team_lead role
+      const response = await api.get('/admin/users')
+      const users = response.data.users || []
+      
+      // Filter users with team_lead role
+      const teamLeads = []
+      for (const user of users) {
+        try {
+          const rolesResponse = await api.get(`/admin/users/${user.id}/roles`)
+          const roles = rolesResponse.data.roles || []
+          const hasTeamLeadRole = roles.some(role => role.name === 'team_lead')
+          
+          if (hasTeamLeadRole) {
+            teamLeads.push({
+              id: user.id,
+              name: user.name || user.email,
+              email: user.email
+            })
+          }
+        } catch (err) {
+          console.warn(`Failed to get roles for user ${user.id}:`, err)
+        }
+      }
+      
+      setAvailableTeamLeads(teamLeads)
+      setShowTeamLeadModal(true)
+    } catch (err) {
+      console.error('Error fetching team leads:', err)
+      alert('Failed to fetch available team leads. Please try again.')
+    }
+  }
+
+  const handleAssignTeamLead = async (teamLeadId) => {
+    try {
+      await api.put(`/projects/${id}/team-lead`, {
+        team_lead_id: teamLeadId
+      })
+      
+      // Refresh project data
+      await fetchProjectDetails()
+      
+      setShowTeamLeadModal(false)
+      alert('Team lead assigned successfully! You can now transition to recruiting stage.')
+    } catch (err) {
+      console.error('Error assigning team lead:', err)
+      alert('Failed to assign team lead. Please try again.')
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -198,22 +251,35 @@ export default function ProjectDetailPage() {
           <div className="bg-white rounded-lg shadow-sm border border-secondary-200 p-6">
             <div className="flex justify-between items-start mb-4">
               <h1 className="text-3xl font-bold text-secondary-900">{project.title}</h1>
-              {canManageProject() && project ? (
-                <ProjectStatusTransition 
-                  project={project} 
-                  onStatusChange={handleStatusChange}
-                  compact={true}
-                />
-              ) : (
-                <span className={`px-3 py-1 text-sm font-medium rounded-full ${
-                  (project.status || project.project_status) === 'active' ? 'bg-green-100 text-green-800' :
-                  (project.status || project.project_status) === 'recruiting' ? 'bg-blue-100 text-blue-800' :
-                  (project.status || project.project_status) === 'completed' ? 'bg-gray-100 text-gray-800' :
-                  'bg-yellow-100 text-yellow-800'
-                }`}>
-                  {project.status || project.project_status || 'draft'}
-                </span>
-              )}
+              <div className="flex items-center gap-3">
+                {canManageProject() && project ? (
+                  <ProjectStatusTransition 
+                    project={project} 
+                    onStatusChange={handleStatusChange}
+                    compact={true}
+                  />
+                ) : (
+                  <span className={`px-3 py-1 text-sm font-medium rounded-full ${
+                    (project.status || project.project_status) === 'active' ? 'bg-green-100 text-green-800' :
+                    (project.status || project.project_status) === 'recruiting' ? 'bg-blue-100 text-blue-800' :
+                    (project.status || project.project_status) === 'completed' ? 'bg-gray-100 text-gray-800' :
+                    'bg-yellow-100 text-yellow-800'
+                  }`}>
+                    {project.status || project.project_status || 'draft'}
+                  </span>
+                )}
+                
+                {/* Quick Assign Team Lead Button for Admins */}
+                {hasAnyRole('admin') && !project.team_lead_id && (
+                  <button
+                    onClick={fetchAvailableTeamLeads}
+                    className="px-3 py-1 text-sm bg-orange-100 text-orange-800 rounded-full hover:bg-orange-200 transition-colors"
+                    title="Assign a team lead to enable recruiting stage"
+                  >
+                    Assign Team Lead
+                  </button>
+                )}
+              </div>
             </div>
 
             <p className="text-secondary-600 text-lg mb-6">{project.description}</p>
@@ -448,6 +514,44 @@ export default function ProjectDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Team Lead Selection Modal */}
+      {showTeamLeadModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold text-secondary-900 mb-4">Assign Team Lead</h3>
+            <p className="text-secondary-600 mb-4">Select a team lead for this project:</p>
+            
+            {availableTeamLeads.length > 0 ? (
+              <div className="space-y-2 mb-4">
+                {availableTeamLeads.map((teamLead) => (
+                  <button
+                    key={teamLead.id}
+                    onClick={() => handleAssignTeamLead(teamLead.id)}
+                    className="w-full text-left p-3 border border-secondary-200 rounded-lg hover:bg-secondary-50 transition-colors"
+                  >
+                    <div className="font-medium text-secondary-900">{teamLead.name}</div>
+                    <div className="text-sm text-secondary-600">{teamLead.email}</div>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="text-secondary-600 mb-4">
+                No team leads available. Users need to have the 'team_lead' role to be assigned as team leads.
+              </div>
+            )}
+            
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowTeamLeadModal(false)}
+                className="px-4 py-2 text-secondary-600 hover:text-secondary-800 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

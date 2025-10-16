@@ -595,6 +595,7 @@ func (h *ProjectHandler) AssignTeamLead(c *gin.Context) {
 	projectIDStr := c.Param("id")
 	projectID, err := uuid.Parse(projectIDStr)
 	if err != nil {
+		log.Printf("❌ ASSIGN_TEAM_LEAD: Invalid project ID: %s", projectIDStr)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid project ID"})
 		return
 	}
@@ -604,6 +605,7 @@ func (h *ProjectHandler) AssignTeamLead(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Printf("❌ ASSIGN_TEAM_LEAD: JSON binding error: %v", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -611,21 +613,27 @@ func (h *ProjectHandler) AssignTeamLead(c *gin.Context) {
 	// Get user context
 	userCtx, exists := middleware.GetUserFromContext(c)
 	if !exists {
+		log.Printf("❌ ASSIGN_TEAM_LEAD: User not found in context")
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found in context"})
 		return
 	}
 
 	// Check if user has permission to assign team lead (admin only)
 	if !userCtx.HasRole("admin") {
+		log.Printf("❌ ASSIGN_TEAM_LEAD: User %s is not admin", userCtx.ID)
 		c.JSON(http.StatusForbidden, gin.H{"error": "Insufficient permissions to assign team lead"})
 		return
 	}
 
+	log.Printf("📝 ASSIGN_TEAM_LEAD: Assigning team lead %s to project %s by admin %s", req.TeamLeadID, projectID, userCtx.ID)
+
 	if err := h.service.AssignTeamLead(projectID, req.TeamLeadID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to assign team lead"})
+		log.Printf("❌ ASSIGN_TEAM_LEAD: Failed to assign team lead: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to assign team lead", "details": err.Error()})
 		return
 	}
 
+	log.Printf("✅ ASSIGN_TEAM_LEAD: Successfully assigned team lead %s to project %s", req.TeamLeadID, projectID)
 	c.JSON(http.StatusOK, gin.H{"message": "Team lead assigned successfully"})
 }
 

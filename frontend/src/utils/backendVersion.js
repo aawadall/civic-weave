@@ -1,8 +1,9 @@
-import { API_BASE_URL } from '../api.js'
-
 let cachedBackendVersion = null
 let lastFetchTime = 0
 const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
+
+// Get API base URL from environment
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api'
 
 export async function getBackendVersion() {
   const now = Date.now()

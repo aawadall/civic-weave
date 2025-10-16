@@ -144,19 +144,23 @@ build-push:
 	@echo "Building with versions:"
 	@echo "Backend: $$(cat backend/VERSION)"
 	@echo "Frontend: $$(cat frontend/VERSION)"
+	@cp backend/VERSION backend/VERSION.tmp
 	cd backend && docker build --no-cache \
-		--build-arg VERSION=$$(cat VERSION) \
+		--build-arg VERSION=$$(cat VERSION.tmp) \
 		--build-arg GIT_COMMIT=$$(git rev-parse --short HEAD 2>/dev/null || echo "unknown") \
 		--build-arg BUILD_ENV=production \
 		-t us-central1-docker.pkg.dev/civicweave-474622/civicweave/backend:latest .
+	@rm -f backend/VERSION.tmp
 	cd backend && docker push us-central1-docker.pkg.dev/civicweave-474622/civicweave/backend:latest
+	@cp frontend/VERSION frontend/VERSION.tmp
 	cd frontend && docker build --no-cache \
 		--build-arg VITE_API_BASE_URL=https://civicweave-backend-162941711179.us-central1.run.app/api \
 		--build-arg VITE_GOOGLE_CLIENT_ID=$${GOOGLE_CLIENT_ID:-162941711179-5ducggubvulr92290a5qasgupdr7ifqk.apps.googleusercontent.com} \
-		--build-arg VITE_VERSION=$$(cat VERSION) \
+		--build-arg VITE_VERSION=$$(cat VERSION.tmp) \
 		--build-arg VITE_GIT_COMMIT=$$(git rev-parse --short HEAD 2>/dev/null || echo "unknown") \
 		--build-arg VITE_BUILD_ENV=production \
 		-t us-central1-docker.pkg.dev/civicweave-474622/civicweave/frontend:latest .
+	@rm -f frontend/VERSION.tmp
 	cd frontend && docker push us-central1-docker.pkg.dev/civicweave-474622/civicweave/frontend:latest
 
 # Alias for clarity
