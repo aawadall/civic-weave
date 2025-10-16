@@ -11,7 +11,12 @@ export default function UserManagementPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedUser, setSelectedUser] = useState(null)
   const [showRoleModal, setShowRoleModal] = useState(false)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [showVerificationModal, setShowVerificationModal] = useState(false)
+  const [showPasswordModal, setShowPasswordModal] = useState(false)
   const [userRoles, setUserRoles] = useState([])
+  const [newPassword, setNewPassword] = useState('')
+  const [passwordError, setPasswordError] = useState('')
 
   useEffect(() => {
     fetchUsers()
@@ -84,6 +89,109 @@ export default function UserManagementPage() {
     setSelectedUser(user)
     setShowRoleModal(true)
     fetchUserRoles(user.id)
+  }
+
+  const openDeleteModal = (user) => {
+    setSelectedUser(user)
+    setShowDeleteModal(true)
+  }
+
+  const openVerificationModal = (user) => {
+    setSelectedUser(user)
+    setShowVerificationModal(true)
+  }
+
+  const openPasswordModal = (user) => {
+    setSelectedUser(user)
+    setNewPassword('')
+    setPasswordError('')
+    setShowPasswordModal(true)
+  }
+
+  const handleDeleteUser = async () => {
+    if (!selectedUser) return
+
+    try {
+      await api.delete(`/admin/users/${selectedUser.id}`)
+      setShowDeleteModal(false)
+      setSelectedUser(null)
+      fetchUsers() // Refresh users list
+      alert('User deleted successfully')
+    } catch (err) {
+      console.error('Error deleting user:', err)
+      let errorMessage = 'Failed to delete user'
+      
+      if (err.response?.status === 403) {
+        errorMessage = 'Access denied. You may not have permission to delete this user.'
+      } else if (err.response?.status === 500) {
+        errorMessage = 'Server error. Please try again later or contact support.'
+      } else if (err.response?.data?.error) {
+        errorMessage = err.response.data.error
+      }
+      
+      alert(errorMessage)
+    }
+  }
+
+  const handleToggleVerification = async (verified) => {
+    if (!selectedUser) return
+
+    try {
+      await api.put(`/admin/users/${selectedUser.id}/verification`, {
+        email_verified: verified
+      })
+      setShowVerificationModal(false)
+      setSelectedUser(null)
+      fetchUsers() // Refresh users list
+      alert(`User email ${verified ? 'verified' : 'unverified'} successfully`)
+    } catch (err) {
+      console.error('Error updating verification status:', err)
+      let errorMessage = 'Failed to update verification status'
+      
+      if (err.response?.status === 403) {
+        errorMessage = 'Access denied. You may not have permission to modify this user.'
+      } else if (err.response?.status === 500) {
+        errorMessage = 'Server error. Please try again later or contact support.'
+      } else if (err.response?.data?.error) {
+        errorMessage = err.response.data.error
+      }
+      
+      alert(errorMessage)
+    }
+  }
+
+  const handleChangePassword = async () => {
+    if (!selectedUser || !newPassword) return
+
+    // Validate password
+    if (newPassword.length < 8) {
+      setPasswordError('Password must be at least 8 characters long')
+      return
+    }
+
+    try {
+      await api.put(`/admin/users/${selectedUser.id}/password`, {
+        new_password: newPassword
+      })
+      setShowPasswordModal(false)
+      setSelectedUser(null)
+      setNewPassword('')
+      setPasswordError('')
+      alert('Password changed successfully')
+    } catch (err) {
+      console.error('Error changing password:', err)
+      let errorMessage = 'Failed to change password'
+      
+      if (err.response?.status === 403) {
+        errorMessage = 'Access denied. You may not have permission to modify this user.'
+      } else if (err.response?.status === 500) {
+        errorMessage = 'Server error. Please try again later or contact support.'
+      } else if (err.response?.data?.error) {
+        errorMessage = err.response.data.error
+      }
+      
+      setPasswordError(errorMessage)
+    }
   }
 
   const filteredUsers = users.filter(user => 
@@ -209,12 +317,32 @@ export default function UserManagementPage() {
                       {new Date(user.created_at).toLocaleDateString()}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <button
-                        onClick={() => openRoleModal(user)}
-                        className="text-primary-600 hover:text-primary-900"
-                      >
-                        Manage Roles
-                      </button>
+                      <div className="flex flex-col space-y-1">
+                        <button
+                          onClick={() => openRoleModal(user)}
+                          className="text-primary-600 hover:text-primary-900 text-left"
+                        >
+                          Manage Roles
+                        </button>
+                        <button
+                          onClick={() => openVerificationModal(user)}
+                          className="text-blue-600 hover:text-blue-900 text-left"
+                        >
+                          {user.email_verified ? 'Unverify Email' : 'Verify Email'}
+                        </button>
+                        <button
+                          onClick={() => openPasswordModal(user)}
+                          className="text-orange-600 hover:text-orange-900 text-left"
+                        >
+                          Change Password
+                        </button>
+                        <button
+                          onClick={() => openDeleteModal(user)}
+                          className="text-red-600 hover:text-red-900 text-left"
+                        >
+                          Delete User
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -305,6 +433,151 @@ export default function UserManagementPage() {
                     className="px-4 py-2 border border-secondary-300 text-secondary-700 rounded-lg hover:bg-secondary-50"
                   >
                     Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Delete User Modal */}
+        {showDeleteModal && selectedUser && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+              <div className="p-6">
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-xl font-semibold text-secondary-900">
+                    Delete User
+                  </h2>
+                  <button
+                    onClick={() => setShowDeleteModal(false)}
+                    className="text-secondary-400 hover:text-secondary-600"
+                  >
+                    ×
+                  </button>
+                </div>
+                <p className="text-secondary-600 mb-6">
+                  Are you sure you want to delete <strong>{selectedUser.name || selectedUser.email}</strong>? 
+                  This action cannot be undone and will permanently remove the user and all associated data.
+                </p>
+                <div className="flex justify-end space-x-3">
+                  <button
+                    onClick={() => setShowDeleteModal(false)}
+                    className="px-4 py-2 border border-secondary-300 text-secondary-700 rounded-lg hover:bg-secondary-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleDeleteUser}
+                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                  >
+                    Delete User
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Verification Status Modal */}
+        {showVerificationModal && selectedUser && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+              <div className="p-6">
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-xl font-semibold text-secondary-900">
+                    Change Email Verification Status
+                  </h2>
+                  <button
+                    onClick={() => setShowVerificationModal(false)}
+                    className="text-secondary-400 hover:text-secondary-600"
+                  >
+                    ×
+                  </button>
+                </div>
+                <p className="text-secondary-600 mb-6">
+                  Current status for <strong>{selectedUser.name || selectedUser.email}</strong>: 
+                  <span className={`ml-2 px-2 py-1 rounded-full text-xs font-medium ${
+                    selectedUser.email_verified 
+                      ? 'bg-green-100 text-green-800' 
+                      : 'bg-yellow-100 text-yellow-800'
+                  }`}>
+                    {selectedUser.email_verified ? 'Verified' : 'Unverified'}
+                  </span>
+                </p>
+                <div className="flex justify-end space-x-3">
+                  <button
+                    onClick={() => setShowVerificationModal(false)}
+                    className="px-4 py-2 border border-secondary-300 text-secondary-700 rounded-lg hover:bg-secondary-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => handleToggleVerification(!selectedUser.email_verified)}
+                    className={`px-4 py-2 rounded-lg text-white ${
+                      selectedUser.email_verified 
+                        ? 'bg-yellow-600 hover:bg-yellow-700' 
+                        : 'bg-green-600 hover:bg-green-700'
+                    }`}
+                  >
+                    {selectedUser.email_verified ? 'Mark as Unverified' : 'Mark as Verified'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Change Password Modal */}
+        {showPasswordModal && selectedUser && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+              <div className="p-6">
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-xl font-semibold text-secondary-900">
+                    Change Password
+                  </h2>
+                  <button
+                    onClick={() => setShowPasswordModal(false)}
+                    className="text-secondary-400 hover:text-secondary-600"
+                  >
+                    ×
+                  </button>
+                </div>
+                <p className="text-secondary-600 mb-4">
+                  Set a new password for <strong>{selectedUser.name || selectedUser.email}</strong>
+                </p>
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-secondary-700 mb-2">
+                    New Password
+                  </label>
+                  <input
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => {
+                      setNewPassword(e.target.value)
+                      setPasswordError('')
+                    }}
+                    className="w-full px-3 py-2 border border-secondary-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    placeholder="Enter new password (min 8 characters)"
+                  />
+                  {passwordError && (
+                    <p className="mt-1 text-sm text-red-600">{passwordError}</p>
+                  )}
+                </div>
+                <div className="flex justify-end space-x-3">
+                  <button
+                    onClick={() => setShowPasswordModal(false)}
+                    className="px-4 py-2 border border-secondary-300 text-secondary-700 rounded-lg hover:bg-secondary-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleChangePassword}
+                    disabled={!newPassword || newPassword.length < 8}
+                    className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Change Password
                   </button>
                 </div>
               </div>

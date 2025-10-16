@@ -198,9 +198,18 @@ func main() {
 
 	// Initialize admin profile handler
 	// var adminSetupHandler *handlers.AdminSetupHandler  // Disabled for security
+	var adminUserManagementHandler *handlers.AdminUserManagementHandler
 	if db != nil {
 		adminProfileHandler = handlers.NewAdminProfileHandler(db)
 		// adminSetupHandler = handlers.NewAdminSetupHandler(userService, adminService, emailService)  // Disabled for security
+	}
+	if userService != nil && volunteerService != nil && adminService != nil && roleService != nil {
+		adminUserManagementHandler = handlers.NewAdminUserManagementHandler(
+			userService,
+			volunteerService,
+			adminService,
+			roleService,
+		)
 	}
 
 	// Initialize task and message handlers
@@ -224,6 +233,7 @@ func main() {
 	log.Printf("   projectHandler: %v", projectHandler != nil)
 	log.Printf("   volunteerHandler: %v", volunteerHandler != nil)
 	log.Printf("   messageHandler: %v", messageHandler != nil)
+	log.Printf("   adminUserManagementHandler: %v", adminUserManagementHandler != nil)
 
 	// API routes
 	log.Println("🛣️  Registering API routes...")
@@ -396,6 +406,17 @@ func main() {
 			protected.PUT("/admin/profile", middleware.RequireRole("admin"), adminProfileHandler.UpdateAdminProfile)
 			protected.GET("/admin/stats", middleware.RequireRole("admin"), adminProfileHandler.GetSystemStats)
 			protected.PUT("/admin/change-password", middleware.RequireRole("admin"), adminProfileHandler.ChangePassword)
+		}
+
+		// Admin user management routes (admin only) - must come before role management to avoid conflicts
+		if adminUserManagementHandler != nil {
+			protected.GET("/admin/users/:id", middleware.RequireRole("admin"), adminUserManagementHandler.GetUserDetails)
+			protected.DELETE("/admin/users/:id", middleware.RequireRole("admin"), adminUserManagementHandler.DeleteUser)
+			protected.PUT("/admin/users/:id/verification", middleware.RequireRole("admin"), adminUserManagementHandler.ForceVerificationStatus)
+			protected.PUT("/admin/users/:id/password", middleware.RequireRole("admin"), adminUserManagementHandler.ChangeUserPassword)
+			log.Println("✅ Admin user management routes registered")
+		} else {
+			log.Println("❌ Admin user management routes NOT registered (adminUserManagementHandler is nil)")
 		}
 
 		// Role management routes (admin only)
