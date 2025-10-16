@@ -26,4 +26,14 @@ const (
 	userDeleteQuery = `DELETE FROM users WHERE id = $1`
 
 	userListAllQuery = `SELECT id, email, password_hash, email_verified, created_at, updated_at FROM users ORDER BY created_at DESC`
+
+	userListAllWithNamesQuery = `
+		SELECT 
+			u.id, u.email, u.password_hash, u.email_verified, 
+			u.created_at, u.updated_at,
+			COALESCE(v.name, a.name, '') as name
+		FROM users u
+		LEFT JOIN volunteers v ON u.id = v.user_id
+		LEFT JOIN admins a ON u.id = a.user_id
+		ORDER BY u.created_at DESC`
 )

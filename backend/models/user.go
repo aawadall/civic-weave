@@ -23,6 +23,12 @@ type UserWithRoles struct {
 	Roles []Role `json:"roles"`
 }
 
+// UserWithName represents a user with their name from volunteer or admin profile
+type UserWithName struct {
+	User
+	Name string `json:"name"`
+}
+
 // UserService handles user operations
 type UserService struct {
 	db *sql.DB
@@ -155,6 +161,27 @@ func (s *UserService) ListAllUsers() ([]User, error) {
 	for rows.Next() {
 		var user User
 		err := rows.Scan(&user.ID, &user.Email, &user.PasswordHash, &user.EmailVerified, &user.CreatedAt, &user.UpdatedAt)
+		if err != nil {
+			return nil, err
+		}
+		users = append(users, user)
+	}
+
+	return users, nil
+}
+
+// ListAllUsersWithNames retrieves all users with their names from volunteer or admin profiles
+func (s *UserService) ListAllUsersWithNames() ([]UserWithName, error) {
+	rows, err := s.db.Query(userListAllWithNamesQuery)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var users []UserWithName
+	for rows.Next() {
+		var user UserWithName
+		err := rows.Scan(&user.ID, &user.Email, &user.PasswordHash, &user.EmailVerified, &user.CreatedAt, &user.UpdatedAt, &user.Name)
 		if err != nil {
 			return nil, err
 		}
