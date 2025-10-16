@@ -1,9 +1,11 @@
 package handlers
 
 import (
+	"database/sql"
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"civicweave/backend/config"
@@ -224,37 +226,125 @@ func (h *ProjectHandler) UpdateProject(c *gin.Context) {
 		return
 	}
 
-	// Check if user is admin or team lead for this project
-	isTeamLead, err := h.service.IsTeamLead(id, userCtx.ID)
+	// Check if user can edit project (team lead, admin, or creator)
+	canEdit, err := h.service.CanEditProject(id, userCtx.ID)
 	if err != nil {
-		log.Printf("❌ UPDATE_PROJECT: Failed to check team lead status: %v", err)
+		log.Printf("❌ UPDATE_PROJECT: Failed to check edit permissions: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check permissions"})
 		return
 	}
 
-	if !userCtx.HasRole("admin") && !isTeamLead {
+	if !canEdit {
 		log.Printf("❌ UPDATE_PROJECT: User %s is not authorized to edit project %s", userCtx.ID, id)
-		c.JSON(http.StatusForbidden, gin.H{"error": "Only project team lead or admin can edit this project"})
+		c.JSON(http.StatusForbidden, gin.H{"error": "Only project team lead, admin, or creator can edit this project"})
 		return
 	}
 
-	var project models.Project
-	if err := c.ShouldBindJSON(&project); err != nil {
+	// Get current project to check status restrictions
+	currentProject, err := h.service.GetByID(id)
+	if err != nil {
+		log.Printf("❌ UPDATE_PROJECT: Failed to get current project: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get current project"})
+		return
+	}
+	if currentProject == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
+		return
+	}
+
+	var updateData models.Project
+	if err := c.ShouldBindJSON(&updateData); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	project.ID = id
+	// Apply field restrictions based on current project status
+	restrictedProject := h.applyFieldRestrictions(currentProject, &updateData, userCtx.HasRole("admin"))
+	restrictedProject.ID = id
 
-	log.Printf("📝 UPDATE_PROJECT: User %s updating project %s", userCtx.ID, id)
-	if err := h.service.Update(&project); err != nil {
+	log.Printf("📝 UPDATE_PROJECT: User %s updating project %s (status: %s)", userCtx.ID, id, currentProject.ProjectStatus)
+	if err := h.service.Update(restrictedProject); err != nil {
 		log.Printf("❌ UPDATE_PROJECT: Failed to update project: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update project"})
 		return
 	}
 
 	log.Printf("✅ UPDATE_PROJECT: Successfully updated project %s", id)
-	c.JSON(http.StatusOK, project)
+	c.JSON(http.StatusOK, restrictedProject)
+}
+
+// applyFieldRestrictions applies field-level restrictions based on project status
+func (h *ProjectHandler) applyFieldRestrictions(currentProject *models.Project, updateData *models.Project, isAdmin bool) *models.Project {
+	// Start with current project as base
+	restricted := *currentProject
+
+	// Admin can override all restrictions
+	if isAdmin {
+		// Admin can update all fields
+		restricted.Title = updateData.Title
+		restricted.Description = updateData.Description
+		restricted.RequiredSkills = updateData.RequiredSkills
+		restricted.LocationLat = updateData.LocationLat
+		restricted.LocationLng = updateData.LocationLng
+		restricted.LocationAddress = updateData.LocationAddress
+		restricted.StartDate = updateData.StartDate
+		restricted.EndDate = updateData.EndDate
+		restricted.TeamLeadID = updateData.TeamLeadID
+		restricted.BudgetTotal = updateData.BudgetTotal
+		restricted.BudgetSpent = updateData.BudgetSpent
+		restricted.AutoNotifyMatches = updateData.AutoNotifyMatches
+		return &restricted
+	}
+
+	// Apply restrictions based on current status
+	switch currentProject.ProjectStatus {
+	case models.ProjectStatusDraft:
+		// All fields editable in draft
+		restricted.Title = updateData.Title
+		restricted.Description = updateData.Description
+		restricted.RequiredSkills = updateData.RequiredSkills
+		restricted.LocationLat = updateData.LocationLat
+		restricted.LocationLng = updateData.LocationLng
+		restricted.LocationAddress = updateData.LocationAddress
+		restricted.StartDate = updateData.StartDate
+		restricted.EndDate = updateData.EndDate
+		restricted.TeamLeadID = updateData.TeamLeadID
+		restricted.BudgetTotal = updateData.BudgetTotal
+		restricted.BudgetSpent = updateData.BudgetSpent
+		restricted.AutoNotifyMatches = updateData.AutoNotifyMatches
+
+	case models.ProjectStatusRecruiting:
+		// Restrict title, description, required_skills
+		restricted.LocationLat = updateData.LocationLat
+		restricted.LocationLng = updateData.LocationLng
+		restricted.LocationAddress = updateData.LocationAddress
+		restricted.StartDate = updateData.StartDate
+		restricted.EndDate = updateData.EndDate
+		restricted.TeamLeadID = updateData.TeamLeadID
+		restricted.BudgetTotal = updateData.BudgetTotal
+		restricted.BudgetSpent = updateData.BudgetSpent
+		restricted.AutoNotifyMatches = updateData.AutoNotifyMatches
+
+	case models.ProjectStatusActive:
+		// Restrict title, required_skills, start_date
+		restricted.Description = updateData.Description
+		restricted.LocationLat = updateData.LocationLat
+		restricted.LocationLng = updateData.LocationLng
+		restricted.LocationAddress = updateData.LocationAddress
+		restricted.EndDate = updateData.EndDate
+		restricted.TeamLeadID = updateData.TeamLeadID
+		restricted.BudgetTotal = updateData.BudgetTotal
+		restricted.BudgetSpent = updateData.BudgetSpent
+		restricted.AutoNotifyMatches = updateData.AutoNotifyMatches
+
+	case models.ProjectStatusCompleted, models.ProjectStatusArchived:
+		// Only team_lead_id, end_date, budget_spent editable
+		restricted.EndDate = updateData.EndDate
+		restricted.TeamLeadID = updateData.TeamLeadID
+		restricted.BudgetSpent = updateData.BudgetSpent
+	}
+
+	return &restricted
 }
 
 // DeleteProject handles DELETE /api/projects/:id
@@ -783,4 +873,90 @@ func (h *ProjectHandler) RemoveVolunteer(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Volunteer removed successfully"})
+}
+
+// TransitionProjectStatusRequest represents a project status transition request
+type TransitionProjectStatusRequest struct {
+	Status string `json:"status" binding:"required"`
+}
+
+// TransitionProjectStatus handles PUT /api/projects/:id/status
+func (h *ProjectHandler) TransitionProjectStatus(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid project ID"})
+		return
+	}
+
+	var req TransitionProjectStatusRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Get user context
+	userCtx, exists := middleware.GetUserFromContext(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found in context"})
+		return
+	}
+
+	// Validate status
+	newStatus := models.ProjectStatus(req.Status)
+	validStatuses := []models.ProjectStatus{
+		models.ProjectStatusDraft,
+		models.ProjectStatusRecruiting,
+		models.ProjectStatusActive,
+		models.ProjectStatusCompleted,
+		models.ProjectStatusArchived,
+	}
+
+	validStatus := false
+	for _, status := range validStatuses {
+		if status == newStatus {
+			validStatus = true
+			break
+		}
+	}
+
+	if !validStatus {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid project status"})
+		return
+	}
+
+	log.Printf("🔄 TRANSITION_PROJECT_STATUS: User %s transitioning project %s to %s", userCtx.ID, id, newStatus)
+
+	// Transition project status
+	if err := h.service.TransitionProjectStatus(id, newStatus, userCtx.ID); err != nil {
+		if err == sql.ErrNoRows {
+			if strings.Contains(err.Error(), "permission") {
+				c.JSON(http.StatusForbidden, gin.H{"error": "Insufficient permissions to transition project status"})
+			} else {
+				c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
+			}
+		} else {
+			log.Printf("❌ TRANSITION_PROJECT_STATUS: Failed to transition project: %v", err)
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		}
+		return
+	}
+
+	log.Printf("✅ TRANSITION_PROJECT_STATUS: Successfully transitioned project %s to %s", id, newStatus)
+
+	// Return updated project
+	project, err := h.service.GetByID(id)
+	if err != nil {
+		log.Printf("⚠️ TRANSITION_PROJECT_STATUS: Failed to fetch updated project: %v", err)
+		c.JSON(http.StatusOK, gin.H{
+			"message": "Project status updated successfully",
+			"status":  newStatus,
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Project status updated successfully",
+		"project": project,
+	})
 }

@@ -286,6 +286,7 @@ func main() {
 			protected.GET("/projects/:id", projectHandler.GetProject)
 			protected.GET("/projects/:id/details", projectHandler.GetProjectWithDetails)
 			protected.PUT("/projects/:id", middleware.RequireAnyRole("team_lead", "admin"), projectHandler.UpdateProject)
+			protected.PUT("/projects/:id/status", projectHandler.TransitionProjectStatus)
 			protected.DELETE("/projects/:id", middleware.RequireRole("admin"), projectHandler.DeleteProject)
 
 			// Project team management routes
@@ -445,7 +446,17 @@ func main() {
 
 	// Health check
 	router.GET("/health", func(c *gin.Context) {
-		c.JSON(200, gin.H{"status": "ok"})
+		c.JSON(200, gin.H{
+			"status":  "ok",
+			"version": GetVersionInfo(),
+		})
+	})
+
+	// Version endpoint
+	router.GET("/version", func(c *gin.Context) {
+		c.JSON(200, gin.H{
+			"version": GetVersionInfo(),
+		})
 	})
 
 	// Start server

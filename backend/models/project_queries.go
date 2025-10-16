@@ -93,4 +93,16 @@ const (
 		FROM projects
 		WHERE project_status IN ('recruiting', 'active')
 		ORDER BY created_at DESC`
+
+	projectIsCreatorQuery = `SELECT COUNT(1) FROM projects WHERE id = $1 AND created_by_admin_id = $2`
+
+	projectTransitionStatusQuery = `
+		UPDATE projects 
+		SET project_status = $2, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $1`
+
+	projectActiveTeamCountQuery = `
+		SELECT COUNT(1) 
+		FROM project_team_members 
+		WHERE project_id = $1 AND status = 'active'`
 )

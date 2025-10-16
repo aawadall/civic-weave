@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import api from '../../services/api'
+import ProjectStatusTransition from '../../components/ProjectStatusTransition'
 
 export default function ProjectLogisticsTab({ projectId }) {
   const [logistics, setLogistics] = useState(null)
@@ -56,8 +57,29 @@ export default function ProjectLogisticsTab({ projectId }) {
     )
   }
 
+  const handleStatusChange = (updatedProject) => {
+    // Update the logistics data with the new project status
+    if (logistics) {
+      setLogistics({
+        ...logistics,
+        project: updatedProject
+      })
+    }
+  }
+
   return (
     <div className="space-y-8">
+      {/* Project Status Management */}
+      {logistics?.project && (
+        <div className="bg-white rounded-lg border border-secondary-200 p-6">
+          <ProjectStatusTransition 
+            project={logistics.project} 
+            onStatusChange={handleStatusChange}
+            showWorkflow={true}
+          />
+        </div>
+      )}
+
       {/* Budget Section - Under Construction */}
       <div className="bg-white rounded-lg border border-secondary-200 p-6">
         <h2 className="text-xl font-bold text-secondary-900 mb-4">Budget</h2>

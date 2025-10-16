@@ -6,6 +6,8 @@ import RichTextEditor from '../../components/RichTextEditor'
 import ProjectTasksTab from './ProjectTasksTab'
 import ProjectMessagesTab from './ProjectMessagesTab'
 import ProjectLogisticsTab from './ProjectLogisticsTab'
+import ProjectStatusTransition from '../../components/ProjectStatusTransition'
+import DebugInfo from '../../components/DebugInfo'
 
 export default function ProjectDetailPage() {
   const { id, tab } = useParams()
@@ -24,9 +26,12 @@ export default function ProjectDetailPage() {
   useEffect(() => {
     if (id) {
       fetchProjectDetails()
-      checkTeamMembership()
+      // Only check team membership if user is logged in
+      if (user) {
+        checkTeamMembership()
+      }
     }
-  }, [id])
+  }, [id, user])
 
   useEffect(() => {
     if (tab) {
@@ -38,6 +43,7 @@ export default function ProjectDetailPage() {
     try {
       setLoading(true)
       const response = await api.get(`/projects/${id}`)
+      console.log('Project data:', response.data)
       setProject(response.data)
       
       // Fetch additional data for team leads and admins
@@ -63,21 +69,24 @@ export default function ProjectDetailPage() {
 
   const checkTeamMembership = async () => {
     try {
-      // Get volunteer profile
-      const volResponse = await api.get('/volunteers')
-      const volunteers = volResponse.data.volunteers || []
-      const myVolunteer = volunteers.find(v => v.user_id === user?.id)
-      setVolunteerProfile(myVolunteer)
-
-      if (myVolunteer) {
-        // Check if user is in project team
-        const teamResponse = await api.get(`/projects/${id}/team-members`)
-        const members = teamResponse.data.team_members || []
-        const isMember = members.some(m => m.volunteer_id === myVolunteer.id && m.status === 'active')
-        setIsTeamMember(isMember)
+      // Check if user is in project team directly
+      const teamResponse = await api.get(`/projects/${id}/team-members`)
+      const members = teamResponse.data.team_members || []
+      
+      // Check if current user is a team member
+      const isMember = members.some(m => m.user_id === user?.id && m.status === 'active')
+      setIsTeamMember(isMember)
+      
+      // Set volunteer profile if found in team
+      const myMember = members.find(m => m.user_id === user?.id)
+      if (myMember) {
+        setVolunteerProfile(myMember)
       }
     } catch (err) {
       console.warn('Could not check team membership:', err)
+      // Don't set any volunteer profile if there's an error
+      setVolunteerProfile(null)
+      setIsTeamMember(false)
     }
   }
 
@@ -96,12 +105,46 @@ export default function ProjectDetailPage() {
   }
 
   const canManageProject = () => {
-    return hasAnyRole('admin') || 
-           (hasAnyRole('team_lead') && project?.created_by_user_id === user?.id)
+    if (!project || !user) {
+      console.log('canManageProject: No project or user', { project: !!project, user: !!user })
+      return false
+    }
+    
+    // Admin can always manage
+    if (hasAnyRole('admin')) {
+      console.log('canManageProject: User is admin')
+      return true
+    }
+    
+    // Team lead can manage if they're the team lead for this project
+    if (hasAnyRole('team_lead') && project?.team_lead_id === user?.id) {
+      console.log('canManageProject: User is team lead for this project')
+      return true
+    }
+    
+    // Project creator can manage
+    if (project?.created_by_admin_id === user?.id) {
+      console.log('canManageProject: User is project creator')
+      return true
+    }
+    
+    console.log('canManageProject: No permissions', { 
+      userRoles: user?.roles, 
+      teamLeadId: project?.team_lead_id, 
+      createdBy: project?.created_by_admin_id,
+      userId: user?.id 
+    })
+    return false
   }
 
   const canApply = () => {
     return hasRole('volunteer') && project?.status === 'recruiting'
+  }
+
+  const handleStatusChange = (updatedProject) => {
+    if (updatedProject) {
+      setProject(updatedProject)
+    }
   }
 
   if (loading) {
@@ -129,6 +172,9 @@ export default function ProjectDetailPage() {
   return (
     <div className="min-h-screen bg-secondary-50 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Debug Info */}
+        <DebugInfo project={project} title="Project Detail Page Debug" />
+        
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
@@ -152,14 +198,22 @@ export default function ProjectDetailPage() {
           <div className="bg-white rounded-lg shadow-sm border border-secondary-200 p-6">
             <div className="flex justify-between items-start mb-4">
               <h1 className="text-3xl font-bold text-secondary-900">{project.title}</h1>
-              <span className={`px-3 py-1 text-sm font-medium rounded-full ${
-                project.status === 'active' ? 'bg-green-100 text-green-800' :
-                project.status === 'recruiting' ? 'bg-blue-100 text-blue-800' :
-                project.status === 'completed' ? 'bg-gray-100 text-gray-800' :
-                'bg-yellow-100 text-yellow-800'
-              }`}>
-                {project.status}
-              </span>
+              {canManageProject() && project ? (
+                <ProjectStatusTransition 
+                  project={project} 
+                  onStatusChange={handleStatusChange}
+                  compact={true}
+                />
+              ) : (
+                <span className={`px-3 py-1 text-sm font-medium rounded-full ${
+                  (project.status || project.project_status) === 'active' ? 'bg-green-100 text-green-800' :
+                  (project.status || project.project_status) === 'recruiting' ? 'bg-blue-100 text-blue-800' :
+                  (project.status || project.project_status) === 'completed' ? 'bg-gray-100 text-gray-800' :
+                  'bg-yellow-100 text-yellow-800'
+                }`}>
+                  {project.status || project.project_status || 'draft'}
+                </span>
+              )}
             </div>
 
             <p className="text-secondary-600 text-lg mb-6">{project.description}</p>

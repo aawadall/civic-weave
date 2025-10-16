@@ -9,6 +9,13 @@ dev-up:
 dev-down:
 	docker-compose down
 
+dev-rebuild:
+	docker-compose down
+	docker-compose build --no-cache
+	docker-compose up -d postgres redis
+	sleep 5
+	docker-compose up -d backend frontend
+
 dev-logs:
 	docker-compose logs -f
 
@@ -52,6 +59,12 @@ lint:
 clean:
 	docker-compose down -v
 	docker system prune -f
+
+clean-frontend:
+	docker-compose down frontend
+	docker rmi civicweave_frontend:dev 2>/dev/null || true
+	docker-compose build --no-cache frontend
+	docker-compose up -d frontend
 
 # GCP Project Setup
 setup-gcp:
@@ -106,19 +119,43 @@ deploy-app:
 
 # Build for local development (localhost URLs)
 build-dev:
-	cd backend && docker build -t civicweave_backend:dev .
-	cd frontend && docker build \
+	@echo "Incrementing versions..."
+	@./scripts/increment-version.sh both
+	@echo "Building with versions:"
+	@echo "Backend: $$(cat backend/VERSION)"
+	@echo "Frontend: $$(cat frontend/VERSION)"
+	cd backend && docker build --no-cache \
+		--build-arg VERSION=$$(cat VERSION) \
+		--build-arg GIT_COMMIT=$$(git rev-parse --short HEAD 2>/dev/null || echo "unknown") \
+		--build-arg BUILD_ENV=development \
+		-t civicweave_backend:dev .
+	cd frontend && docker build --no-cache \
 		--build-arg VITE_API_BASE_URL=http://localhost:8081/api \
 		--build-arg VITE_GOOGLE_CLIENT_ID=$${GOOGLE_CLIENT_ID:-162941711179-5ducggubvulr92290a5qasgupdr7ifqk.apps.googleusercontent.com} \
+		--build-arg VITE_VERSION=$$(cat VERSION) \
+		--build-arg VITE_GIT_COMMIT=$$(git rev-parse --short HEAD 2>/dev/null || echo "unknown") \
+		--build-arg VITE_BUILD_ENV=development \
 		-t civicweave_frontend:dev .
 
 # Build and push for production
 build-push:
-	cd backend && docker build -t us-central1-docker.pkg.dev/civicweave-474622/civicweave/backend:latest .
+	@echo "Incrementing versions..."
+	@./scripts/increment-version.sh both
+	@echo "Building with versions:"
+	@echo "Backend: $$(cat backend/VERSION)"
+	@echo "Frontend: $$(cat frontend/VERSION)"
+	cd backend && docker build --no-cache \
+		--build-arg VERSION=$$(cat VERSION) \
+		--build-arg GIT_COMMIT=$$(git rev-parse --short HEAD 2>/dev/null || echo "unknown") \
+		--build-arg BUILD_ENV=production \
+		-t us-central1-docker.pkg.dev/civicweave-474622/civicweave/backend:latest .
 	cd backend && docker push us-central1-docker.pkg.dev/civicweave-474622/civicweave/backend:latest
-	cd frontend && docker build \
+	cd frontend && docker build --no-cache \
 		--build-arg VITE_API_BASE_URL=https://civicweave-backend-162941711179.us-central1.run.app/api \
 		--build-arg VITE_GOOGLE_CLIENT_ID=$${GOOGLE_CLIENT_ID:-162941711179-5ducggubvulr92290a5qasgupdr7ifqk.apps.googleusercontent.com} \
+		--build-arg VITE_VERSION=$$(cat VERSION) \
+		--build-arg VITE_GIT_COMMIT=$$(git rev-parse --short HEAD 2>/dev/null || echo "unknown") \
+		--build-arg VITE_BUILD_ENV=production \
 		-t us-central1-docker.pkg.dev/civicweave-474622/civicweave/frontend:latest .
 	cd frontend && docker push us-central1-docker.pkg.dev/civicweave-474622/civicweave/frontend:latest
 
@@ -136,8 +173,10 @@ help:
 	@echo "Development:"
 	@echo "  dev-up        - Start development environment (Docker)"
 	@echo "  dev-down      - Stop development environment"
+	@echo "  dev-rebuild   - Rebuild and restart with no cache"
 	@echo "  dev-logs      - View logs"
 	@echo "  build-dev     - Build Docker images for local testing"
+	@echo "  clean-frontend - Force rebuild frontend container"
 	@echo ""
 	@echo "Database:"
 	@echo "  db-migrate         - Run database migrations"

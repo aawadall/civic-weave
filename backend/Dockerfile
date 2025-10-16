@@ -14,6 +14,16 @@ RUN go mod download
 # Copy source code
 COPY . .
 
+# Build arguments for version info
+ARG VERSION=1.0.0
+ARG GIT_COMMIT=unknown
+ARG BUILD_ENV=development
+
+# Set build-time environment variables
+ENV VERSION=${VERSION}
+ENV GIT_COMMIT=${GIT_COMMIT}
+ENV BUILD_ENV=${BUILD_ENV}
+
 # Build the application
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main ./cmd/server
 

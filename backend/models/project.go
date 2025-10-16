@@ -2,6 +2,7 @@ package models
 
 import (
 	"database/sql"
+	"fmt"
 	"log"
 	"time"
 
@@ -412,4 +413,145 @@ func (s *ProjectService) GetActiveProjects() ([]Project, error) {
 // GetDB returns the database connection (needed for creating other services)
 func (s *ProjectService) GetDB() *sql.DB {
 	return s.db
+}
+
+// IsProjectCreator checks if a user is the creator of a project
+func (s *ProjectService) IsProjectCreator(projectID, userID uuid.UUID) (bool, error) {
+	var count int
+	err := s.db.QueryRow(projectIsCreatorQuery, projectID, userID).Scan(&count)
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
+// CanEditProject checks if a user can edit a project (team lead, admin, or creator)
+func (s *ProjectService) CanEditProject(projectID, userID uuid.UUID) (bool, error) {
+	// Check if user is admin
+	userService := NewUserService(s.db)
+	roles, err := userService.GetUserRoles(userID)
+	if err != nil {
+		return false, err
+	}
+
+	for _, role := range roles {
+		if role.Name == "admin" {
+			return true, nil
+		}
+	}
+
+	// Check if user is team lead
+	isTeamLead, err := s.IsTeamLead(projectID, userID)
+	if err != nil {
+		return false, err
+	}
+	if isTeamLead {
+		return true, nil
+	}
+
+	// Check if user is creator
+	isCreator, err := s.IsProjectCreator(projectID, userID)
+	if err != nil {
+		return false, err
+	}
+
+	return isCreator, nil
+}
+
+// TransitionProjectStatus transitions a project to a new status with validation
+func (s *ProjectService) TransitionProjectStatus(projectID uuid.UUID, newStatus ProjectStatus, userID uuid.UUID) error {
+	// Get current project
+	project, err := s.GetByID(projectID)
+	if err != nil {
+		return err
+	}
+	if project == nil {
+		return sql.ErrNoRows
+	}
+
+	// Check if user can edit project
+	canEdit, err := s.CanEditProject(projectID, userID)
+	if err != nil {
+		return err
+	}
+	if !canEdit {
+		return sql.ErrNoRows // Permission denied
+	}
+
+	// Validate transition
+	if err := s.validateStatusTransition(project.ProjectStatus, newStatus, projectID); err != nil {
+		return err
+	}
+
+	// Update project status
+	_, err = s.db.Exec(projectTransitionStatusQuery, projectID, newStatus)
+	return err
+}
+
+// validateStatusTransition validates if a status transition is allowed
+func (s *ProjectService) validateStatusTransition(currentStatus, newStatus ProjectStatus, projectID uuid.UUID) error {
+	// Same status is always allowed
+	if currentStatus == newStatus {
+		return nil
+	}
+
+	// Define valid transitions
+	validTransitions := map[ProjectStatus][]ProjectStatus{
+		ProjectStatusDraft:      {ProjectStatusRecruiting, ProjectStatusArchived},
+		ProjectStatusRecruiting: {ProjectStatusActive, ProjectStatusArchived},
+		ProjectStatusActive:     {ProjectStatusCompleted, ProjectStatusArchived},
+		ProjectStatusCompleted:  {ProjectStatusArchived},
+		ProjectStatusArchived:   {}, // No transitions from archived
+	}
+
+	// Check if transition is valid
+	allowedTransitions, exists := validTransitions[currentStatus]
+	if !exists {
+		return fmt.Errorf("invalid current status: %s", currentStatus)
+	}
+
+	validTransition := false
+	for _, allowed := range allowedTransitions {
+		if allowed == newStatus {
+			validTransition = true
+			break
+		}
+	}
+
+	if !validTransition {
+		return fmt.Errorf("invalid transition from %s to %s", currentStatus, newStatus)
+	}
+
+	// Get project details for validation
+	project, err := s.GetByID(projectID)
+	if err != nil {
+		return fmt.Errorf("failed to get project details: %w", err)
+	}
+
+	// Validate specific transition requirements
+	switch newStatus {
+	case ProjectStatusRecruiting:
+		// Must have team lead assigned
+		if project.TeamLeadID == nil {
+			return fmt.Errorf("cannot transition to recruiting: team lead must be assigned")
+		}
+	case ProjectStatusActive:
+		// Must have at least one active team member
+		activeCount, err := s.getActiveTeamMemberCount(projectID)
+		if err != nil {
+			return err
+		}
+		if activeCount == 0 {
+			return fmt.Errorf("cannot transition to active: must have at least one active team member")
+		}
+	}
+
+	return nil
+}
+
+// getActiveTeamMemberCount returns the count of active team members for a project
+func (s *ProjectService) getActiveTeamMemberCount(projectID uuid.UUID) (int, error) {
+	var count int
+	err := s.db.QueryRow(projectActiveTeamCountQuery, projectID).Scan(&count)
+	return count, err
 }

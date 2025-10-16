@@ -1,7 +1,10 @@
 import { Routes, Route } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
 import { ToastProvider } from './contexts/ToastContext'
+import { BUILD_TIMESTAMP, BUILD_VERSION } from './utils/buildInfo'
 import Layout from './components/Layout'
+import AppFooter from './components/AppFooter'
+import VersionToggle from './components/VersionToggle'
 import HomePage from './pages/HomePage'
 import RegisterPage from './pages/RegisterPage'
 import LoginPage from './pages/LoginPage'
@@ -20,6 +23,7 @@ import AdminProfilePage from './pages/admin/AdminProfilePage'
 import ProjectsListPage from './pages/projects/ProjectsListPage'
 import ProjectDetailPage from './pages/projects/ProjectDetailPage'
 import CreateProjectPage from './pages/projects/CreateProjectPage'
+import EditProjectPage from './pages/projects/EditProjectPage'
 import MessageCenter from './pages/MessageCenter'
 // Volunteer pages
 import VolunteersPoolPage from './pages/volunteers/VolunteersPoolPage'
@@ -34,6 +38,8 @@ import ProtectedRoute from './components/ProtectedRoute'
 import Toast from './components/Toast'
 
 function App() {
+  // Log build info for debugging
+  console.log('App starting with build info:', { BUILD_TIMESTAMP, BUILD_VERSION })
   return (
     <ToastProvider>
       <AuthProvider>
@@ -149,6 +155,14 @@ function App() {
                   </ProtectedRoute>
                 } 
               />
+              <Route 
+                path="projects/:id/edit" 
+                element={
+                  <ProtectedRoute>
+                    <EditProjectPage />
+                  </ProtectedRoute>
+                } 
+              />
               {/* Message Center */}
               <Route 
                 path="messages" 
@@ -211,6 +225,8 @@ function App() {
               />
             </Route>
           </Routes>
+          <AppFooter />
+          <VersionToggle />
           <Toast />
         </div>
       </AuthProvider>
