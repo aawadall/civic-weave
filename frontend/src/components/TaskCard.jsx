@@ -94,7 +94,9 @@ export default function TaskCard({ task, onClick, onStatusChange, canEdit = fals
       {/* Assignee info */}
       {task.assignee_id && (
         <div className="mt-2 pt-2 border-t border-secondary-100">
-          <span className="text-xs text-secondary-500">Assigned</span>
+          <span className="text-xs text-secondary-500">
+            Assigned to: {task.assignee_name || 'Unknown'}
+          </span>
         </div>
       )}
     </div>

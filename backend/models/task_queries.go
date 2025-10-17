@@ -14,43 +14,52 @@ const (
 		FROM project_tasks WHERE id = $1`
 
 	taskListByProjectOwnerQuery = `
-		SELECT id, project_id, title, description, assignee_id, created_by_id, 
-		       status, priority, due_date, labels, created_at, updated_at
-		FROM project_tasks 
-		WHERE project_id = $1
+		SELECT pt.id, pt.project_id, pt.title, pt.description, pt.assignee_id, pt.created_by_id, 
+		       pt.status, pt.priority, pt.due_date, pt.labels, pt.created_at, pt.updated_at,
+		       v.name as assignee_name, u.email as assignee_email
+		FROM project_tasks pt
+		LEFT JOIN volunteers v ON pt.assignee_id = v.id
+		LEFT JOIN users u ON v.user_id = u.id
+		WHERE pt.project_id = $1
 		ORDER BY 
-			CASE priority 
+			CASE pt.priority 
 				WHEN 'high' THEN 1 
 				WHEN 'medium' THEN 2 
 				WHEN 'low' THEN 3 
 			END,
-			created_at DESC`
+			pt.created_at DESC`
 
 	taskListByProjectMemberQuery = `
-		SELECT id, project_id, title, description, assignee_id, created_by_id, 
-		       status, priority, due_date, labels, created_at, updated_at
-		FROM project_tasks 
-		WHERE project_id = $1 AND (assignee_id = $2 OR assignee_id IS NULL)
+		SELECT pt.id, pt.project_id, pt.title, pt.description, pt.assignee_id, pt.created_by_id, 
+		       pt.status, pt.priority, pt.due_date, pt.labels, pt.created_at, pt.updated_at,
+		       v.name as assignee_name, u.email as assignee_email
+		FROM project_tasks pt
+		LEFT JOIN volunteers v ON pt.assignee_id = v.id
+		LEFT JOIN users u ON v.user_id = u.id
+		WHERE pt.project_id = $1 AND (pt.assignee_id = $2 OR pt.assignee_id IS NULL)
 		ORDER BY 
-			CASE priority 
+			CASE pt.priority 
 				WHEN 'high' THEN 1 
 				WHEN 'medium' THEN 2 
 				WHEN 'low' THEN 3 
 			END,
-			created_at DESC`
+			pt.created_at DESC`
 
 	taskListUnassignedByProjectQuery = `
-		SELECT id, project_id, title, description, assignee_id, created_by_id, 
-		       status, priority, due_date, labels, created_at, updated_at
-		FROM project_tasks 
-		WHERE project_id = $1 AND assignee_id IS NULL AND status != 'done'
+		SELECT pt.id, pt.project_id, pt.title, pt.description, pt.assignee_id, pt.created_by_id, 
+		       pt.status, pt.priority, pt.due_date, pt.labels, pt.created_at, pt.updated_at,
+		       v.name as assignee_name, u.email as assignee_email
+		FROM project_tasks pt
+		LEFT JOIN volunteers v ON pt.assignee_id = v.id
+		LEFT JOIN users u ON v.user_id = u.id
+		WHERE pt.project_id = $1 AND pt.assignee_id IS NULL AND pt.status != 'done'
 		ORDER BY 
-			CASE priority 
+			CASE pt.priority 
 				WHEN 'high' THEN 1 
 				WHEN 'medium' THEN 2 
 				WHEN 'low' THEN 3 
 			END,
-			created_at DESC`
+			pt.created_at DESC`
 
 	taskListByAssigneeQuery = `
 		SELECT id, project_id, title, description, assignee_id, created_by_id, 

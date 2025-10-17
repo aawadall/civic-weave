@@ -364,29 +364,35 @@ type TeamMemberWithDetails struct {
 
 // GetProjectTeamMembersWithDetails retrieves team members with volunteer details
 func (s *ProjectService) GetProjectTeamMembersWithDetails(projectID uuid.UUID) ([]TeamMemberWithDetails, error) {
-	query := `
-		SELECT ptm.id, ptm.project_id, ptm.volunteer_id, ptm.joined_at, ptm.status, ptm.created_at, ptm.updated_at,
-		       COALESCE(v.name, u.first_name || ' ' || u.last_name) as volunteer_name, u.email as volunteer_email
-		FROM project_team_members ptm
-		JOIN volunteers v ON ptm.volunteer_id = v.id
-		JOIN users u ON v.user_id = u.id
-		WHERE ptm.project_id = $1
-		ORDER BY ptm.joined_at`
-	
-	rows, err := s.db.Query(query, projectID)
+	// First get the basic team members
+	basicMembers, err := s.GetProjectTeamMembers(projectID)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
 	var members []TeamMemberWithDetails
-	for rows.Next() {
-		var member TeamMemberWithDetails
-		err := rows.Scan(&member.ID, &member.ProjectID, &member.VolunteerID,
-			&member.JoinedAt, &member.Status, &member.CreatedAt, &member.UpdatedAt,
-			&member.VolunteerName, &member.VolunteerEmail)
+	for _, basicMember := range basicMembers {
+		// Get volunteer details
+		volunteerService := NewVolunteerService(s.db)
+		volunteer, err := volunteerService.GetByID(basicMember.VolunteerID)
 		if err != nil {
-			return nil, err
+			// If volunteer not found, skip this member
+			continue
+		}
+
+		// Get user details for email
+		userService := NewUserService(s.db)
+		user, err := userService.GetByID(volunteer.UserID)
+		if err != nil {
+			// If user not found, skip this member
+			continue
+		}
+
+		// Create enriched member
+		member := TeamMemberWithDetails{
+			ProjectTeamMember: basicMember,
+			VolunteerName:     volunteer.Name,
+			VolunteerEmail:    user.Email,
 		}
 		members = append(members, member)
 	}

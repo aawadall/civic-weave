@@ -86,8 +86,8 @@ func (h *TaskHandler) ListTasks(c *gin.Context) {
 	// This allows them to self-assign tasks
 	if !isTeamMember && !userCtx.HasRole("admin") {
 		// Check if user is a volunteer
-		_, err := h.volunteerService.GetByUserID(userCtx.ID)
-		if err != nil {
+		volunteer, err := h.volunteerService.GetByUserID(userCtx.ID)
+		if err != nil || volunteer == nil {
 			c.JSON(http.StatusForbidden, gin.H{"error": "Only team members or volunteers can view tasks"})
 			return
 		}
