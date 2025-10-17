@@ -52,9 +52,10 @@ export function getAvailableTransitions(currentStatus, projectData = {}) {
         console.log('getAvailableTransitions: Recruiting check - hasTeamLead:', hasTeamLead, 'team_lead_id:', projectData.team_lead_id)
         return hasTeamLead
       case PROJECT_STATUSES.ACTIVE:
-        const hasActiveMembers = projectData.active_team_count > 0
-        console.log('getAvailableTransitions: Active check - hasActiveMembers:', hasActiveMembers, 'active_team_count:', projectData.active_team_count)
-        return hasActiveMembers
+        // Allow transition to active if there are any team members (not just active ones)
+        const hasTeamMembers = (projectData.active_team_count > 0) || (projectData.team_members && projectData.team_members.length > 0)
+        console.log('getAvailableTransitions: Active check - hasTeamMembers:', hasTeamMembers, 'active_team_count:', projectData.active_team_count, 'team_members:', projectData.team_members)
+        return hasTeamMembers
       default:
         return true
     }
