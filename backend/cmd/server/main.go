@@ -368,6 +368,7 @@ func main() {
 				protected.GET("/messages/conversations", messageHandler.GetConversations)
 				protected.GET("/messages/conversations/:id", messageHandler.GetConversation)
 				protected.GET("/messages/unread-count", messageHandler.GetUniversalUnreadCount)
+				protected.GET("/messages/recipients/search", messageHandler.SearchRecipients)
 			}
 
 			// Broadcast routes

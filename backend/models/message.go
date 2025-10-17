@@ -2,6 +2,7 @@ package models
 
 import (
 	"database/sql"
+	"log"
 	"time"
 
 	"github.com/google/uuid"
@@ -300,10 +301,22 @@ func (s *MessageService) CreateUniversalMessage(message *ProjectMessage) error {
 	if message.MessageType == "" {
 		message.MessageType = "general"
 	}
-	return s.db.QueryRow(messageCreateUniversalQuery, message.ID, message.ProjectID, message.SenderID,
+
+	log.Printf("DEBUG: CreateUniversalMessage - ID: %s, ProjectID: %v, SenderID: %s, RecipientUserID: %v, RecipientTeamID: %v, Subject: %s, MessageText: %s, TaskID: %v, MessageType: %s, MessageScope: %s",
+		message.ID, message.ProjectID, message.SenderID, message.RecipientUserID, message.RecipientTeamID, message.Subject, message.MessageText, message.TaskID, message.MessageType, message.MessageScope)
+
+	err := s.db.QueryRow(messageCreateUniversalQuery, message.ID, message.ProjectID, message.SenderID,
 		message.RecipientUserID, message.RecipientTeamID, message.Subject, message.MessageText,
 		message.TaskID, message.MessageType, message.MessageScope).
 		Scan(&message.CreatedAt)
+
+	if err != nil {
+		log.Printf("DEBUG: Database error in CreateUniversalMessage: %v", err)
+		return err
+	}
+
+	log.Printf("DEBUG: CreateUniversalMessage successful, CreatedAt: %v", message.CreatedAt)
+	return nil
 }
 
 // GetInbox retrieves user's inbox (all messages where user is recipient)
@@ -442,4 +455,63 @@ func (s *MessageService) GetUniversalUnreadCount(userID uuid.UUID) (*UniversalUn
 		return nil, err
 	}
 	return count, nil
+}
+
+// SearchUser represents a user search result
+type SearchUser struct {
+	ID    uuid.UUID `json:"id"`
+	Name  string    `json:"name"`
+	Email string    `json:"email"`
+	Type  string    `json:"type"`
+}
+
+// SearchProject represents a project search result
+type SearchProject struct {
+	ID    uuid.UUID `json:"id"`
+	Title string    `json:"title"`
+	Type  string    `json:"type"`
+}
+
+// SearchUsers searches for users by name or email
+func (s *MessageService) SearchUsers(query string, limit int) ([]SearchUser, error) {
+	rows, err := s.db.Query(messageSearchUsersQuery, query, limit)
+	if err != nil {
+		return []SearchUser{}, err
+	}
+	defer rows.Close()
+
+	var users []SearchUser
+	for rows.Next() {
+		var user SearchUser
+		err := rows.Scan(&user.ID, &user.Name, &user.Email)
+		if err != nil {
+			return []SearchUser{}, err
+		}
+		user.Type = "user"
+		users = append(users, user)
+	}
+
+	return users, rows.Err()
+}
+
+// SearchUserProjects searches for projects where user is enrolled
+func (s *MessageService) SearchUserProjects(userID uuid.UUID, query string, limit int) ([]SearchProject, error) {
+	rows, err := s.db.Query(messageSearchUserProjectsQuery, userID, query, limit)
+	if err != nil {
+		return []SearchProject{}, err
+	}
+	defer rows.Close()
+
+	var projects []SearchProject
+	for rows.Next() {
+		var project SearchProject
+		err := rows.Scan(&project.ID, &project.Title)
+		if err != nil {
+			return []SearchProject{}, err
+		}
+		project.Type = "project"
+		projects = append(projects, project)
+	}
+
+	return projects, rows.Err()
 }

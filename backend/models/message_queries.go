@@ -307,4 +307,27 @@ const (
 			END
 		FROM project_messages
 		WHERE id = $1`
+
+	messageSearchUsersQuery = `
+		SELECT DISTINCT u.id, COALESCE(v.name, a.name, u.email) as name, u.email
+		FROM users u
+		LEFT JOIN volunteers v ON u.id = v.user_id
+		LEFT JOIN admins a ON u.id = a.user_id
+		WHERE (
+			LOWER(COALESCE(v.name, a.name, u.email)) LIKE LOWER('%' || $1 || '%') OR
+			LOWER(u.email) LIKE LOWER('%' || $1 || '%')
+		)
+		ORDER BY name
+		LIMIT $2`
+
+	messageSearchUserProjectsQuery = `
+		SELECT DISTINCT p.id, p.title
+		FROM projects p
+		JOIN project_team_members ptm ON p.id = ptm.project_id
+		JOIN volunteers v ON ptm.volunteer_id = v.id
+		WHERE v.user_id = $1 
+		  AND ptm.status = 'active'
+		  AND LOWER(p.title) LIKE LOWER('%' || $2 || '%')
+		ORDER BY p.title
+		LIMIT $3`
 )

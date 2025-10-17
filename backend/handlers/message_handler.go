@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -499,6 +500,8 @@ func (h *MessageHandler) SendUniversalMessage(c *gin.Context) {
 		MessageType: "general",
 	}
 
+	log.Printf("DEBUG: Creating message with recipient type: %s, recipient ID: %s", req.RecipientType, req.RecipientID)
+
 	switch req.RecipientType {
 	case "user":
 		message.RecipientUserID = &recipientID
@@ -529,10 +532,13 @@ func (h *MessageHandler) SendUniversalMessage(c *gin.Context) {
 		}
 	}
 
+	log.Printf("DEBUG: About to call CreateUniversalMessage")
 	if err := h.messageService.CreateUniversalMessage(message); err != nil {
+		log.Printf("DEBUG: CreateUniversalMessage error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send message"})
 		return
 	}
+	log.Printf("DEBUG: CreateUniversalMessage succeeded")
 
 	c.JSON(http.StatusCreated, message)
 }
@@ -713,4 +719,50 @@ func (h *MessageHandler) GetUniversalUnreadCount(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, count)
+}
+
+// SearchRecipients handles GET /api/messages/recipients/search
+func (h *MessageHandler) SearchRecipients(c *gin.Context) {
+	// Get user context
+	userCtx, exists := middleware.GetUserFromContext(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found in context"})
+		return
+	}
+
+	// Get search query
+	query := c.Query("q")
+	if len(query) < 2 {
+		c.JSON(http.StatusOK, gin.H{
+			"users":    []interface{}{},
+			"projects": []interface{}{},
+		})
+		return
+	}
+
+	// Search users and projects
+	users, err := h.messageService.SearchUsers(query, 10)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to search users"})
+		return
+	}
+
+	projects, err := h.messageService.SearchUserProjects(userCtx.ID, query, 10)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to search projects"})
+		return
+	}
+
+	// Ensure we always return arrays, never null
+	if users == nil {
+		users = []models.SearchUser{}
+	}
+	if projects == nil {
+		projects = []models.SearchProject{}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"users":    users,
+		"projects": projects,
+	})
 }

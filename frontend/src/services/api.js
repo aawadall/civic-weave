@@ -75,6 +75,10 @@ export const getInbox = (params = {}) => {
   return api.get('/messages/inbox', { params })
 }
 
+export const searchRecipients = (query) => {
+  return api.get('/messages/recipients/search', { params: { q: query } })
+}
+
 export const getSentMessages = (params = {}) => {
   return api.get('/messages/sent', { params })
 }
