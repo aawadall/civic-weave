@@ -53,7 +53,23 @@ export default function ProjectTasksTab({ projectId, isProjectOwner }) {
   const handleCreateTask = async (e) => {
     e.preventDefault()
     try {
-      await api.post(`/projects/${projectId}/tasks`, newTask)
+      // Transform the data to match backend expectations
+      const taskData = {
+        title: newTask.title,
+        description: newTask.description,
+        priority: newTask.priority,
+        labels: newTask.labels || []
+      }
+      
+      // Only include due_date if it's provided and not empty
+      // Convert date string to ISO format for Go time.Time parsing
+      if (newTask.due_date && newTask.due_date.trim() !== '') {
+        // Convert "YYYY-MM-DD" to "YYYY-MM-DDTHH:MM:SSZ" format
+        const date = new Date(newTask.due_date + 'T00:00:00Z')
+        taskData.due_date = date.toISOString()
+      }
+      
+      await api.post(`/projects/${projectId}/tasks`, taskData)
       setShowCreateModal(false)
       setNewTask({ title: '', description: '', priority: 'medium', due_date: '', labels: [] })
       fetchTasks()
