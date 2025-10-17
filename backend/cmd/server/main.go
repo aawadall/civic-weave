@@ -215,9 +215,9 @@ func main() {
 	// Initialize task and message handlers
 	if db != nil && projectService != nil && volunteerService != nil {
 		taskService := models.NewTaskService(db)
-		taskHandler = handlers.NewTaskHandler(taskService, projectService, volunteerService)
-
 		messageService := models.NewMessageService(db)
+		taskHandler = handlers.NewTaskHandler(taskService, projectService, volunteerService, messageService)
+
 		messageHandler = handlers.NewMessageHandler(messageService, projectService)
 	}
 
