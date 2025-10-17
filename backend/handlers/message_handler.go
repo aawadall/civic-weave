@@ -48,7 +48,7 @@ func (h *MessageHandler) ListMessages(c *gin.Context) {
 	// Get pagination params
 	limitStr := c.DefaultQuery("limit", "50")
 	offsetStr := c.DefaultQuery("offset", "0")
-	
+
 	limit, err := strconv.Atoi(limitStr)
 	if err != nil || limit < 1 || limit > 100 {
 		limit = 50
@@ -225,7 +225,7 @@ func (h *MessageHandler) SendMessage(c *gin.Context) {
 
 	// Create message
 	message := &models.ProjectMessage{
-		ProjectID:   projectID,
+		ProjectID:   &projectID,
 		SenderID:    userCtx.ID,
 		MessageText: req.MessageText,
 	}
@@ -329,7 +329,10 @@ func (h *MessageHandler) DeleteMessage(c *gin.Context) {
 
 	// Check permissions (sender, project owner, or admin)
 	isSender := message.SenderID == userCtx.ID
-	isProjectOwner, err := h.projectService.IsTeamLead(message.ProjectID, userCtx.ID)
+	var isProjectOwner bool
+	if message.ProjectID != nil {
+		isProjectOwner, err = h.projectService.IsTeamLead(*message.ProjectID, userCtx.ID)
+	}
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check project ownership"})
 		return
@@ -458,3 +461,256 @@ func (h *MessageHandler) GetAllUnreadCounts(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"unread_counts": counts})
 }
 
+// SendUniversalMessageRequest represents universal message creation request
+type SendUniversalMessageRequest struct {
+	RecipientType string  `json:"recipient_type" binding:"required"` // "user", "team", "project"
+	RecipientID   string  `json:"recipient_id" binding:"required"`
+	Subject       *string `json:"subject,omitempty"`
+	MessageText   string  `json:"message_text" binding:"required"`
+}
+
+// SendUniversalMessage handles POST /api/messages
+func (h *MessageHandler) SendUniversalMessage(c *gin.Context) {
+	var req SendUniversalMessageRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Get user context
+	userCtx, exists := middleware.GetUserFromContext(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found in context"})
+		return
+	}
+
+	// Parse recipient ID
+	recipientID, err := uuid.Parse(req.RecipientID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid recipient ID"})
+		return
+	}
+
+	// Create message based on recipient type
+	message := &models.ProjectMessage{
+		SenderID:    userCtx.ID,
+		Subject:     req.Subject,
+		MessageText: req.MessageText,
+		MessageType: "general",
+	}
+
+	switch req.RecipientType {
+	case "user":
+		message.RecipientUserID = &recipientID
+		message.MessageScope = "user_to_user"
+	case "team":
+		message.RecipientTeamID = &recipientID
+		message.MessageScope = "user_to_team"
+	case "project":
+		message.ProjectID = &recipientID
+		message.MessageScope = "project"
+	default:
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid recipient type"})
+		return
+	}
+
+	// Validate recipient exists and user has permission
+	if req.RecipientType == "team" || req.RecipientType == "project" {
+		// Check if user is team member
+		isTeamMember, err := h.projectService.IsTeamMember(recipientID, userCtx.ID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check team membership"})
+			return
+		}
+
+		if !isTeamMember {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Only team members can send messages to this project/team"})
+			return
+		}
+	}
+
+	if err := h.messageService.CreateUniversalMessage(message); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send message"})
+		return
+	}
+
+	c.JSON(http.StatusCreated, message)
+}
+
+// GetInbox handles GET /api/messages/inbox
+func (h *MessageHandler) GetInbox(c *gin.Context) {
+	// Get user context
+	userCtx, exists := middleware.GetUserFromContext(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found in context"})
+		return
+	}
+
+	// Get pagination params
+	limitStr := c.DefaultQuery("limit", "50")
+	offsetStr := c.DefaultQuery("offset", "0")
+
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil || limit < 1 || limit > 100 {
+		limit = 50
+	}
+
+	offset, err := strconv.Atoi(offsetStr)
+	if err != nil || offset < 0 {
+		offset = 0
+	}
+
+	// Get inbox messages
+	messages, err := h.messageService.GetInbox(userCtx.ID, limit, offset)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get inbox messages"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"messages": messages,
+		"limit":    limit,
+		"offset":   offset,
+		"count":    len(messages),
+	})
+}
+
+// GetSentMessages handles GET /api/messages/sent
+func (h *MessageHandler) GetSentMessages(c *gin.Context) {
+	// Get user context
+	userCtx, exists := middleware.GetUserFromContext(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found in context"})
+		return
+	}
+
+	// Get pagination params
+	limitStr := c.DefaultQuery("limit", "50")
+	offsetStr := c.DefaultQuery("offset", "0")
+
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil || limit < 1 || limit > 100 {
+		limit = 50
+	}
+
+	offset, err := strconv.Atoi(offsetStr)
+	if err != nil || offset < 0 {
+		offset = 0
+	}
+
+	// Get sent messages
+	messages, err := h.messageService.GetSentMessages(userCtx.ID, limit, offset)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get sent messages"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"messages": messages,
+		"limit":    limit,
+		"offset":   offset,
+		"count":    len(messages),
+	})
+}
+
+// GetConversations handles GET /api/messages/conversations
+func (h *MessageHandler) GetConversations(c *gin.Context) {
+	// Get user context
+	userCtx, exists := middleware.GetUserFromContext(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found in context"})
+		return
+	}
+
+	// Get pagination params
+	limitStr := c.DefaultQuery("limit", "20")
+	offsetStr := c.DefaultQuery("offset", "0")
+
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil || limit < 1 || limit > 100 {
+		limit = 20
+	}
+
+	offset, err := strconv.Atoi(offsetStr)
+	if err != nil || offset < 0 {
+		offset = 0
+	}
+
+	// Get conversations
+	conversations, err := h.messageService.GetConversations(userCtx.ID, limit, offset)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get conversations"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"conversations": conversations,
+		"limit":         limit,
+		"offset":        offset,
+		"count":         len(conversations),
+	})
+}
+
+// GetConversation handles GET /api/messages/conversations/:id
+func (h *MessageHandler) GetConversation(c *gin.Context) {
+	conversationIDStr := c.Param("id")
+	conversationID, err := uuid.Parse(conversationIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid conversation ID"})
+		return
+	}
+
+	// Get user context
+	userCtx, exists := middleware.GetUserFromContext(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found in context"})
+		return
+	}
+
+	// Get pagination params
+	limitStr := c.DefaultQuery("limit", "50")
+	offsetStr := c.DefaultQuery("offset", "0")
+
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil || limit < 1 || limit > 100 {
+		limit = 50
+	}
+
+	offset, err := strconv.Atoi(offsetStr)
+	if err != nil || offset < 0 {
+		offset = 0
+	}
+
+	// Get conversation messages
+	messages, err := h.messageService.GetConversation(conversationID, userCtx.ID, limit, offset)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get conversation messages"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"messages": messages,
+		"limit":    limit,
+		"offset":   offset,
+		"count":    len(messages),
+	})
+}
+
+// GetUniversalUnreadCount handles GET /api/messages/unread-count
+func (h *MessageHandler) GetUniversalUnreadCount(c *gin.Context) {
+	// Get user context
+	userCtx, exists := middleware.GetUserFromContext(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found in context"})
+		return
+	}
+
+	// Get universal unread count
+	count, err := h.messageService.GetUniversalUnreadCount(userCtx.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get unread count"})
+		return
+	}
+
+	c.JSON(http.StatusOK, count)
+}

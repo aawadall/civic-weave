@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { markTaskBlocked, requestTaskTakeover, markTaskDone } from '../services/api'
+import { startTask, markTaskBlocked, requestTaskTakeover, markTaskDone } from '../services/api'
 
 export default function TaskStatusActions({ task, onStatusChanged }) {
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -39,6 +39,19 @@ export default function TaskStatusActions({ task, onStatusChanged }) {
     }
   }
 
+  const handleStartTask = async () => {
+    try {
+      setIsSubmitting(true)
+      await startTask(task.id)
+      onStatusChanged?.()
+    } catch (error) {
+      console.error('Error starting task:', error)
+      alert('Failed to start task')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
   const handleMarkDone = async () => {
     try {
       setIsSubmitting(true)
@@ -70,6 +83,16 @@ export default function TaskStatusActions({ task, onStatusChanged }) {
       <h3 className="text-lg font-semibold text-secondary-900">Task Actions</h3>
       
       <div className="grid grid-cols-1 gap-3">
+        {task.status === 'todo' && (
+          <button
+            onClick={handleStartTask}
+            disabled={isSubmitting}
+            className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+          >
+            {isSubmitting ? 'Starting...' : '🚀 Start Task'}
+          </button>
+        )}
+        
         <button
           onClick={() => setShowDoneModal(true)}
           className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"

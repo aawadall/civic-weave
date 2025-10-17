@@ -48,6 +48,117 @@ export const getTaskComments = (taskId) => {
   return api.get(`/tasks/${taskId}/comments`)
 }
 
+// Dashboard API
+export const getUserProjects = () => {
+  return api.get('/users/me/projects')
+}
+
+export const getUserTasks = () => {
+  return api.get('/users/me/tasks')
+}
+
+export const getDashboardData = (params = {}) => {
+  return api.get('/users/me/dashboard', { params })
+}
+
+// Universal Messaging API
+export const sendMessage = (recipientType, recipientId, subject, messageText) => {
+  return api.post('/messages', {
+    recipient_type: recipientType,
+    recipient_id: recipientId,
+    subject,
+    message_text: messageText
+  })
+}
+
+export const getInbox = (params = {}) => {
+  return api.get('/messages/inbox', { params })
+}
+
+export const getSentMessages = (params = {}) => {
+  return api.get('/messages/sent', { params })
+}
+
+export const getConversations = (params = {}) => {
+  return api.get('/messages/conversations', { params })
+}
+
+export const getConversation = (conversationId, params = {}) => {
+  return api.get(`/messages/conversations/${conversationId}`, { params })
+}
+
+export const getUniversalUnreadCount = () => {
+  return api.get('/messages/unread-count')
+}
+
+// Broadcast API
+export const getBroadcasts = (params = {}) => {
+  return api.get('/broadcasts', { params })
+}
+
+export const getBroadcast = (id) => {
+  return api.get(`/broadcasts/${id}`)
+}
+
+export const createBroadcast = (data) => {
+  return api.post('/broadcasts', data)
+}
+
+export const updateBroadcast = (id, data) => {
+  return api.put(`/broadcasts/${id}`, data)
+}
+
+export const deleteBroadcast = (id) => {
+  return api.delete(`/broadcasts/${id}`)
+}
+
+export const markBroadcastRead = (id) => {
+  return api.post(`/broadcasts/${id}/read`)
+}
+
+export const getBroadcastStats = () => {
+  return api.get('/broadcasts/stats')
+}
+
+// Resource Library API
+export const getResources = (params = {}) => {
+  return api.get('/resources', { params })
+}
+
+export const getResource = (id) => {
+  return api.get(`/resources/${id}`)
+}
+
+export const uploadResource = (formData) => {
+  return api.post('/resources', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    }
+  })
+}
+
+export const updateResource = (id, data) => {
+  return api.put(`/resources/${id}`, data)
+}
+
+export const deleteResource = (id) => {
+  return api.delete(`/resources/${id}`)
+}
+
+export const downloadResource = (id) => {
+  return api.get(`/resources/${id}/download`, {
+    responseType: 'blob'
+  })
+}
+
+export const getResourceStats = () => {
+  return api.get('/resources/stats')
+}
+
+export const getRecentResources = (params = {}) => {
+  return api.get('/resources/recent', { params })
+}
+
 // Task Time Logging API
 export const logTaskTime = (taskId, timeLogData) => {
   return api.post(`/tasks/${taskId}/time-logs`, timeLogData)
@@ -58,6 +169,10 @@ export const getTaskTimeLogs = (taskId) => {
 }
 
 // Task Status Transitions API
+export const startTask = (taskId) => {
+  return api.post(`/tasks/${taskId}/start`)
+}
+
 export const markTaskBlocked = (taskId, reason) => {
   return api.post(`/tasks/${taskId}/mark-blocked`, { reason })
 }

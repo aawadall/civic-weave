@@ -11,10 +11,10 @@ import (
 type TaskStatus string
 
 const (
-	TaskStatusTodo             TaskStatus = "todo"
-	TaskStatusInProgress       TaskStatus = "in_progress"
-	TaskStatusDone             TaskStatus = "done"
-	TaskStatusBlocked          TaskStatus = "blocked"
+	TaskStatusTodo              TaskStatus = "todo"
+	TaskStatusInProgress        TaskStatus = "in_progress"
+	TaskStatusDone              TaskStatus = "done"
+	TaskStatusBlocked           TaskStatus = "blocked"
 	TaskStatusTakeoverRequested TaskStatus = "takeover_requested"
 )
 
@@ -29,20 +29,20 @@ const (
 
 // ProjectTask represents a task in a project
 type ProjectTask struct {
-	ID           uuid.UUID    `json:"id" db:"id"`
-	ProjectID    uuid.UUID    `json:"project_id" db:"project_id"`
-	Title        string       `json:"title" db:"title"`
-	Description  string       `json:"description" db:"description"`
-	AssigneeID   *uuid.UUID   `json:"assignee_id" db:"assignee_id"`
-	AssigneeName *string      `json:"assignee_name,omitempty" db:"assignee_name"`
-	AssigneeEmail *string     `json:"assignee_email,omitempty" db:"assignee_email"`
-	CreatedByID  uuid.UUID    `json:"created_by_id" db:"created_by_id"`
-	Status       TaskStatus   `json:"status" db:"status"`
-	Priority     TaskPriority `json:"priority" db:"priority"`
-	DueDate      *time.Time   `json:"due_date" db:"due_date"`
-	Labels       []string     `json:"labels" db:"labels"`
-	CreatedAt    time.Time    `json:"created_at" db:"created_at"`
-	UpdatedAt    time.Time    `json:"updated_at" db:"updated_at"`
+	ID            uuid.UUID    `json:"id" db:"id"`
+	ProjectID     uuid.UUID    `json:"project_id" db:"project_id"`
+	Title         string       `json:"title" db:"title"`
+	Description   string       `json:"description" db:"description"`
+	AssigneeID    *uuid.UUID   `json:"assignee_id" db:"assignee_id"`
+	AssigneeName  *string      `json:"assignee_name,omitempty" db:"assignee_name"`
+	AssigneeEmail *string      `json:"assignee_email,omitempty" db:"assignee_email"`
+	CreatedByID   uuid.UUID    `json:"created_by_id" db:"created_by_id"`
+	Status        TaskStatus   `json:"status" db:"status"`
+	Priority      TaskPriority `json:"priority" db:"priority"`
+	DueDate       *time.Time   `json:"due_date" db:"due_date"`
+	Labels        []string     `json:"labels" db:"labels"`
+	CreatedAt     time.Time    `json:"created_at" db:"created_at"`
+	UpdatedAt     time.Time    `json:"updated_at" db:"updated_at"`
 }
 
 // TaskUpdate represents a progress update on a task
@@ -143,7 +143,7 @@ func (s *TaskService) ListByProject(projectID uuid.UUID, userID *uuid.UUID, isPr
 		err := rows.Scan(
 			&task.ID, &task.ProjectID, &task.Title, &task.Description, &task.AssigneeID,
 			&task.CreatedByID, &task.Status, &task.Priority, &task.DueDate, &labelsJSON,
-			&task.CreatedAt, &task.UpdatedAt, &task.AssigneeName, &task.AssigneeEmail,
+			&task.CreatedAt, &task.UpdatedAt,
 		)
 		if err != nil {
 			return nil, err
@@ -175,7 +175,7 @@ func (s *TaskService) ListUnassignedByProject(projectID uuid.UUID) ([]ProjectTas
 		err := rows.Scan(
 			&task.ID, &task.ProjectID, &task.Title, &task.Description, &task.AssigneeID,
 			&task.CreatedByID, &task.Status, &task.Priority, &task.DueDate, &labelsJSON,
-			&task.CreatedAt, &task.UpdatedAt, &task.AssigneeName, &task.AssigneeEmail,
+			&task.CreatedAt, &task.UpdatedAt,
 		)
 		if err != nil {
 			return nil, err
@@ -207,7 +207,7 @@ func (s *TaskService) ListByAssignee(assigneeID uuid.UUID) ([]ProjectTask, error
 		err := rows.Scan(
 			&task.ID, &task.ProjectID, &task.Title, &task.Description, &task.AssigneeID,
 			&task.CreatedByID, &task.Status, &task.Priority, &task.DueDate, &labelsJSON,
-			&task.CreatedAt, &task.UpdatedAt, &task.AssigneeName, &task.AssigneeEmail,
+			&task.CreatedAt, &task.UpdatedAt,
 		)
 		if err != nil {
 			return nil, err

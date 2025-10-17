@@ -166,4 +166,67 @@ const (
 		SELECT COUNT(1) 
 		FROM project_team_members 
 		WHERE project_id = $1 AND status = 'active'`
+
+	projectGetUserEnrolledQuery = `
+		SELECT 
+			p.id, p.title, p.description, p.location_lat, p.location_lng, 
+			p.location_address, p.start_date, p.end_date, p.project_status, 
+			p.created_by_admin_id, p.team_lead_id, p.auto_notify_matches, p.created_at, p.updated_at,
+			CASE 
+				WHEN COUNT(prs.skill_id) > 0 THEN
+					JSON_AGG(
+						JSON_BUILD_OBJECT('id', st.id, 'name', st.skill_name)
+					) FILTER (WHERE st.id IS NOT NULL)::jsonb
+				ELSE COALESCE(p.required_skills, '[]'::jsonb)
+			END as required_skills,
+			COUNT(DISTINCT a.id) as signup_count,
+			COUNT(DISTINCT ptm.id) as active_team_count,
+			COALESCE(tl_v.name, tl_a.name, tl_u.email) as team_lead_name,
+			tl_u.email as team_lead_email,
+			COALESCE(admin_v.name, admin_a.name, admin_u.email) as created_by_admin_name,
+			admin_u.email as created_by_admin_email,
+			COALESCE(msg_stats.unread_count, 0) as unread_message_count,
+			COALESCE(task_stats.assigned_tasks, 0) as assigned_tasks_count,
+			COALESCE(task_stats.overdue_tasks, 0) as overdue_tasks_count
+		FROM projects p
+		JOIN project_team_members ptm ON p.id = ptm.project_id
+		JOIN volunteers v ON ptm.volunteer_id = v.id
+		LEFT JOIN project_required_skills prs ON p.id = prs.project_id
+		LEFT JOIN skill_taxonomy st ON prs.skill_id = st.id
+		LEFT JOIN applications a ON p.id = a.project_id
+		LEFT JOIN users tl_u ON p.team_lead_id = tl_u.id
+		LEFT JOIN volunteers tl_v ON tl_u.id = tl_v.user_id
+		LEFT JOIN admins tl_a ON tl_u.id = tl_a.user_id
+		LEFT JOIN users admin_u ON p.created_by_admin_id = admin_u.id
+		LEFT JOIN volunteers admin_v ON admin_u.id = admin_v.user_id
+		LEFT JOIN admins admin_a ON admin_u.id = admin_a.user_id
+		LEFT JOIN (
+			SELECT 
+				pm.project_id,
+				COUNT(*) as unread_count
+			FROM project_messages pm
+			LEFT JOIN message_reads mr ON pm.id = mr.message_id AND mr.user_id = $1
+			WHERE pm.deleted_at IS NULL 
+			AND mr.user_id IS NULL
+			GROUP BY pm.project_id
+		) msg_stats ON p.id = msg_stats.project_id
+		LEFT JOIN (
+			SELECT 
+				pt.project_id,
+				COUNT(*) as assigned_tasks,
+				COUNT(CASE WHEN pt.due_date < NOW() AND pt.status != 'done' THEN 1 END) as overdue_tasks
+			FROM project_tasks pt
+			JOIN volunteers v ON pt.assignee_id = v.id
+			WHERE v.user_id = $1
+			GROUP BY pt.project_id
+		) task_stats ON p.id = task_stats.project_id
+		WHERE ptm.volunteer_id = v.id
+		AND v.user_id = $1
+		AND ptm.status = 'active'
+		GROUP BY p.id, p.title, p.description, p.location_lat, p.location_lng, 
+		         p.location_address, p.start_date, p.end_date, p.project_status, 
+		         p.created_by_admin_id, p.team_lead_id, p.auto_notify_matches, p.created_at, p.updated_at,
+		         p.required_skills, tl_v.name, tl_a.name, tl_u.email, admin_v.name, admin_a.name, admin_u.email,
+		         msg_stats.unread_count, task_stats.assigned_tasks, task_stats.overdue_tasks
+		ORDER BY p.created_at DESC`
 )

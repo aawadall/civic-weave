@@ -213,12 +213,26 @@ func main() {
 	}
 
 	// Initialize task and message handlers
-	if db != nil && projectService != nil && volunteerService != nil {
-		taskService := models.NewTaskService(db)
-		messageService := models.NewMessageService(db)
-		taskHandler = handlers.NewTaskHandler(taskService, projectService, volunteerService, messageService)
+	var taskService *models.TaskService
+	var messageService *models.MessageService
+	var broadcastService *models.BroadcastService
+	var resourceService *models.ResourceService
+	var userDashboardHandler *handlers.UserDashboardHandler
 
+	if db != nil && projectService != nil && volunteerService != nil {
+		taskService = models.NewTaskService(db)
+		messageService = models.NewMessageService(db)
+		broadcastService = models.NewBroadcastService(db)
+		resourceService = models.NewResourceService(db)
+		taskHandler = handlers.NewTaskHandler(taskService, projectService, volunteerService, messageService)
 		messageHandler = handlers.NewMessageHandler(messageService, projectService)
+		userDashboardHandler = handlers.NewUserDashboardHandler(
+			projectService,
+			taskService,
+			messageService,
+			broadcastService,
+			resourceService,
+		)
 	}
 
 	// Setup Gin router
@@ -316,16 +330,17 @@ func main() {
 				protected.POST("/tasks/:id/assign", taskHandler.SelfAssignTask)
 				protected.PUT("/tasks/:id/assign", taskHandler.AssignTask)
 				protected.POST("/tasks/:id/updates", taskHandler.AddTaskUpdate)
-				
+
 				// Task comments
 				protected.POST("/tasks/:id/comments", taskHandler.AddTaskComment)
 				protected.GET("/tasks/:id/comments", taskHandler.GetTaskComments)
-				
+
 				// Task time logging
 				protected.POST("/tasks/:id/time-logs", taskHandler.LogTaskTime)
 				protected.GET("/tasks/:id/time-logs", taskHandler.GetTaskTimeLogs)
-				
+
 				// Task status transitions
+				protected.POST("/tasks/:id/start", taskHandler.StartTask)
 				protected.POST("/tasks/:id/mark-blocked", taskHandler.MarkTaskBlocked)
 				protected.POST("/tasks/:id/request-takeover", taskHandler.RequestTaskTakeover)
 				protected.POST("/tasks/:id/mark-done", taskHandler.MarkTaskDone)
@@ -343,6 +358,48 @@ func main() {
 				protected.DELETE("/messages/:id", messageHandler.DeleteMessage)
 				protected.POST("/messages/:id/read", messageHandler.MarkMessageAsRead)
 				protected.GET("/messages/unread-counts", messageHandler.GetAllUnreadCounts)
+			}
+
+			// Universal messaging routes
+			if messageHandler != nil {
+				protected.POST("/messages", messageHandler.SendUniversalMessage)
+				protected.GET("/messages/inbox", messageHandler.GetInbox)
+				protected.GET("/messages/sent", messageHandler.GetSentMessages)
+				protected.GET("/messages/conversations", messageHandler.GetConversations)
+				protected.GET("/messages/conversations/:id", messageHandler.GetConversation)
+				protected.GET("/messages/unread-count", messageHandler.GetUniversalUnreadCount)
+			}
+
+			// Broadcast routes
+			if broadcastService != nil {
+				broadcastHandler := handlers.NewBroadcastHandler(broadcastService)
+				protected.GET("/broadcasts", broadcastHandler.ListBroadcasts)
+				protected.GET("/broadcasts/:id", broadcastHandler.GetBroadcast)
+				protected.POST("/broadcasts", middleware.RequireRole("admin"), broadcastHandler.CreateBroadcast)
+				protected.PUT("/broadcasts/:id", broadcastHandler.UpdateBroadcast)
+				protected.DELETE("/broadcasts/:id", broadcastHandler.DeleteBroadcast)
+				protected.POST("/broadcasts/:id/read", broadcastHandler.MarkBroadcastAsRead)
+				protected.GET("/broadcasts/stats", broadcastHandler.GetBroadcastStats)
+			}
+
+			// Resource library routes
+			if resourceService != nil {
+				resourceHandler := handlers.NewResourceHandler(resourceService)
+				protected.GET("/resources", resourceHandler.ListResources)
+				protected.GET("/resources/:id", resourceHandler.GetResource)
+				protected.POST("/resources", middleware.RequireAnyRole("team_lead", "admin"), resourceHandler.CreateResource)
+				protected.PUT("/resources/:id", resourceHandler.UpdateResource)
+				protected.DELETE("/resources/:id", resourceHandler.DeleteResource)
+				protected.GET("/resources/:id/download", resourceHandler.DownloadResource)
+				protected.GET("/resources/stats", middleware.RequireRole("admin"), resourceHandler.GetResourceStats)
+				protected.GET("/resources/recent", resourceHandler.GetRecentResources)
+			}
+
+			// User dashboard routes
+			if userDashboardHandler != nil {
+				protected.GET("/users/me/projects", userDashboardHandler.GetUserProjects)
+				protected.GET("/users/me/tasks", userDashboardHandler.GetUserTasks)
+				protected.GET("/users/me/dashboard", userDashboardHandler.GetDashboardData)
 			}
 
 			// Application routes
