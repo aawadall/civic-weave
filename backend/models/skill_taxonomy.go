@@ -40,6 +40,15 @@ type InitiativeRequiredSkill struct {
 	SkillName string `json:"skill_name" db:"skill_name"`
 }
 
+// ProjectRequiredSkill represents a required skill for a project
+type ProjectRequiredSkill struct {
+	ProjectID uuid.UUID `json:"project_id" db:"project_id"`
+	SkillID   int       `json:"skill_id" db:"skill_id"`
+	AddedAt   time.Time `json:"added_at" db:"added_at"`
+	// Joined fields
+	SkillName string `json:"skill_name" db:"skill_name"`
+}
+
 // VolunteerInitiativeMatch represents pre-calculated match scores
 type VolunteerInitiativeMatch struct {
 	VolunteerID       uuid.UUID `json:"volunteer_id" db:"volunteer_id"`
@@ -278,6 +287,103 @@ func (s *SkillTaxonomyService) UpdateInitiativeSkills(initiativeID uuid.UUID, sk
 		`, initiativeID, skillID)
 		if err != nil {
 			return fmt.Errorf("failed to insert initiative skill %d: %w", skillID, err)
+		}
+	}
+
+	return tx.Commit()
+}
+
+// GetProjectSkills retrieves all required skills for a project
+func (s *SkillTaxonomyService) GetProjectSkills(projectID uuid.UUID) ([]ProjectRequiredSkill, error) {
+	query := `
+		SELECT prs.project_id, prs.skill_id, prs.added_at, st.skill_name
+		FROM project_required_skills prs
+		JOIN skill_taxonomy st ON prs.skill_id = st.id
+		WHERE prs.project_id = $1
+		ORDER BY st.skill_name
+	`
+
+	rows, err := s.db.Query(query, projectID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query project skills: %w", err)
+	}
+	defer rows.Close()
+
+	var skills []ProjectRequiredSkill
+	for rows.Next() {
+		var skill ProjectRequiredSkill
+		err := rows.Scan(&skill.ProjectID, &skill.SkillID, &skill.AddedAt, &skill.SkillName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan project skill: %w", err)
+		}
+		skills = append(skills, skill)
+	}
+
+	return skills, rows.Err()
+}
+
+// UpdateProjectSkills replaces all required skills for a project
+func (s *SkillTaxonomyService) UpdateProjectSkills(projectID uuid.UUID, skillIDs []int) error {
+	// Start transaction
+	tx, err := s.db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	// Get skill names for the JSONB field
+	var skillNames []string
+	if len(skillIDs) > 0 {
+		skillNamesQuery := `SELECT skill_name FROM skill_taxonomy WHERE id = ANY($1) ORDER BY skill_name`
+		rows, err := tx.Query(skillNamesQuery, skillIDs)
+		if err != nil {
+			return fmt.Errorf("failed to get skill names: %w", err)
+		}
+		defer rows.Close()
+
+		for rows.Next() {
+			var skillName string
+			if err := rows.Scan(&skillName); err != nil {
+				return fmt.Errorf("failed to scan skill name: %w", err)
+			}
+			skillNames = append(skillNames, skillName)
+		}
+		if err := rows.Err(); err != nil {
+			return fmt.Errorf("failed to iterate skill names: %w", err)
+		}
+	}
+
+	// Update the legacy JSONB field in projects table
+	skillsJSON, err := ToJSONArray(skillNames)
+	if err != nil {
+		return fmt.Errorf("failed to serialize skills to JSON: %w", err)
+	}
+
+	_, err = tx.Exec(`
+		UPDATE projects 
+		SET required_skills = $2, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $1
+	`, projectID, skillsJSON)
+	if err != nil {
+		return fmt.Errorf("failed to update projects.required_skills: %w", err)
+	}
+
+	// Delete existing required skills from taxonomy table
+	_, err = tx.Exec(`
+		DELETE FROM project_required_skills WHERE project_id = $1
+	`, projectID)
+	if err != nil {
+		return fmt.Errorf("failed to delete existing project skills: %w", err)
+	}
+
+	// Insert new required skills into taxonomy table
+	for _, skillID := range skillIDs {
+		_, err = tx.Exec(`
+			INSERT INTO project_required_skills (project_id, skill_id)
+			VALUES ($1, $2)
+		`, projectID, skillID)
+		if err != nil {
+			return fmt.Errorf("failed to insert project skill %d: %w", skillID, err)
 		}
 	}
 

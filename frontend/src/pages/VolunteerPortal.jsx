@@ -57,7 +57,7 @@ export default function VolunteerPortal() {
     try {
       await api.post('/applications', {
         project_id: initiativeId,
-        volunteer_id: user.id
+        message: 'I would like to volunteer for this project.'
       })
       
       setAppliedInitiatives(prev => new Set([...prev, initiativeId]))
@@ -200,7 +200,7 @@ export default function VolunteerPortal() {
                   <h3 className="text-lg font-semibold text-secondary-900 line-clamp-2">
                     {initiative.title}
                   </h3>
-                  {getStatusBadge(initiative.status)}
+                  {getStatusBadge(initiative.project_status || initiative.status || 'draft')}
                 </div>
                 
                 <p className="text-secondary-600 text-sm line-clamp-3 mb-4">
@@ -250,7 +250,7 @@ export default function VolunteerPortal() {
                 
                 <div className="flex justify-between items-center">
                   <Link
-                    to={`/initiatives/${initiative.id}`}
+                    to={`/projects/${initiative.id}`}
                     className="text-primary-600 hover:text-primary-500 text-sm font-medium"
                   >
                     View Details →

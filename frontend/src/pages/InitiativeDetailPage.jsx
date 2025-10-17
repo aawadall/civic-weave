@@ -65,7 +65,7 @@ export default function InitiativeDetailPage() {
       setApplying(true)
       await api.post('/applications', {
         project_id: id,
-        volunteer_id: user.id
+        message: 'I would like to volunteer for this project.'
       })
       
       setHasApplied(true)
@@ -151,7 +151,7 @@ export default function InitiativeDetailPage() {
               <h1 className="text-3xl font-bold text-secondary-900">
                 {initiative.title}
               </h1>
-              {getStatusBadge(initiative.status)}
+              {getStatusBadge(initiative.project_status || initiative.status || 'draft')}
             </div>
 
             <div className="prose max-w-none">
@@ -219,7 +219,7 @@ export default function InitiativeDetailPage() {
                   Your application has been received. We'll review it and get back to you soon.
                 </p>
               </div>
-            ) : initiative.status === 'active' ? (
+            ) : (initiative.project_status || initiative.status) === 'active' ? (
               <div>
                 <p className="text-sm text-secondary-600 mb-4">
                   Ready to make a difference? Apply now to volunteer for this initiative.
@@ -235,17 +235,17 @@ export default function InitiativeDetailPage() {
             ) : (
               <div className="text-center py-6">
                 <div className="text-secondary-400 mb-3">
-                  {initiative.status === 'closed' ? (
+                  {(initiative.project_status || initiative.status) === 'closed' ? (
                     <ClockIcon className="h-12 w-12 mx-auto" />
                   ) : (
                     <UserGroupIcon className="h-12 w-12 mx-auto" />
                   )}
                 </div>
                 <h4 className="font-semibold text-secondary-900 mb-2">
-                  {initiative.status === 'closed' ? 'Applications Closed' : 'Not Yet Available'}
+                  {(initiative.project_status || initiative.status) === 'closed' ? 'Applications Closed' : 'Not Yet Available'}
                 </h4>
                 <p className="text-sm text-secondary-600">
-                  {initiative.status === 'closed' 
+                  {(initiative.project_status || initiative.status) === 'closed' 
                     ? 'This initiative is no longer accepting applications.'
                     : 'This initiative is still being prepared.'
                   }

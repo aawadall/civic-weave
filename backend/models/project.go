@@ -2,6 +2,7 @@ package models
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"log"
 	"time"
@@ -186,8 +187,7 @@ func (s *ProjectService) List(limit, offset int, status *string, skills []string
 	if len(skills) > 0 {
 		// Query with skills filter
 		query = projectListWithSkillsQuery
-		skillsJSON, _ := ToJSONArray(skills)
-		args = []interface{}{status, skillsJSON, limit, offset}
+		args = []interface{}{status, skills, limit, offset}
 	} else {
 		// Query without skills filter
 		query = projectListQuery
@@ -210,19 +210,30 @@ func (s *ProjectService) List(limit, offset int, status *string, skills []string
 		var project Project
 		var skillsJSON string
 		err := rows.Scan(&project.ID, &project.Title, &project.Description,
-			&skillsJSON, &project.LocationLat, &project.LocationLng, &project.LocationAddress,
+			&project.LocationLat, &project.LocationLng, &project.LocationAddress,
 			&project.StartDate, &project.EndDate, &project.Status, &project.ProjectStatus,
-			&project.CreatedByAdminID, &project.TeamLeadID, &project.AutoNotifyMatches, &project.CreatedAt, &project.UpdatedAt)
+			&project.CreatedByAdminID, &project.TeamLeadID, &project.AutoNotifyMatches, &project.CreatedAt, &project.UpdatedAt,
+			&skillsJSON)
 		if err != nil {
 			log.Printf("❌ PROJECT_LIST_SCAN: Row %d scan failed: %v", rowCount, err)
 			return nil, err
 		}
 
-		// Parse required skills JSON
-		if err := ParseJSONArray(skillsJSON, &project.RequiredSkills); err != nil {
+		// Parse required skills JSON - now contains objects with id and name
+		var skillObjects []map[string]interface{}
+		if err := json.Unmarshal([]byte(skillsJSON), &skillObjects); err != nil {
 			log.Printf("❌ PROJECT_LIST_PARSE: Failed to parse skills for project %s: %v", project.ID, err)
 			return nil, err
 		}
+
+		// Convert skill objects to skill names
+		var skillNames []string
+		for _, skillObj := range skillObjects {
+			if name, ok := skillObj["name"].(string); ok {
+				skillNames = append(skillNames, name)
+			}
+		}
+		project.RequiredSkills = skillNames
 
 		projects = append(projects, project)
 	}
@@ -244,17 +255,28 @@ func (s *ProjectService) ListByTeamLead(teamLeadID uuid.UUID, limit, offset int)
 		var project Project
 		var skillsJSON string
 		err := rows.Scan(&project.ID, &project.Title, &project.Description,
-			&skillsJSON, &project.LocationLat, &project.LocationLng, &project.LocationAddress,
+			&project.LocationLat, &project.LocationLng, &project.LocationAddress,
 			&project.StartDate, &project.EndDate, &project.Status, &project.ProjectStatus,
-			&project.CreatedByAdminID, &project.TeamLeadID, &project.AutoNotifyMatches, &project.CreatedAt, &project.UpdatedAt)
+			&project.CreatedByAdminID, &project.TeamLeadID, &project.AutoNotifyMatches, &project.CreatedAt, &project.UpdatedAt,
+			&skillsJSON)
 		if err != nil {
 			return nil, err
 		}
 
-		// Parse required skills JSON
-		if err := ParseJSONArray(skillsJSON, &project.RequiredSkills); err != nil {
+		// Parse required skills JSON - now contains objects with id and name
+		var skillObjects []map[string]interface{}
+		if err := json.Unmarshal([]byte(skillsJSON), &skillObjects); err != nil {
 			return nil, err
 		}
+
+		// Convert skill objects to skill names
+		var skillNames []string
+		for _, skillObj := range skillObjects {
+			if name, ok := skillObj["name"].(string); ok {
+				skillNames = append(skillNames, name)
+			}
+		}
+		project.RequiredSkills = skillNames
 
 		projects = append(projects, project)
 	}
@@ -392,17 +414,28 @@ func (s *ProjectService) GetActiveProjects() ([]Project, error) {
 		var project Project
 		var skillsJSON string
 		err := rows.Scan(&project.ID, &project.Title, &project.Description,
-			&skillsJSON, &project.LocationLat, &project.LocationLng, &project.LocationAddress,
+			&project.LocationLat, &project.LocationLng, &project.LocationAddress,
 			&project.StartDate, &project.EndDate, &project.Status, &project.ProjectStatus,
-			&project.CreatedByAdminID, &project.TeamLeadID, &project.AutoNotifyMatches, &project.CreatedAt, &project.UpdatedAt)
+			&project.CreatedByAdminID, &project.TeamLeadID, &project.AutoNotifyMatches, &project.CreatedAt, &project.UpdatedAt,
+			&skillsJSON)
 		if err != nil {
 			return nil, err
 		}
 
-		// Parse required skills JSON
-		if err := ParseJSONArray(skillsJSON, &project.RequiredSkills); err != nil {
+		// Parse required skills JSON - now contains objects with id and name
+		var skillObjects []map[string]interface{}
+		if err := json.Unmarshal([]byte(skillsJSON), &skillObjects); err != nil {
 			return nil, err
 		}
+
+		// Convert skill objects to skill names
+		var skillNames []string
+		for _, skillObj := range skillObjects {
+			if name, ok := skillObj["name"].(string); ok {
+				skillNames = append(skillNames, name)
+			}
+		}
+		project.RequiredSkills = skillNames
 
 		projects = append(projects, project)
 	}

@@ -214,7 +214,7 @@ export default function ProjectDetailPage() {
         <div className="text-center">
           <h2 className="text-2xl font-bold text-secondary-900 mb-4">Project Not Found</h2>
           <p className="text-secondary-600 mb-4">{error || 'The requested project could not be found.'}</p>
-          <Link to="/projects" className="btn-primary">
+          <Link to="/projects" state={{ refreshProjects: true }} className="btn-primary">
             Back to Projects
           </Link>
         </div>
@@ -231,7 +231,12 @@ export default function ProjectDetailPage() {
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
-            <Link to="/projects" className="text-primary-600 hover:text-primary-800 text-sm font-medium">
+            <Link 
+              to="/projects" 
+              state={{ refreshProjects: true }}
+              onClick={() => console.log('🔄 ProjectDetailPage: Navigating back with refresh flag')}
+              className="text-primary-600 hover:text-primary-800 text-sm font-medium"
+            >
               ← Back to Projects
             </Link>
             {canManageProject() && (

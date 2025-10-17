@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"log"
 	"net/http"
 	"time"
 
@@ -79,11 +80,32 @@ func (h *AdminUserManagementHandler) DeleteUser(c *gin.Context) {
 		return
 	}
 
-	// Delete user (this will cascade delete related records due to foreign key constraints)
-	if err := h.userService.Delete(userID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete user"})
+	// Check for constraints that would prevent deletion
+	constraintIssues, err := h.checkUserDeletionConstraints(userID)
+	if err != nil {
+		log.Printf("❌ USER_DELETE_CONSTRAINT_CHECK: Failed to check constraints for user %s: %v", userID, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate user deletion constraints"})
 		return
 	}
+
+	if len(constraintIssues) > 0 {
+		log.Printf("❌ USER_DELETE_CONSTRAINTS: User %s has constraint violations: %v", userID, constraintIssues)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":       "Cannot delete user due to existing references",
+			"constraints": constraintIssues,
+		})
+		return
+	}
+
+	// Delete user (this will cascade delete related records due to foreign key constraints)
+	log.Printf("🔄 USER_DELETE: Attempting to delete user %s", userID)
+	if err := h.userService.Delete(userID); err != nil {
+		log.Printf("❌ USER_DELETE: Failed to delete user %s: %v", userID, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete user", "details": err.Error()})
+		return
+	}
+
+	log.Printf("✅ USER_DELETE: Successfully deleted user %s", userID)
 
 	c.JSON(http.StatusOK, gin.H{"message": "User deleted successfully"})
 }
@@ -227,4 +249,59 @@ func (h *AdminUserManagementHandler) GetUserDetails(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, response)
+}
+
+// checkUserDeletionConstraints checks for foreign key constraints that would prevent user deletion
+func (h *AdminUserManagementHandler) checkUserDeletionConstraints(userID uuid.UUID) ([]string, error) {
+	var constraintIssues []string
+
+	// Check if user is team lead on any projects
+	var teamLeadCount int
+	err := h.userService.GetDB().QueryRow(`
+		SELECT COUNT(*) FROM projects WHERE team_lead_id = $1
+	`, userID).Scan(&teamLeadCount)
+	if err != nil {
+		return nil, err
+	}
+	if teamLeadCount > 0 {
+		constraintIssues = append(constraintIssues, "User is team lead on active projects")
+	}
+
+	// Check if user has created any campaigns
+	var campaignCount int
+	err = h.userService.GetDB().QueryRow(`
+		SELECT COUNT(*) FROM campaigns WHERE created_by_user_id = $1
+	`, userID).Scan(&campaignCount)
+	if err != nil {
+		return nil, err
+	}
+	if campaignCount > 0 {
+		constraintIssues = append(constraintIssues, "User has created campaigns")
+	}
+
+	// Check if user has created any project tasks
+	var taskCount int
+	err = h.userService.GetDB().QueryRow(`
+		SELECT COUNT(*) FROM project_tasks WHERE created_by_id = $1
+	`, userID).Scan(&taskCount)
+	if err != nil {
+		return nil, err
+	}
+	if taskCount > 0 {
+		constraintIssues = append(constraintIssues, "User has created project tasks")
+	}
+
+	// Check if user has sent any project messages
+	var messageCount int
+	err = h.userService.GetDB().QueryRow(`
+		SELECT COUNT(*) FROM project_messages WHERE sender_id = $1
+	`, userID).Scan(&messageCount)
+	if err != nil {
+		return nil, err
+	}
+	if messageCount > 0 {
+		constraintIssues = append(constraintIssues, "User has sent project messages")
+	}
+
+	return constraintIssues, nil
 }

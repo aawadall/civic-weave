@@ -56,6 +56,7 @@ export default function ProjectStatusTransition({
         status: newStatus
       })
       
+      console.log('✅ ProjectStatusTransition: Status updated successfully:', response.data)
       setShowConfirmModal(false)
       setSelectedStatus(null)
       

@@ -16,31 +16,69 @@ const (
 		FROM projects WHERE id = $1`
 
 	projectListWithSkillsQuery = `
-		SELECT id, title, description, required_skills, location_lat, location_lng, 
-		       location_address, start_date, end_date, status, project_status, 
-		       created_by_admin_id, team_lead_id, auto_notify_matches, created_at, updated_at
-		FROM projects
-		WHERE ($1::text IS NULL OR status = $1 OR project_status::text = $1)
-		AND required_skills && $2::jsonb
-		ORDER BY created_at DESC
+		SELECT p.id, p.title, p.description, p.location_lat, p.location_lng, 
+		       p.location_address, p.start_date, p.end_date, p.status, p.project_status, 
+		       p.created_by_admin_id, p.team_lead_id, p.auto_notify_matches, p.created_at, p.updated_at,
+		       COALESCE(
+		           JSON_AGG(
+		               JSON_BUILD_OBJECT('id', st.id, 'name', st.skill_name)
+		           ) FILTER (WHERE st.id IS NOT NULL), 
+		           '[]'::json
+		       ) as required_skills
+		FROM projects p
+		LEFT JOIN project_required_skills prs ON p.id = prs.project_id
+		LEFT JOIN skill_taxonomy st ON prs.skill_id = st.id
+		WHERE ($1::text IS NULL OR p.status = $1 OR p.project_status::text = $1)
+		GROUP BY p.id, p.title, p.description, p.location_lat, p.location_lng, 
+		         p.location_address, p.start_date, p.end_date, p.status, p.project_status, 
+		         p.created_by_admin_id, p.team_lead_id, p.auto_notify_matches, p.created_at, p.updated_at
+		HAVING ($2::jsonb IS NULL OR $2::jsonb = '[]'::jsonb OR 
+		        EXISTS (
+		            SELECT 1 FROM project_required_skills prs2 
+		            JOIN skill_taxonomy st2 ON prs2.skill_id = st2.id 
+		            WHERE prs2.project_id = p.id AND st2.skill_name = ANY($2::text[])
+		        ))
+		ORDER BY p.created_at DESC
 		LIMIT $3 OFFSET $4`
 
 	projectListQuery = `
-		SELECT id, title, description, required_skills, location_lat, location_lng, 
-		       location_address, start_date, end_date, status, project_status, 
-		       created_by_admin_id, team_lead_id, auto_notify_matches, created_at, updated_at
-		FROM projects
-		WHERE ($1::text IS NULL OR status = $1 OR project_status::text = $1)
-		ORDER BY created_at DESC
+		SELECT p.id, p.title, p.description, p.location_lat, p.location_lng, 
+		       p.location_address, p.start_date, p.end_date, p.status, p.project_status, 
+		       p.created_by_admin_id, p.team_lead_id, p.auto_notify_matches, p.created_at, p.updated_at,
+		       COALESCE(
+		           JSON_AGG(
+		               JSON_BUILD_OBJECT('id', st.id, 'name', st.skill_name)
+		           ) FILTER (WHERE st.id IS NOT NULL), 
+		           '[]'::json
+		       ) as required_skills
+		FROM projects p
+		LEFT JOIN project_required_skills prs ON p.id = prs.project_id
+		LEFT JOIN skill_taxonomy st ON prs.skill_id = st.id
+		WHERE ($1::text IS NULL OR p.status = $1 OR p.project_status::text = $1)
+		GROUP BY p.id, p.title, p.description, p.location_lat, p.location_lng, 
+		         p.location_address, p.start_date, p.end_date, p.status, p.project_status, 
+		         p.created_by_admin_id, p.team_lead_id, p.auto_notify_matches, p.created_at, p.updated_at
+		ORDER BY p.created_at DESC
 		LIMIT $2 OFFSET $3`
 
 	projectListByTeamLeadQuery = `
-		SELECT id, title, description, required_skills, location_lat, location_lng, 
-		       location_address, start_date, end_date, status, project_status, 
-		       created_by_admin_id, team_lead_id, auto_notify_matches, created_at, updated_at
-		FROM projects
-		WHERE team_lead_id = $1
-		ORDER BY created_at DESC
+		SELECT p.id, p.title, p.description, p.location_lat, p.location_lng, 
+		       p.location_address, p.start_date, p.end_date, p.status, p.project_status, 
+		       p.created_by_admin_id, p.team_lead_id, p.auto_notify_matches, p.created_at, p.updated_at,
+		       COALESCE(
+		           JSON_AGG(
+		               JSON_BUILD_OBJECT('id', st.id, 'name', st.skill_name)
+		           ) FILTER (WHERE st.id IS NOT NULL), 
+		           '[]'::json
+		       ) as required_skills
+		FROM projects p
+		LEFT JOIN project_required_skills prs ON p.id = prs.project_id
+		LEFT JOIN skill_taxonomy st ON prs.skill_id = st.id
+		WHERE p.team_lead_id = $1
+		GROUP BY p.id, p.title, p.description, p.location_lat, p.location_lng, 
+		         p.location_address, p.start_date, p.end_date, p.status, p.project_status, 
+		         p.created_by_admin_id, p.team_lead_id, p.auto_notify_matches, p.created_at, p.updated_at
+		ORDER BY p.created_at DESC
 		LIMIT $2 OFFSET $3`
 
 	projectUpdateQuery = `
@@ -87,12 +125,23 @@ const (
 		WHERE id = $1`
 
 	projectGetActiveProjectsQuery = `
-		SELECT id, title, description, required_skills, location_lat, location_lng, 
-		       location_address, start_date, end_date, status, project_status, 
-		       created_by_admin_id, team_lead_id, auto_notify_matches, created_at, updated_at
-		FROM projects
-		WHERE project_status IN ('recruiting', 'active')
-		ORDER BY created_at DESC`
+		SELECT p.id, p.title, p.description, p.location_lat, p.location_lng, 
+		       p.location_address, p.start_date, p.end_date, p.status, p.project_status, 
+		       p.created_by_admin_id, p.team_lead_id, p.auto_notify_matches, p.created_at, p.updated_at,
+		       COALESCE(
+		           JSON_AGG(
+		               JSON_BUILD_OBJECT('id', st.id, 'name', st.skill_name)
+		           ) FILTER (WHERE st.id IS NOT NULL), 
+		           '[]'::json
+		       ) as required_skills
+		FROM projects p
+		LEFT JOIN project_required_skills prs ON p.id = prs.project_id
+		LEFT JOIN skill_taxonomy st ON prs.skill_id = st.id
+		WHERE p.project_status IN ('recruiting', 'active')
+		GROUP BY p.id, p.title, p.description, p.location_lat, p.location_lng, 
+		         p.location_address, p.start_date, p.end_date, p.status, p.project_status, 
+		         p.created_by_admin_id, p.team_lead_id, p.auto_notify_matches, p.created_at, p.updated_at
+		ORDER BY p.created_at DESC`
 
 	projectIsCreatorQuery = `SELECT COUNT(1) FROM projects WHERE id = $1 AND created_by_admin_id = $2`
 

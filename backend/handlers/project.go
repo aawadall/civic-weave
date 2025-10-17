@@ -66,6 +66,7 @@ func (h *ProjectHandler) ListProjects(c *gin.Context) {
 	}
 
 	log.Printf("✅ LIST_PROJECTS: Successfully fetched %d projects", len(projects))
+
 	c.JSON(http.StatusOK, gin.H{
 		"projects": projects,
 		"limit":    limit,

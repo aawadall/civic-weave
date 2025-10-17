@@ -75,8 +75,8 @@ func (h *ApplicationHandler) ListApplications(c *gin.Context) {
 
 // CreateApplicationRequest represents application creation request
 type CreateApplicationRequest struct {
-	InitiativeID string `json:"initiative_id" binding:"required"`
-	Message      string `json:"message"`
+	ProjectID string `json:"project_id" binding:"required"`
+	Message   string `json:"message"`
 }
 
 // CreateApplication handles POST /api/applications
@@ -94,22 +94,22 @@ func (h *ApplicationHandler) CreateApplication(c *gin.Context) {
 		return
 	}
 
-	// Parse initiative ID
-	initiativeID, err := uuid.Parse(req.InitiativeID)
+	// Parse project ID
+	projectID, err := uuid.Parse(req.ProjectID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid initiative ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid project ID"})
 		return
 	}
 
 	// Check if application already exists
-	existing, err := h.service.GetByInitiativeAndVolunteer(initiativeID, userCtx.ID)
+	existing, err := h.service.GetByProjectAndVolunteer(projectID, userCtx.ID)
 	if err == nil && existing != nil {
 		c.JSON(http.StatusConflict, gin.H{"error": "Application already exists"})
 		return
 	}
 
 	application := &models.Application{
-		ProjectID:   initiativeID,
+		ProjectID:   projectID,
 		VolunteerID: userCtx.ID,
 		Status:      "pending",
 		AdminNotes:  req.Message, // Store volunteer message in admin_notes for now
