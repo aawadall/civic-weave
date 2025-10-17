@@ -82,9 +82,15 @@ func (h *TaskHandler) ListTasks(c *gin.Context) {
 		return
 	}
 
-	if !isTeamMember {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Only team members can view tasks"})
-		return
+	// Allow volunteers to see unassigned tasks even if not team members yet
+	// This allows them to self-assign tasks
+	if !isTeamMember && !userCtx.HasRole("admin") {
+		// Check if user is a volunteer
+		_, err := h.volunteerService.GetByUserID(userCtx.ID)
+		if err != nil {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Only team members or volunteers can view tasks"})
+			return
+		}
 	}
 
 	// Check if user is project owner
@@ -100,10 +106,22 @@ func (h *TaskHandler) ListTasks(c *gin.Context) {
 	}
 
 	// Get tasks (filtered based on permissions)
-	tasks, err := h.taskService.ListByProject(projectID, &userCtx.ID, isProjectOwner)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get tasks"})
-		return
+	// If user is not a team member but is a volunteer, only show unassigned tasks
+	var tasks []models.ProjectTask
+	if !isTeamMember && !userCtx.HasRole("admin") {
+		// Show only unassigned tasks to volunteers who aren't team members yet
+		tasks, err = h.taskService.ListUnassignedByProject(projectID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get unassigned tasks"})
+			return
+		}
+	} else {
+		// Team members and admins see filtered tasks
+		tasks, err = h.taskService.ListByProject(projectID, &userCtx.ID, isProjectOwner)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get tasks"})
+			return
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{

@@ -292,6 +292,7 @@ func main() {
 			// Project team management routes
 			protected.GET("/projects/:id/signups", projectHandler.GetProjectSignups)
 			protected.GET("/projects/:id/team-members", projectHandler.GetProjectTeamMembers)
+			protected.GET("/projects/:id/team-members-with-details", projectHandler.GetProjectTeamMembersWithDetails)
 			protected.POST("/projects/:id/team-members", projectHandler.AddTeamMember)
 			protected.PUT("/projects/:id/team-members/:volunteerId", projectHandler.UpdateTeamMemberStatus)
 			protected.PUT("/projects/:id/team-lead", middleware.RequireRole("admin"), projectHandler.AssignTeamLead)

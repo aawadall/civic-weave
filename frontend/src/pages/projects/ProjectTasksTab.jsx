@@ -57,7 +57,7 @@ export default function ProjectTasksTab({ projectId, isProjectOwner }) {
 
   const fetchTeamMembers = async () => {
     try {
-      const response = await api.get(`/projects/${projectId}/team-members`)
+      const response = await api.get(`/projects/${projectId}/team-members-with-details`)
       setTeamMembers(response.data.team_members || [])
     } catch (error) {
       console.error('Error fetching team members:', error)
