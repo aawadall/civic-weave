@@ -234,6 +234,7 @@ export default function ProjectDetailPage() {
             <Link 
               to="/projects" 
               state={{ refreshProjects: true }}
+              onClick={() => console.log('🔄 ProjectDetailPage: Navigating back with refresh flag')}
               className="text-primary-600 hover:text-primary-800 text-sm font-medium"
             >
               ← Back to Projects

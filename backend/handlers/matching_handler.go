@@ -51,16 +51,16 @@ func (h *SkillMatchingHandler) GetCandidateVolunteers(c *gin.Context) {
 		minScore = 0.1
 	}
 
-	// Query pre-calculated matches (super fast!)
+	// Query pre-calculated matches from projects (super fast!)
 	query := `
 		SELECT 
 			v.id, v.name, v.phone, v.location_address,
 			m.match_score, m.jaccard_index, 
 			m.matched_skill_ids, m.matched_skill_count,
 			m.calculated_at
-		FROM volunteer_initiative_matches m
+		FROM volunteer_project_matches m
 		JOIN volunteers v ON m.volunteer_id = v.id
-		WHERE m.initiative_id = $1 
+		WHERE m.project_id = $1 
 			AND m.match_score >= $2
 			AND v.skills_visible = true
 		ORDER BY m.match_score DESC, m.matched_skill_count DESC
@@ -140,18 +140,18 @@ func (h *SkillMatchingHandler) GetRecommendedInitiatives(c *gin.Context) {
 		minScore = 0.2
 	}
 
-	// Query pre-calculated matches
+	// Query pre-calculated matches from projects
 	query := `
 		SELECT 
-			i.id, i.title, i.description, i.location_address,
-			i.start_date, i.end_date, i.status,
+			p.id, p.title, p.description, p.location_address,
+			p.start_date, p.end_date, p.project_status,
 			m.match_score, m.matched_skill_count,
 			m.matched_skill_ids, m.calculated_at
-		FROM volunteer_initiative_matches m
-		JOIN initiatives i ON m.initiative_id = i.id
+		FROM volunteer_project_matches m
+		JOIN projects p ON m.project_id = p.id
 		WHERE m.volunteer_id = $1 
 			AND m.match_score >= $2
-			AND i.status = 'active'
+			AND p.project_status = 'active'
 		ORDER BY m.match_score DESC, m.matched_skill_count DESC
 		LIMIT $3
 	`
@@ -165,14 +165,14 @@ func (h *SkillMatchingHandler) GetRecommendedInitiatives(c *gin.Context) {
 
 	var recommendations []gin.H
 	for rows.Next() {
-		var initiative struct {
+		var project struct {
 			ID                uuid.UUID  `json:"id"`
 			Title             string     `json:"title"`
 			Description       string     `json:"description"`
 			LocationAddress   string     `json:"location_address"`
 			StartDate         *time.Time `json:"start_date"`
 			EndDate           *time.Time `json:"end_date"`
-			Status            string     `json:"status"`
+			ProjectStatus     string     `json:"project_status"`
 			MatchScore        float64    `json:"match_score"`
 			MatchedSkillCount int        `json:"matched_skill_count"`
 			MatchedSkillIDs   []int      `json:"matched_skill_ids"`
@@ -180,10 +180,10 @@ func (h *SkillMatchingHandler) GetRecommendedInitiatives(c *gin.Context) {
 		}
 
 		err := rows.Scan(
-			&initiative.ID, &initiative.Title, &initiative.Description, &initiative.LocationAddress,
-			&initiative.StartDate, &initiative.EndDate, &initiative.Status,
-			&initiative.MatchScore, &initiative.MatchedSkillCount,
-			&initiative.MatchedSkillIDs, &initiative.CalculatedAt,
+			&project.ID, &project.Title, &project.Description, &project.LocationAddress,
+			&project.StartDate, &project.EndDate, &project.ProjectStatus,
+			&project.MatchScore, &project.MatchedSkillCount,
+			&project.MatchedSkillIDs, &project.CalculatedAt,
 		)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to scan initiative data"})
@@ -191,8 +191,8 @@ func (h *SkillMatchingHandler) GetRecommendedInitiatives(c *gin.Context) {
 		}
 
 		recommendations = append(recommendations, gin.H{
-			"initiative":       initiative,
-			"match_percentage": int(initiative.MatchScore * 100),
+			"project":          project,
+			"match_percentage": int(project.MatchScore * 100),
 		})
 	}
 
@@ -231,8 +231,8 @@ func (h *SkillMatchingHandler) GetMatchExplanation(c *gin.Context) {
 
 	err = h.db.QueryRow(`
 		SELECT match_score, jaccard_index, matched_skill_ids, matched_skill_count, calculated_at
-		FROM volunteer_initiative_matches
-		WHERE volunteer_id = $1 AND initiative_id = $2
+		FROM volunteer_project_matches
+		WHERE volunteer_id = $1 AND project_id = $2
 	`, volunteerID, initiativeID).Scan(
 		&match.MatchScore, &match.JaccardIndex,
 		&match.MatchedSkillIDs, &match.MatchedSkillCount,
@@ -265,10 +265,10 @@ func (h *SkillMatchingHandler) GetMatchExplanation(c *gin.Context) {
 		}
 	}
 
-	// Get initiative required skills
-	initiativeSkills, err := h.taxonomyService.GetInitiativeSkills(initiativeID)
+	// Get project required skills
+	projectSkills, err := h.taxonomyService.GetProjectSkills(initiativeID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get initiative skills"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get project skills"})
 		return
 	}
 
@@ -282,13 +282,13 @@ func (h *SkillMatchingHandler) GetMatchExplanation(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"match_details":     match,
 		"matched_skills":    skillNames,
-		"initiative_skills": initiativeSkills,
+		"project_skills": projectSkills,
 		"volunteer_skills":  volunteerSkills,
 		"explanation": gin.H{
 			"match_percentage":    int(match.MatchScore * 100),
 			"skills_matched":      match.MatchedSkillCount,
-			"total_required":      len(initiativeSkills),
-			"coverage_percentage": int(float64(match.MatchedSkillCount) / float64(len(initiativeSkills)) * 100),
+			"total_required":      len(projectSkills),
+			"coverage_percentage": int(float64(match.MatchedSkillCount) / float64(len(projectSkills)) * 100),
 		},
 	})
 }

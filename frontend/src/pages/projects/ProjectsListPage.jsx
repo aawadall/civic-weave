@@ -19,20 +19,46 @@ export default function ProjectsListPage() {
   // Refresh projects when returning from detail page (detected by state change)
   useEffect(() => {
     if (location.state?.refreshProjects) {
+      console.log('🔄 ProjectsListPage: Refreshing due to location state change')
       fetchProjects()
       // Clear the refresh flag to prevent unnecessary re-fetches
       window.history.replaceState({}, document.title, location.pathname)
     }
   }, [location])
 
+  // Refresh projects when page becomes visible again (handles browser back button)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        console.log('🔄 ProjectsListPage: Page became visible, refreshing projects')
+        fetchProjects()
+      }
+    }
+
+    const handleFocus = () => {
+      console.log('🔄 ProjectsListPage: Window focused, refreshing projects')
+      fetchProjects()
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('focus', handleFocus)
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('focus', handleFocus)
+    }
+  }, [])
+
   const fetchProjects = async () => {
     try {
       setLoading(true)
+      console.log('🔄 ProjectsListPage: Fetching projects...')
       const response = await api.get('/projects')
+      console.log('✅ ProjectsListPage: Fetched projects:', response.data.projects?.length || 0)
       setProjects(response.data.projects || [])
     } catch (err) {
       setError('Failed to fetch projects')
-      console.error('Error fetching projects:', err)
+      console.error('❌ ProjectsListPage: Error fetching projects:', err)
     } finally {
       setLoading(false)
     }
@@ -41,7 +67,8 @@ export default function ProjectsListPage() {
   const filteredProjects = projects.filter(project => {
     const matchesSearch = project.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          project.description.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesStatus = !statusFilter || project.status === statusFilter
+    const projectStatus = project.project_status || project.status || 'draft'
+    const matchesStatus = !statusFilter || projectStatus === statusFilter
     return matchesSearch && matchesStatus
   })
 
@@ -124,12 +151,12 @@ export default function ProjectsListPage() {
                   {project.title}
                 </h3>
                 <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                  project.status === 'active' ? 'bg-green-100 text-green-800' :
-                  project.status === 'recruiting' ? 'bg-blue-100 text-blue-800' :
-                  project.status === 'completed' ? 'bg-gray-100 text-gray-800' :
+                  (project.project_status || project.status) === 'active' ? 'bg-green-100 text-green-800' :
+                  (project.project_status || project.status) === 'recruiting' ? 'bg-blue-100 text-blue-800' :
+                  (project.project_status || project.status) === 'completed' ? 'bg-gray-100 text-gray-800' :
                   'bg-yellow-100 text-yellow-800'
                 }`}>
-                  {project.status}
+                  {project.project_status || project.status || 'draft'}
                 </span>
               </div>
 

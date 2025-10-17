@@ -340,9 +340,9 @@ func main() {
 			// New matching routes (sparse vector system)
 			if skillMatchingHandler != nil {
 				protected.GET("/matching/my-matches", skillMatchingHandler.GetMyMatches)
-				protected.GET("/initiatives/:id/candidate-volunteers", skillMatchingHandler.GetCandidateVolunteers)
-				protected.GET("/volunteers/me/recommended-initiatives", skillMatchingHandler.GetRecommendedInitiatives)
-				protected.GET("/matching/explanation/:volunteerId/:initiativeId", skillMatchingHandler.GetMatchExplanation)
+				protected.GET("/projects/:id/candidate-volunteers", skillMatchingHandler.GetCandidateVolunteers)
+				protected.GET("/volunteers/me/recommended-projects", skillMatchingHandler.GetRecommendedInitiatives)
+				protected.GET("/matching/explanation/:volunteerId/:projectId", skillMatchingHandler.GetMatchExplanation)
 			}
 
 			// Legacy matching routes (updated to use projects)
@@ -366,7 +366,7 @@ func main() {
 				protected.DELETE("/volunteers/me/skills/:skill_id", skillHandler.RemoveVolunteerSkill)
 				protected.GET("/volunteers/me/profile-completion", skillHandler.GetProfileCompletion)
 
-				// Initiative skill management
+				// Project skill management (legacy initiative endpoints for backward compatibility)
 				protected.GET("/initiatives/:id/skills", skillHandler.GetInitiativeSkills)
 				protected.PUT("/initiatives/:id/skills", skillHandler.UpdateInitiativeSkills)
 

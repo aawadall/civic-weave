@@ -331,7 +331,44 @@ func (s *SkillTaxonomyService) UpdateProjectSkills(projectID uuid.UUID, skillIDs
 	}
 	defer tx.Rollback()
 
-	// Delete existing required skills
+	// Get skill names for the JSONB field
+	var skillNames []string
+	if len(skillIDs) > 0 {
+		skillNamesQuery := `SELECT skill_name FROM skill_taxonomy WHERE id = ANY($1) ORDER BY skill_name`
+		rows, err := tx.Query(skillNamesQuery, skillIDs)
+		if err != nil {
+			return fmt.Errorf("failed to get skill names: %w", err)
+		}
+		defer rows.Close()
+
+		for rows.Next() {
+			var skillName string
+			if err := rows.Scan(&skillName); err != nil {
+				return fmt.Errorf("failed to scan skill name: %w", err)
+			}
+			skillNames = append(skillNames, skillName)
+		}
+		if err := rows.Err(); err != nil {
+			return fmt.Errorf("failed to iterate skill names: %w", err)
+		}
+	}
+
+	// Update the legacy JSONB field in projects table
+	skillsJSON, err := ToJSONArray(skillNames)
+	if err != nil {
+		return fmt.Errorf("failed to serialize skills to JSON: %w", err)
+	}
+
+	_, err = tx.Exec(`
+		UPDATE projects 
+		SET required_skills = $2, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $1
+	`, projectID, skillsJSON)
+	if err != nil {
+		return fmt.Errorf("failed to update projects.required_skills: %w", err)
+	}
+
+	// Delete existing required skills from taxonomy table
 	_, err = tx.Exec(`
 		DELETE FROM project_required_skills WHERE project_id = $1
 	`, projectID)
@@ -339,7 +376,7 @@ func (s *SkillTaxonomyService) UpdateProjectSkills(projectID uuid.UUID, skillIDs
 		return fmt.Errorf("failed to delete existing project skills: %w", err)
 	}
 
-	// Insert new required skills
+	// Insert new required skills into taxonomy table
 	for _, skillID := range skillIDs {
 		_, err = tx.Exec(`
 			INSERT INTO project_required_skills (project_id, skill_id)
