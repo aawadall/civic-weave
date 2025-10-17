@@ -262,12 +262,13 @@ export default function ProjectTasksTab({ projectId, isProjectOwner }) {
 
                   <div>
                     <label className="block text-sm font-medium text-secondary-900 mb-2">
-                      Due Date
+                      Due Date <span className="text-secondary-500 text-sm">(optional)</span>
                     </label>
                     <input
                       type="date"
                       value={newTask.due_date}
                       onChange={(e) => setNewTask({ ...newTask, due_date: e.target.value })}
+                      placeholder="Select due date"
                       className="w-full px-4 py-2 border border-secondary-300 rounded-lg focus:ring-2 focus:ring-primary-500"
                     />
                   </div>
