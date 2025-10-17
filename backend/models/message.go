@@ -7,17 +7,21 @@ import (
 	"github.com/google/uuid"
 )
 
-// ProjectMessage represents a message in a project
+// ProjectMessage represents a message (expanded for universal messaging)
 type ProjectMessage struct {
-	ID          uuid.UUID  `json:"id" db:"id"`
-	ProjectID   uuid.UUID  `json:"project_id" db:"project_id"`
-	SenderID    uuid.UUID  `json:"sender_id" db:"sender_id"`
-	MessageText string     `json:"message_text" db:"message_text"`
-	TaskID      *uuid.UUID `json:"task_id,omitempty" db:"task_id"`
-	MessageType string     `json:"message_type" db:"message_type"`
-	CreatedAt   time.Time  `json:"created_at" db:"created_at"`
-	EditedAt    *time.Time `json:"edited_at,omitempty" db:"edited_at"`
-	DeletedAt   *time.Time `json:"deleted_at,omitempty" db:"deleted_at"`
+	ID              uuid.UUID  `json:"id" db:"id"`
+	ProjectID       *uuid.UUID `json:"project_id,omitempty" db:"project_id"`
+	SenderID        uuid.UUID  `json:"sender_id" db:"sender_id"`
+	RecipientUserID *uuid.UUID `json:"recipient_user_id,omitempty" db:"recipient_user_id"`
+	RecipientTeamID *uuid.UUID `json:"recipient_team_id,omitempty" db:"recipient_team_id"`
+	Subject         *string    `json:"subject,omitempty" db:"subject"`
+	MessageText     string     `json:"message_text" db:"message_text"`
+	TaskID          *uuid.UUID `json:"task_id,omitempty" db:"task_id"`
+	MessageType     string     `json:"message_type" db:"message_type"`
+	MessageScope    string     `json:"message_scope" db:"message_scope"`
+	CreatedAt       time.Time  `json:"created_at" db:"created_at"`
+	EditedAt        *time.Time `json:"edited_at,omitempty" db:"edited_at"`
+	DeletedAt       *time.Time `json:"deleted_at,omitempty" db:"deleted_at"`
 }
 
 // MessageRead represents a read receipt for a message
@@ -30,15 +34,37 @@ type MessageRead struct {
 // MessageWithSender includes message and sender info
 type MessageWithSender struct {
 	ProjectMessage
-	SenderName  string `json:"sender_name"`
-	SenderEmail string `json:"sender_email"`
-	IsRead      bool   `json:"is_read"`
+	SenderName     string  `json:"sender_name"`
+	SenderEmail    string  `json:"sender_email"`
+	RecipientName  *string `json:"recipient_name,omitempty"`
+	RecipientEmail *string `json:"recipient_email,omitempty"`
+	ProjectTitle   *string `json:"project_title,omitempty"`
+	IsRead         bool    `json:"is_read"`
+}
+
+// Conversation represents a message conversation/thread
+type Conversation struct {
+	ID               uuid.UUID          `json:"id"`
+	Type             string             `json:"type"` // "user_to_user", "user_to_team", "project"
+	Title            string             `json:"title"`
+	LastMessage      *MessageWithSender `json:"last_message,omitempty"`
+	UnreadCount      int                `json:"unread_count"`
+	ParticipantCount int                `json:"participant_count"`
+	UpdatedAt        time.Time          `json:"updated_at"`
 }
 
 // UnreadCount represents unread message count for a project
 type UnreadCount struct {
 	ProjectID uuid.UUID `json:"project_id"`
 	Count     int       `json:"count"`
+}
+
+// UniversalUnreadCount represents unread message count across all contexts
+type UniversalUnreadCount struct {
+	DirectMessages  int `json:"direct_messages"`
+	TeamMessages    int `json:"team_messages"`
+	ProjectMessages int `json:"project_messages"`
+	Total           int `json:"total"`
 }
 
 // MessageService handles message operations
@@ -247,11 +273,173 @@ func (s *MessageService) CanUserEdit(messageID, userID uuid.UUID) (bool, error) 
 // CreateTaskNotification creates a task-related notification message
 func (s *MessageService) CreateTaskNotification(projectID, senderID, taskID uuid.UUID, messageType, messageText string) error {
 	message := &ProjectMessage{
-		ProjectID:   projectID,
-		SenderID:    senderID,
-		MessageText: messageText,
-		TaskID:      &taskID,
-		MessageType: messageType,
+		ProjectID:    &projectID,
+		SenderID:     senderID,
+		MessageText:  messageText,
+		TaskID:       &taskID,
+		MessageType:  messageType,
+		MessageScope: "project",
 	}
 	return s.Create(message)
+}
+
+// CreateUniversalMessage creates a message for universal messaging
+func (s *MessageService) CreateUniversalMessage(message *ProjectMessage) error {
+	message.ID = uuid.New()
+	// Set default message scope if not specified
+	if message.MessageScope == "" {
+		if message.RecipientUserID != nil {
+			message.MessageScope = "user_to_user"
+		} else if message.RecipientTeamID != nil {
+			message.MessageScope = "user_to_team"
+		} else if message.ProjectID != nil {
+			message.MessageScope = "project"
+		}
+	}
+	// Set default message type if not specified
+	if message.MessageType == "" {
+		message.MessageType = "general"
+	}
+	return s.db.QueryRow(messageCreateUniversalQuery, message.ID, message.ProjectID, message.SenderID,
+		message.RecipientUserID, message.RecipientTeamID, message.Subject, message.MessageText,
+		message.TaskID, message.MessageType, message.MessageScope).
+		Scan(&message.CreatedAt)
+}
+
+// GetInbox retrieves user's inbox (all messages where user is recipient)
+func (s *MessageService) GetInbox(userID uuid.UUID, limit, offset int) ([]MessageWithSender, error) {
+	rows, err := s.db.Query(messageGetInboxQuery, userID, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var messages []MessageWithSender
+	for rows.Next() {
+		var msg MessageWithSender
+		err := rows.Scan(
+			&msg.ID, &msg.ProjectID, &msg.SenderID, &msg.RecipientUserID, &msg.RecipientTeamID,
+			&msg.Subject, &msg.MessageText, &msg.TaskID, &msg.MessageType, &msg.MessageScope,
+			&msg.CreatedAt, &msg.EditedAt, &msg.DeletedAt,
+			&msg.SenderName, &msg.SenderEmail, &msg.RecipientName, &msg.RecipientEmail,
+			&msg.ProjectTitle, &msg.IsRead,
+		)
+		if err != nil {
+			return nil, err
+		}
+		messages = append(messages, msg)
+	}
+
+	return messages, rows.Err()
+}
+
+// GetSentMessages retrieves messages sent by user
+func (s *MessageService) GetSentMessages(userID uuid.UUID, limit, offset int) ([]MessageWithSender, error) {
+	rows, err := s.db.Query(messageGetSentQuery, userID, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var messages []MessageWithSender
+	for rows.Next() {
+		var msg MessageWithSender
+		err := rows.Scan(
+			&msg.ID, &msg.ProjectID, &msg.SenderID, &msg.RecipientUserID, &msg.RecipientTeamID,
+			&msg.Subject, &msg.MessageText, &msg.TaskID, &msg.MessageType, &msg.MessageScope,
+			&msg.CreatedAt, &msg.EditedAt, &msg.DeletedAt,
+			&msg.SenderName, &msg.SenderEmail, &msg.RecipientName, &msg.RecipientEmail,
+			&msg.ProjectTitle, &msg.IsRead,
+		)
+		if err != nil {
+			return nil, err
+		}
+		messages = append(messages, msg)
+	}
+
+	return messages, rows.Err()
+}
+
+// GetConversations retrieves user's conversations grouped by thread
+func (s *MessageService) GetConversations(userID uuid.UUID, limit, offset int) ([]Conversation, error) {
+	rows, err := s.db.Query(messageGetConversationsQuery, userID, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var conversations []Conversation
+	for rows.Next() {
+		var conv Conversation
+		var lastMessageID *uuid.UUID
+		var lastMessageText *string
+		var lastMessageCreatedAt *time.Time
+		var senderName *string
+		var senderEmail *string
+
+		err := rows.Scan(
+			&conv.ID, &conv.Type, &conv.Title, &conv.UnreadCount, &conv.ParticipantCount,
+			&conv.UpdatedAt, &lastMessageID, &lastMessageText, &lastMessageCreatedAt,
+			&senderName, &senderEmail,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		// Build last message if exists
+		if lastMessageID != nil {
+			conv.LastMessage = &MessageWithSender{
+				ProjectMessage: ProjectMessage{
+					ID:          *lastMessageID,
+					MessageText: *lastMessageText,
+					CreatedAt:   *lastMessageCreatedAt,
+				},
+				SenderName:  *senderName,
+				SenderEmail: *senderEmail,
+			}
+		}
+
+		conversations = append(conversations, conv)
+	}
+
+	return conversations, rows.Err()
+}
+
+// GetConversation retrieves messages in a specific conversation
+func (s *MessageService) GetConversation(conversationID uuid.UUID, userID uuid.UUID, limit, offset int) ([]MessageWithSender, error) {
+	rows, err := s.db.Query(messageGetConversationQuery, conversationID, userID, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var messages []MessageWithSender
+	for rows.Next() {
+		var msg MessageWithSender
+		err := rows.Scan(
+			&msg.ID, &msg.ProjectID, &msg.SenderID, &msg.RecipientUserID, &msg.RecipientTeamID,
+			&msg.Subject, &msg.MessageText, &msg.TaskID, &msg.MessageType, &msg.MessageScope,
+			&msg.CreatedAt, &msg.EditedAt, &msg.DeletedAt,
+			&msg.SenderName, &msg.SenderEmail, &msg.RecipientName, &msg.RecipientEmail,
+			&msg.ProjectTitle, &msg.IsRead,
+		)
+		if err != nil {
+			return nil, err
+		}
+		messages = append(messages, msg)
+	}
+
+	return messages, rows.Err()
+}
+
+// GetUniversalUnreadCount returns unread message counts across all contexts
+func (s *MessageService) GetUniversalUnreadCount(userID uuid.UUID) (*UniversalUnreadCount, error) {
+	count := &UniversalUnreadCount{}
+	err := s.db.QueryRow(messageGetUniversalUnreadCountQuery, userID).Scan(
+		&count.DirectMessages, &count.TeamMessages, &count.ProjectMessages, &count.Total,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return count, nil
 }

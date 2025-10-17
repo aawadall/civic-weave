@@ -68,12 +68,15 @@ type ProjectTeamMember struct {
 // ProjectWithDetails represents a project with additional details
 type ProjectWithDetails struct {
 	Project
-	TeamLead        *User               `json:"team_lead,omitempty"`
-	CreatedByAdmin  *Admin              `json:"created_by_admin,omitempty"`
-	TeamMembers     []ProjectTeamMember `json:"team_members,omitempty"`
-	Applications    []Application       `json:"applications,omitempty"`
-	SignupCount     int                 `json:"signup_count"`
-	ActiveTeamCount int                 `json:"active_team_count"`
+	TeamLead           *User               `json:"team_lead,omitempty"`
+	CreatedByAdmin     *Admin              `json:"created_by_admin,omitempty"`
+	TeamMembers        []ProjectTeamMember `json:"team_members,omitempty"`
+	Applications       []Application       `json:"applications,omitempty"`
+	SignupCount        int                 `json:"signup_count"`
+	ActiveTeamCount    int                 `json:"active_team_count"`
+	UnreadMessageCount int                 `json:"unread_message_count"`
+	AssignedTasksCount int                 `json:"assigned_tasks_count"`
+	OverdueTasksCount  int                 `json:"overdue_tasks_count"`
 }
 
 // ProjectService handles project operations
@@ -571,6 +574,92 @@ func (s *ProjectService) CanEditProject(projectID, userID uuid.UUID) (bool, erro
 	}
 
 	return isCreator, nil
+}
+
+// GetUserEnrolledProjects retrieves all projects where a user is an active team member
+func (s *ProjectService) GetUserEnrolledProjects(userID uuid.UUID) ([]ProjectWithDetails, error) {
+	rows, err := s.db.Query(projectGetUserEnrolledQuery, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var projects []ProjectWithDetails
+	for rows.Next() {
+		var project ProjectWithDetails
+		var skillsJSON string
+		var teamLeadID *uuid.UUID
+		var teamLeadName *string
+		var teamLeadEmail *string
+		var createdByAdminName *string
+		var createdByAdminEmail *string
+		var unreadCount *int
+		var assignedTasks *int
+		var overdueTasks *int
+
+		err := rows.Scan(
+			&project.ID, &project.Title, &project.Description, &project.LocationLat, &project.LocationLng,
+			&project.LocationAddress, &project.StartDate, &project.EndDate, &project.ProjectStatus,
+			&project.CreatedByAdminID, &teamLeadID, &project.AutoNotifyMatches, &project.CreatedAt, &project.UpdatedAt,
+			&skillsJSON, &project.SignupCount, &project.ActiveTeamCount,
+			&teamLeadName, &teamLeadEmail, &createdByAdminName, &createdByAdminEmail,
+			&unreadCount, &assignedTasks, &overdueTasks,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		// Parse required skills JSON
+		var skillData []interface{}
+		if err := json.Unmarshal([]byte(skillsJSON), &skillData); err != nil {
+			return nil, err
+		}
+
+		// Convert to skill names
+		var skillNames []string
+		for _, skillItem := range skillData {
+			switch v := skillItem.(type) {
+			case string:
+				skillNames = append(skillNames, v)
+			case map[string]interface{}:
+				if name, ok := v["name"].(string); ok {
+					skillNames = append(skillNames, name)
+				}
+			}
+		}
+		project.RequiredSkills = skillNames
+
+		// Set team lead info
+		if teamLeadID != nil {
+			project.TeamLead = &User{
+				ID:    *teamLeadID,
+				Email: *teamLeadEmail,
+			}
+		}
+
+		// Set created by admin info
+		if createdByAdminName != nil {
+			project.CreatedByAdmin = &Admin{
+				ID:   project.CreatedByAdminID,
+				Name: *createdByAdminName,
+			}
+		}
+
+		// Add unread count and task stats to project
+		if unreadCount != nil {
+			project.UnreadMessageCount = *unreadCount
+		}
+		if assignedTasks != nil {
+			project.AssignedTasksCount = *assignedTasks
+		}
+		if overdueTasks != nil {
+			project.OverdueTasksCount = *overdueTasks
+		}
+
+		projects = append(projects, project)
+	}
+
+	return projects, rows.Err()
 }
 
 // TransitionProjectStatus transitions a project to a new status with validation
