@@ -28,8 +28,8 @@ func NewTaskHandler(taskService *models.TaskService, projectService *models.Proj
 		projectService:     projectService,
 		volunteerService:   volunteerService,
 		messageService:     messageService,
-		taskCommentService: models.NewTaskCommentService(taskService.db),
-		taskTimeLogService: models.NewTaskTimeLogService(taskService.db),
+		taskCommentService: models.NewTaskCommentService(taskService.GetDB()),
+		taskTimeLogService: models.NewTaskTimeLogService(taskService.GetDB()),
 	}
 }
 
@@ -545,8 +545,7 @@ func (h *TaskHandler) AddTaskComment(c *gin.Context) {
 		CommentText: req.CommentText,
 	}
 
-	commentService := models.NewTaskCommentService(h.taskService.(*models.TaskService).db)
-	if err := commentService.Create(comment); err != nil {
+	if err := h.taskCommentService.Create(comment); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add comment"})
 		return
 	}
@@ -590,8 +589,7 @@ func (h *TaskHandler) GetTaskComments(c *gin.Context) {
 	}
 
 	// Get comments
-	commentService := models.NewTaskCommentService(h.taskService.(*models.TaskService).db)
-	comments, err := commentService.GetByTask(taskID)
+	comments, err := h.taskCommentService.GetByTask(taskID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get comments"})
 		return
@@ -661,8 +659,7 @@ func (h *TaskHandler) LogTaskTime(c *gin.Context) {
 		Description: req.Description,
 	}
 
-	timeLogService := models.NewTaskTimeLogService(h.taskService.(*models.TaskService).db)
-	if err := timeLogService.Create(timeLog); err != nil {
+	if err := h.taskTimeLogService.Create(timeLog); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to log time"})
 		return
 	}
@@ -706,8 +703,7 @@ func (h *TaskHandler) GetTaskTimeLogs(c *gin.Context) {
 	}
 
 	// Get time logs
-	timeLogService := models.NewTaskTimeLogService(h.taskService.(*models.TaskService).db)
-	timeLogs, err := timeLogService.GetByTask(taskID)
+	timeLogs, err := h.taskTimeLogService.GetByTask(taskID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get time logs"})
 		return
@@ -882,177 +878,5 @@ func (h *TaskHandler) MarkTaskDone(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Task marked as done"})
-}
-
-// AddTaskComment handles POST /api/tasks/:id/comments
-func (h *TaskHandler) AddTaskComment(c *gin.Context) {
-	taskIDStr := c.Param("id")
-	taskID, err := uuid.Parse(taskIDStr)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid task ID"})
-		return
-	}
-
-	var req struct {
-		CommentText string `json:"comment_text" binding:"required"`
-	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	// Get user context
-	userCtx, exists := middleware.GetUserFromContext(c)
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found in context"})
-		return
-	}
-
-	// Get task to verify it exists
-	task, err := h.taskService.GetByID(taskID)
-	if err != nil || task == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
-		return
-	}
-
-	// Create comment
-	comment := &models.TaskComment{
-		TaskID:      taskID,
-		UserID:      userCtx.ID,
-		CommentText: req.CommentText,
-	}
-
-	if err := h.taskCommentService.Create(comment); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add comment"})
-		return
-	}
-
-	c.JSON(http.StatusCreated, gin.H{"message": "Comment added successfully", "comment": comment})
-}
-
-// GetTaskComments handles GET /api/tasks/:id/comments
-func (h *TaskHandler) GetTaskComments(c *gin.Context) {
-	taskIDStr := c.Param("id")
-	taskID, err := uuid.Parse(taskIDStr)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid task ID"})
-		return
-	}
-
-	// Get task to verify it exists
-	task, err := h.taskService.GetByID(taskID)
-	if err != nil || task == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
-		return
-	}
-
-	// Get comments
-	comments, err := h.taskCommentService.GetByTask(taskID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get comments"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"comments": comments})
-}
-
-// LogTaskTime handles POST /api/tasks/:id/time-logs
-func (h *TaskHandler) LogTaskTime(c *gin.Context) {
-	taskIDStr := c.Param("id")
-	taskID, err := uuid.Parse(taskIDStr)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid task ID"})
-		return
-	}
-
-	var req struct {
-		Hours       float64 `json:"hours" binding:"required,min=0.1"`
-		LogDate     string  `json:"log_date" binding:"required"`
-		Description string  `json:"description"`
-	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	// Get user context
-	userCtx, exists := middleware.GetUserFromContext(c)
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found in context"})
-		return
-	}
-
-	// Get volunteer for this user
-	volunteer, err := h.volunteerService.GetByUserID(userCtx.ID)
-	if err != nil || volunteer == nil {
-		c.JSON(http.StatusForbidden, gin.H{"error": "User is not a volunteer"})
-		return
-	}
-
-	// Get task to verify it exists
-	task, err := h.taskService.GetByID(taskID)
-	if err != nil || task == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
-		return
-	}
-
-	// Parse log date
-	logDate, err := time.Parse("2006-01-02", req.LogDate)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid date format. Use YYYY-MM-DD"})
-		return
-	}
-
-	// Create time log
-	timeLog := &models.TaskTimeLog{
-		TaskID:      taskID,
-		VolunteerID: volunteer.ID,
-		Hours:       req.Hours,
-		LogDate:     logDate,
-		Description: req.Description,
-	}
-
-	if err := h.taskTimeLogService.Create(timeLog); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to log time"})
-		return
-	}
-
-	c.JSON(http.StatusCreated, gin.H{"message": "Time logged successfully", "time_log": timeLog})
-}
-
-// GetTaskTimeLogs handles GET /api/tasks/:id/time-logs
-func (h *TaskHandler) GetTaskTimeLogs(c *gin.Context) {
-	taskIDStr := c.Param("id")
-	taskID, err := uuid.Parse(taskIDStr)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid task ID"})
-		return
-	}
-
-	// Get task to verify it exists
-	task, err := h.taskService.GetByID(taskID)
-	if err != nil || task == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
-		return
-	}
-
-	// Get time logs
-	timeLogs, err := h.taskTimeLogService.GetByTask(taskID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get time logs"})
-		return
-	}
-
-	// Get total hours
-	totalHours, err := h.taskTimeLogService.GetTotalHoursByTask(taskID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get total hours"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"time_logs":   timeLogs,
-		"total_hours": totalHours,
-	})
 }
 

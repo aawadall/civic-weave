@@ -63,6 +63,11 @@ type TaskService struct {
 	db *sql.DB
 }
 
+// GetDB returns the database connection (for use by other services)
+func (s *TaskService) GetDB() *sql.DB {
+	return s.db
+}
+
 // NewTaskService creates a new task service
 func NewTaskService(db *sql.DB) *TaskService {
 	return &TaskService{db: db}
