@@ -366,7 +366,7 @@ type TeamMemberWithDetails struct {
 func (s *ProjectService) GetProjectTeamMembersWithDetails(projectID uuid.UUID) ([]TeamMemberWithDetails, error) {
 	query := `
 		SELECT ptm.id, ptm.project_id, ptm.volunteer_id, ptm.joined_at, ptm.status, ptm.created_at, ptm.updated_at,
-		       u.first_name || ' ' || u.last_name as volunteer_name, u.email as volunteer_email
+		       COALESCE(v.name, u.first_name || ' ' || u.last_name) as volunteer_name, u.email as volunteer_email
 		FROM project_team_members ptm
 		JOIN volunteers v ON ptm.volunteer_id = v.id
 		JOIN users u ON v.user_id = u.id
