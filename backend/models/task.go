@@ -11,9 +11,11 @@ import (
 type TaskStatus string
 
 const (
-	TaskStatusTodo       TaskStatus = "todo"
-	TaskStatusInProgress TaskStatus = "in_progress"
-	TaskStatusDone       TaskStatus = "done"
+	TaskStatusTodo             TaskStatus = "todo"
+	TaskStatusInProgress       TaskStatus = "in_progress"
+	TaskStatusDone             TaskStatus = "done"
+	TaskStatusBlocked          TaskStatus = "blocked"
+	TaskStatusTakeoverRequested TaskStatus = "takeover_requested"
 )
 
 // TaskPriority represents the priority level of a task
@@ -327,4 +329,19 @@ func (s *TaskService) GetTaskWithUpdates(taskID uuid.UUID) (*TaskWithUpdates, er
 		ProjectTask: *task,
 		Updates:     updates,
 	}, nil
+}
+
+// MarkAsBlocked marks a task as blocked
+func (s *TaskService) MarkAsBlocked(taskID uuid.UUID) error {
+	return s.UpdateStatus(taskID, TaskStatusBlocked)
+}
+
+// RequestTakeover marks a task as requesting takeover
+func (s *TaskService) RequestTakeover(taskID uuid.UUID) error {
+	return s.UpdateStatus(taskID, TaskStatusTakeoverRequested)
+}
+
+// MarkAsDone marks a task as done
+func (s *TaskService) MarkAsDone(taskID uuid.UUID) error {
+	return s.UpdateStatus(taskID, TaskStatusDone)
 }

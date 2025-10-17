@@ -489,3 +489,395 @@ func (h *TaskHandler) DeleteTask(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Task deleted successfully"})
 }
 
+// AddTaskComment handles POST /api/tasks/:id/comments
+func (h *TaskHandler) AddTaskComment(c *gin.Context) {
+	taskIDStr := c.Param("id")
+	taskID, err := uuid.Parse(taskIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid task ID"})
+		return
+	}
+
+	var req struct {
+		CommentText string `json:"comment_text" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Get user context
+	userCtx, exists := middleware.GetUserFromContext(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found in context"})
+		return
+	}
+
+	// Get task to verify it exists
+	task, err := h.taskService.GetByID(taskID)
+	if err != nil || task == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
+		return
+	}
+
+	// Check if user is team member
+	isTeamMember, err := h.projectService.IsTeamMember(task.ProjectID, userCtx.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check team membership"})
+		return
+	}
+
+	if !isTeamMember {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Only team members can comment on tasks"})
+		return
+	}
+
+	// Create comment
+	comment := &models.TaskComment{
+		TaskID:      taskID,
+		UserID:      userCtx.ID,
+		CommentText: req.CommentText,
+	}
+
+	commentService := models.NewTaskCommentService(h.taskService.(*models.TaskService).db)
+	if err := commentService.Create(comment); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add comment"})
+		return
+	}
+
+	c.JSON(http.StatusCreated, comment)
+}
+
+// GetTaskComments handles GET /api/tasks/:id/comments
+func (h *TaskHandler) GetTaskComments(c *gin.Context) {
+	taskIDStr := c.Param("id")
+	taskID, err := uuid.Parse(taskIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid task ID"})
+		return
+	}
+
+	// Get user context
+	userCtx, exists := middleware.GetUserFromContext(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found in context"})
+		return
+	}
+
+	// Get task to verify it exists and check permissions
+	task, err := h.taskService.GetByID(taskID)
+	if err != nil || task == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
+		return
+	}
+
+	// Check if user is team member
+	isTeamMember, err := h.projectService.IsTeamMember(task.ProjectID, userCtx.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check team membership"})
+		return
+	}
+
+	if !isTeamMember {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Only team members can view task comments"})
+		return
+	}
+
+	// Get comments
+	commentService := models.NewTaskCommentService(h.taskService.(*models.TaskService).db)
+	comments, err := commentService.GetByTask(taskID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get comments"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"comments": comments})
+}
+
+// LogTaskTime handles POST /api/tasks/:id/time-logs
+func (h *TaskHandler) LogTaskTime(c *gin.Context) {
+	taskIDStr := c.Param("id")
+	taskID, err := uuid.Parse(taskIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid task ID"})
+		return
+	}
+
+	var req struct {
+		Hours       float64   `json:"hours" binding:"required,min=0.1"`
+		LogDate     time.Time `json:"log_date" binding:"required"`
+		Description string    `json:"description"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Get user context
+	userCtx, exists := middleware.GetUserFromContext(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found in context"})
+		return
+	}
+
+	// Get task to verify it exists
+	task, err := h.taskService.GetByID(taskID)
+	if err != nil || task == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
+		return
+	}
+
+	// Check if user is team member
+	isTeamMember, err := h.projectService.IsTeamMember(task.ProjectID, userCtx.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check team membership"})
+		return
+	}
+
+	if !isTeamMember {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Only team members can log time"})
+		return
+	}
+
+	// Get volunteer ID for user
+	volunteer, err := h.volunteerService.GetByUserID(userCtx.ID)
+	if err != nil || volunteer == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Volunteer profile not found"})
+		return
+	}
+
+	// Create time log
+	timeLog := &models.TaskTimeLog{
+		TaskID:      taskID,
+		VolunteerID: volunteer.ID,
+		Hours:       req.Hours,
+		LogDate:     req.LogDate,
+		Description: req.Description,
+	}
+
+	timeLogService := models.NewTaskTimeLogService(h.taskService.(*models.TaskService).db)
+	if err := timeLogService.Create(timeLog); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to log time"})
+		return
+	}
+
+	c.JSON(http.StatusCreated, timeLog)
+}
+
+// GetTaskTimeLogs handles GET /api/tasks/:id/time-logs
+func (h *TaskHandler) GetTaskTimeLogs(c *gin.Context) {
+	taskIDStr := c.Param("id")
+	taskID, err := uuid.Parse(taskIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid task ID"})
+		return
+	}
+
+	// Get user context
+	userCtx, exists := middleware.GetUserFromContext(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found in context"})
+		return
+	}
+
+	// Get task to verify it exists and check permissions
+	task, err := h.taskService.GetByID(taskID)
+	if err != nil || task == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
+		return
+	}
+
+	// Check if user is team member
+	isTeamMember, err := h.projectService.IsTeamMember(task.ProjectID, userCtx.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check team membership"})
+		return
+	}
+
+	if !isTeamMember {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Only team members can view time logs"})
+		return
+	}
+
+	// Get time logs
+	timeLogService := models.NewTaskTimeLogService(h.taskService.(*models.TaskService).db)
+	timeLogs, err := timeLogService.GetByTask(taskID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get time logs"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"time_logs": timeLogs})
+}
+
+// MarkTaskBlocked handles POST /api/tasks/:id/mark-blocked
+func (h *TaskHandler) MarkTaskBlocked(c *gin.Context) {
+	taskIDStr := c.Param("id")
+	taskID, err := uuid.Parse(taskIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid task ID"})
+		return
+	}
+
+	var req struct {
+		Reason string `json:"reason"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Get user context
+	userCtx, exists := middleware.GetUserFromContext(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found in context"})
+		return
+	}
+
+	// Get task to verify it exists
+	task, err := h.taskService.GetByID(taskID)
+	if err != nil || task == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
+		return
+	}
+
+	// Check if user is the assignee
+	if task.AssigneeID == nil || *task.AssigneeID != userCtx.ID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Only the task assignee can mark it as blocked"})
+		return
+	}
+
+	// Mark as blocked
+	if err := h.taskService.MarkAsBlocked(taskID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to mark task as blocked"})
+		return
+	}
+
+	// Create notification message
+	messageService := models.NewMessageService(h.taskService.(*models.TaskService).db)
+	messageText := "🚫 Task blocked"
+	if req.Reason != "" {
+		messageText += ": " + req.Reason
+	}
+	if err := messageService.CreateTaskNotification(task.ProjectID, userCtx.ID, taskID, "task_blocked", messageText); err != nil {
+		// Log error but don't fail the request
+		// TODO: Add proper logging
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Task marked as blocked"})
+}
+
+// RequestTaskTakeover handles POST /api/tasks/:id/request-takeover
+func (h *TaskHandler) RequestTaskTakeover(c *gin.Context) {
+	taskIDStr := c.Param("id")
+	taskID, err := uuid.Parse(taskIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid task ID"})
+		return
+	}
+
+	var req struct {
+		Reason string `json:"reason"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Get user context
+	userCtx, exists := middleware.GetUserFromContext(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found in context"})
+		return
+	}
+
+	// Get task to verify it exists
+	task, err := h.taskService.GetByID(taskID)
+	if err != nil || task == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
+		return
+	}
+
+	// Check if user is the assignee
+	if task.AssigneeID == nil || *task.AssigneeID != userCtx.ID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Only the task assignee can request takeover"})
+		return
+	}
+
+	// Request takeover
+	if err := h.taskService.RequestTakeover(taskID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to request task takeover"})
+		return
+	}
+
+	// Create notification message
+	messageService := models.NewMessageService(h.taskService.(*models.TaskService).db)
+	messageText := "🔄 Task takeover requested"
+	if req.Reason != "" {
+		messageText += ": " + req.Reason
+	}
+	if err := messageService.CreateTaskNotification(task.ProjectID, userCtx.ID, taskID, "task_takeover", messageText); err != nil {
+		// Log error but don't fail the request
+		// TODO: Add proper logging
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Task takeover requested"})
+}
+
+// MarkTaskDone handles POST /api/tasks/:id/mark-done
+func (h *TaskHandler) MarkTaskDone(c *gin.Context) {
+	taskIDStr := c.Param("id")
+	taskID, err := uuid.Parse(taskIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid task ID"})
+		return
+	}
+
+	var req struct {
+		CompletionNote string `json:"completion_note"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Get user context
+	userCtx, exists := middleware.GetUserFromContext(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found in context"})
+		return
+	}
+
+	// Get task to verify it exists
+	task, err := h.taskService.GetByID(taskID)
+	if err != nil || task == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
+		return
+	}
+
+	// Check if user is the assignee
+	if task.AssigneeID == nil || *task.AssigneeID != userCtx.ID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Only the task assignee can mark it as done"})
+		return
+	}
+
+	// Mark as done
+	if err := h.taskService.MarkAsDone(taskID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to mark task as done"})
+		return
+	}
+
+	// Create notification message
+	messageService := models.NewMessageService(h.taskService.(*models.TaskService).db)
+	messageText := "✅ Task completed"
+	if req.CompletionNote != "" {
+		messageText += ": " + req.CompletionNote
+	}
+	if err := messageService.CreateTaskNotification(task.ProjectID, userCtx.ID, taskID, "task_done", messageText); err != nil {
+		// Log error but don't fail the request
+		// TODO: Add proper logging
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Task marked as done"})
+}
+
