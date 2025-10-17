@@ -110,9 +110,14 @@ terraform init -reconfigure
 ## Security Considerations
 
 - All secrets are stored in Google Secret Manager
-- Database uses SSL encryption
-- Cloud Run services use service accounts with minimal permissions
-- Public access is granted only to necessary services
+- Database uses SSL encryption and is not publicly accessible
+- **Backend Cloud Run service is private** - only accessible via authenticated service accounts
+- **Frontend Cloud Run service is public** - users need access to the UI
+- Service-to-service authentication between frontend and backend
+- **Dedicated service accounts** for each Cloud Run service with minimal permissions:
+  - Backend service account: `civicweave-backend-sa` (access to secrets, database, Redis)
+  - Frontend service account: `civicweave-frontend-sa` (minimal permissions, no access to sensitive resources)
+- Database has no public IP and uses Cloud SQL Proxy for secure connections
 
 ## Monitoring and Logs
 

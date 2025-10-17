@@ -27,30 +27,27 @@ ENV BUILD_ENV=${BUILD_ENV}
 # Build the application
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main ./cmd/server
 
-FROM alpine:latest
+# Use distroless image for smaller size and better security
+FROM gcr.io/distroless/static-debian12:latest
 
 # Accept build arguments for runtime
 ARG VERSION
 ARG GIT_COMMIT
 ARG BUILD_ENV
 
-RUN apk --no-cache add ca-certificates tzdata
-
-WORKDIR /root/
-
-# Copy the binary from builder stage
-COPY --from=builder /app/main .
-
-# Copy migration files
-COPY --from=builder /app/migrations ./migrations
-
 # Set environment variables for runtime
 ENV VERSION=${VERSION}
 ENV GIT_COMMIT=${GIT_COMMIT}
 ENV BUILD_ENV=${BUILD_ENV}
 
+# Copy the binary from builder stage
+COPY --from=builder /app/main /main
+
+# Copy migration files
+COPY --from=builder /app/migrations /migrations
+
 # Expose port
 EXPOSE 8080
 
 # Run the binary
-CMD ["./main"]
+ENTRYPOINT ["/main"]
