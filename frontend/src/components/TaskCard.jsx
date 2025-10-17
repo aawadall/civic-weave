@@ -1,7 +1,7 @@
 import TaskStatusBadge from './TaskStatusBadge'
 import PriorityBadge from './PriorityBadge'
 
-export default function TaskCard({ task, onClick, onStatusChange, canEdit = false }) {
+export default function TaskCard({ task, onClick, onStatusChange, canEdit = false, totalHours = 0 }) {
   const formatDate = (dateString) => {
     if (!dateString) return null
     return new Date(dateString).toLocaleDateString()
@@ -51,6 +51,12 @@ export default function TaskCard({ task, onClick, onStatusChange, canEdit = fals
         <div className="flex items-center gap-3">
           <TaskStatusBadge status={task.status} />
           
+          {totalHours > 0 && (
+            <span className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded">
+              ⏱️ {totalHours.toFixed(1)}h
+            </span>
+          )}
+          
           {task.due_date && (
             <span className={`text-xs ${
               new Date(task.due_date) < new Date() && task.status !== 'done'
@@ -63,7 +69,7 @@ export default function TaskCard({ task, onClick, onStatusChange, canEdit = fals
         </div>
 
         {/* Quick status change for assignee */}
-        {canEdit && task.status !== 'done' && (
+        {canEdit && task.status !== 'done' && task.status !== 'blocked' && task.status !== 'takeover_requested' && (
           <div className="flex gap-1">
             {task.status === 'todo' && (
               <button
@@ -88,7 +94,9 @@ export default function TaskCard({ task, onClick, onStatusChange, canEdit = fals
       {/* Assignee info */}
       {task.assignee_id && (
         <div className="mt-2 pt-2 border-t border-secondary-100">
-          <span className="text-xs text-secondary-500">Assigned</span>
+          <span className="text-xs text-secondary-500">
+            Assigned to: {task.assignee_name || 'Unknown'}
+          </span>
         </div>
       )}
     </div>

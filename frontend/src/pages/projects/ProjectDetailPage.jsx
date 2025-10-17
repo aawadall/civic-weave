@@ -147,7 +147,25 @@ export default function ProjectDetailPage() {
   }
 
   const canApply = () => {
-    return hasRole('volunteer') && project?.project_status === 'recruiting'
+    // Check if user is a volunteer, project is recruiting, and user hasn't already applied
+    if (!hasRole('volunteer') || project?.project_status !== 'recruiting') {
+      return false
+    }
+    
+    // Check if user has already applied (look in signups array)
+    if (signups && signups.length > 0) {
+      const hasApplied = signups.some(signup => signup.volunteer_id === user?.id)
+      if (hasApplied) {
+        return false
+      }
+    }
+    
+    // Check if user is already a team member
+    if (isTeamMember) {
+      return false
+    }
+    
+    return true
   }
 
   const handleStatusChange = (updatedProject) => {
@@ -329,10 +347,22 @@ export default function ProjectDetailPage() {
                   {applying ? 'Applying...' : 'Apply to Project'}
                 </button>
               )}
-              {project.status === 'recruiting' && hasRole('volunteer') && (
-                <p className="text-sm text-secondary-600 self-center">
-                  This project is currently recruiting volunteers
-                </p>
+              {hasRole('volunteer') && project?.project_status === 'recruiting' && !canApply() && (
+                <div className="flex items-center gap-2">
+                  {isTeamMember ? (
+                    <span className="text-sm text-green-600 font-medium">
+                      ✅ You are already a team member
+                    </span>
+                  ) : signups && signups.some(signup => signup.volunteer_id === user?.id) ? (
+                    <span className="text-sm text-blue-600 font-medium">
+                      📝 You have already applied to this project
+                    </span>
+                  ) : (
+                    <p className="text-sm text-secondary-600 self-center">
+                      This project is currently recruiting volunteers
+                    </p>
+                  )}
+                </div>
               )}
             </div>
           </div>
@@ -364,7 +394,7 @@ export default function ProjectDetailPage() {
                   Required Skills
                 </button>
               )}
-              {isTeamMember && (
+              {(isTeamMember || canManageProject()) && (
                 <>
                   <button
                     onClick={() => setActiveTab('tasks')}
@@ -452,7 +482,7 @@ export default function ProjectDetailPage() {
               </div>
             )}
 
-            {activeTab === 'tasks' && isTeamMember && (
+            {activeTab === 'tasks' && (isTeamMember || canManageProject()) && (
               <ProjectTasksTab projectId={id} isProjectOwner={canManageProject()} />
             )}
 

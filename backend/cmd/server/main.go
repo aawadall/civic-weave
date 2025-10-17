@@ -215,9 +215,9 @@ func main() {
 	// Initialize task and message handlers
 	if db != nil && projectService != nil && volunteerService != nil {
 		taskService := models.NewTaskService(db)
-		taskHandler = handlers.NewTaskHandler(taskService, projectService, volunteerService)
-
 		messageService := models.NewMessageService(db)
+		taskHandler = handlers.NewTaskHandler(taskService, projectService, volunteerService, messageService)
+
 		messageHandler = handlers.NewMessageHandler(messageService, projectService)
 	}
 
@@ -292,6 +292,7 @@ func main() {
 			// Project team management routes
 			protected.GET("/projects/:id/signups", projectHandler.GetProjectSignups)
 			protected.GET("/projects/:id/team-members", projectHandler.GetProjectTeamMembers)
+			protected.GET("/projects/:id/team-members-with-details", projectHandler.GetProjectTeamMembersWithDetails)
 			protected.POST("/projects/:id/team-members", projectHandler.AddTeamMember)
 			protected.PUT("/projects/:id/team-members/:volunteerId", projectHandler.UpdateTeamMemberStatus)
 			protected.PUT("/projects/:id/team-lead", middleware.RequireRole("admin"), projectHandler.AssignTeamLead)
@@ -313,7 +314,21 @@ func main() {
 				protected.PUT("/tasks/:id", taskHandler.UpdateTask)
 				protected.DELETE("/tasks/:id", taskHandler.DeleteTask)
 				protected.POST("/tasks/:id/assign", taskHandler.SelfAssignTask)
+				protected.PUT("/tasks/:id/assign", taskHandler.AssignTask)
 				protected.POST("/tasks/:id/updates", taskHandler.AddTaskUpdate)
+				
+				// Task comments
+				protected.POST("/tasks/:id/comments", taskHandler.AddTaskComment)
+				protected.GET("/tasks/:id/comments", taskHandler.GetTaskComments)
+				
+				// Task time logging
+				protected.POST("/tasks/:id/time-logs", taskHandler.LogTaskTime)
+				protected.GET("/tasks/:id/time-logs", taskHandler.GetTaskTimeLogs)
+				
+				// Task status transitions
+				protected.POST("/tasks/:id/mark-blocked", taskHandler.MarkTaskBlocked)
+				protected.POST("/tasks/:id/request-takeover", taskHandler.RequestTaskTakeover)
+				protected.POST("/tasks/:id/mark-done", taskHandler.MarkTaskDone)
 			}
 
 			// Project message routes

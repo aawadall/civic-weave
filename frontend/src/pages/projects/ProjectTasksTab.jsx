@@ -4,24 +4,31 @@ import api from '../../services/api'
 import TaskCard from '../../components/TaskCard'
 import TaskStatusBadge from '../../components/TaskStatusBadge'
 import PriorityBadge from '../../components/PriorityBadge'
+import TaskDetailModal from '../../components/TaskDetailModal'
 
 export default function ProjectTasksTab({ projectId, isProjectOwner }) {
   const { user } = useAuth()
   const [tasks, setTasks] = useState([])
   const [unassignedTasks, setUnassignedTasks] = useState([])
+  const [teamMembers, setTeamMembers] = useState([])
   const [loading, setLoading] = useState(true)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [selectedTask, setSelectedTask] = useState(null)
+  const [showTaskDetailModal, setShowTaskDetailModal] = useState(false)
   const [newTask, setNewTask] = useState({
     title: '',
     description: '',
     priority: 'medium',
     due_date: '',
-    labels: []
+    labels: [],
+    assignee_id: null
   })
 
   useEffect(() => {
     fetchTasks()
+    if (isProjectOwner) {
+      fetchTeamMembers()
+    }
     if (!isProjectOwner) {
       fetchUnassignedTasks()
     }
@@ -48,12 +55,42 @@ export default function ProjectTasksTab({ projectId, isProjectOwner }) {
     }
   }
 
+  const fetchTeamMembers = async () => {
+    try {
+      const response = await api.get(`/projects/${projectId}/team-members-with-details`)
+      setTeamMembers(response.data.team_members || [])
+    } catch (error) {
+      console.error('Error fetching team members:', error)
+    }
+  }
+
   const handleCreateTask = async (e) => {
     e.preventDefault()
     try {
-      await api.post(`/projects/${projectId}/tasks`, newTask)
+      // Transform the data to match backend expectations
+      const taskData = {
+        title: newTask.title,
+        description: newTask.description,
+        priority: newTask.priority,
+        labels: newTask.labels || []
+      }
+      
+      // Only include assignee_id if it's provided
+      if (newTask.assignee_id) {
+        taskData.assignee_id = newTask.assignee_id
+      }
+      
+      // Only include due_date if it's provided and not empty
+      // Convert date string to ISO format for Go time.Time parsing
+      if (newTask.due_date && newTask.due_date.trim() !== '') {
+        // Convert "YYYY-MM-DD" to "YYYY-MM-DDTHH:MM:SSZ" format
+        const date = new Date(newTask.due_date + 'T00:00:00Z')
+        taskData.due_date = date.toISOString()
+      }
+      
+      await api.post(`/projects/${projectId}/tasks`, taskData)
       setShowCreateModal(false)
-      setNewTask({ title: '', description: '', priority: 'medium', due_date: '', labels: [] })
+      setNewTask({ title: '', description: '', priority: 'medium', due_date: '', labels: [], assignee_id: null })
       fetchTasks()
     } catch (error) {
       console.error('Error creating task:', error)
@@ -79,6 +116,18 @@ export default function ProjectTasksTab({ projectId, isProjectOwner }) {
     } catch (error) {
       console.error('Error self-assigning task:', error)
       alert('Failed to assign task')
+    }
+  }
+
+  const handleTaskClick = (task) => {
+    setSelectedTask(task)
+    setShowTaskDetailModal(true)
+  }
+
+  const handleTaskUpdated = () => {
+    fetchTasks()
+    if (!isProjectOwner) {
+      fetchUnassignedTasks()
     }
   }
 
@@ -124,7 +173,7 @@ export default function ProjectTasksTab({ projectId, isProjectOwner }) {
                 <TaskCard
                   key={task.id}
                   task={task}
-                  onClick={() => setSelectedTask(task)}
+                  onClick={() => handleTaskClick(task)}
                   onStatusChange={handleStatusChange}
                   canEdit={false}
                 />
@@ -148,7 +197,7 @@ export default function ProjectTasksTab({ projectId, isProjectOwner }) {
                 <TaskCard
                   key={task.id}
                   task={task}
-                  onClick={() => setSelectedTask(task)}
+                  onClick={() => handleTaskClick(task)}
                   onStatusChange={handleStatusChange}
                   canEdit={false}
                 />
@@ -172,7 +221,7 @@ export default function ProjectTasksTab({ projectId, isProjectOwner }) {
                 <TaskCard
                   key={task.id}
                   task={task}
-                  onClick={() => setSelectedTask(task)}
+                  onClick={() => handleTaskClick(task)}
                   canEdit={false}
                 />
               ))}
@@ -232,16 +281,38 @@ export default function ProjectTasksTab({ projectId, isProjectOwner }) {
 
                   <div>
                     <label className="block text-sm font-medium text-secondary-900 mb-2">
-                      Due Date
+                      Due Date <span className="text-secondary-500 text-sm">(optional)</span>
                     </label>
                     <input
                       type="date"
                       value={newTask.due_date}
                       onChange={(e) => setNewTask({ ...newTask, due_date: e.target.value })}
+                      placeholder="Select due date"
                       className="w-full px-4 py-2 border border-secondary-300 rounded-lg focus:ring-2 focus:ring-primary-500"
                     />
                   </div>
                 </div>
+
+                {/* Assignee Selection - Only for TLs */}
+                {isProjectOwner && teamMembers.length > 0 && (
+                  <div>
+                    <label className="block text-sm font-medium text-secondary-900 mb-2">
+                      Assign to <span className="text-secondary-500 text-sm">(optional)</span>
+                    </label>
+                    <select
+                      value={newTask.assignee_id || ''}
+                      onChange={(e) => setNewTask({ ...newTask, assignee_id: e.target.value || null })}
+                      className="w-full px-4 py-2 border border-secondary-300 rounded-lg focus:ring-2 focus:ring-primary-500"
+                    >
+                      <option value="">Unassigned</option>
+                      {teamMembers.map(member => (
+                        <option key={member.volunteer_id} value={member.volunteer_id}>
+                          {member.volunteer_name || member.volunteer_email}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
                 <div className="flex justify-end gap-4">
                   <button
@@ -277,7 +348,7 @@ export default function ProjectTasksTab({ projectId, isProjectOwner }) {
               <TaskCard
                 key={task.id}
                 task={task}
-                onClick={() => setSelectedTask(task)}
+                onClick={() => handleTaskClick(task)}
                 onStatusChange={handleStatusChange}
                 canEdit={true}
               />
@@ -300,7 +371,7 @@ export default function ProjectTasksTab({ projectId, isProjectOwner }) {
               <div key={task.id} className="relative">
                 <TaskCard
                   task={task}
-                  onClick={() => setSelectedTask(task)}
+                  onClick={() => handleTaskClick(task)}
                 />
                 <button
                   onClick={() => handleSelfAssign(task.id)}
@@ -313,6 +384,17 @@ export default function ProjectTasksTab({ projectId, isProjectOwner }) {
           </div>
         </div>
       )}
+
+      {/* Task Detail Modal */}
+      <TaskDetailModal
+        task={selectedTask}
+        isOpen={showTaskDetailModal}
+        onClose={() => {
+          setShowTaskDetailModal(false)
+          setSelectedTask(null)
+        }}
+        onTaskUpdated={handleTaskUpdated}
+      />
     </div>
   )
 }

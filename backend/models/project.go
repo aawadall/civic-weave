@@ -355,6 +355,51 @@ func (s *ProjectService) GetProjectTeamMembers(projectID uuid.UUID) ([]ProjectTe
 	return members, nil
 }
 
+// TeamMemberWithDetails represents a team member with volunteer details
+type TeamMemberWithDetails struct {
+	ProjectTeamMember
+	VolunteerName  string `json:"volunteer_name"`
+	VolunteerEmail string `json:"volunteer_email"`
+}
+
+// GetProjectTeamMembersWithDetails retrieves team members with volunteer details
+func (s *ProjectService) GetProjectTeamMembersWithDetails(projectID uuid.UUID) ([]TeamMemberWithDetails, error) {
+	// First get the basic team members
+	basicMembers, err := s.GetProjectTeamMembers(projectID)
+	if err != nil {
+		return nil, err
+	}
+
+	var members []TeamMemberWithDetails
+	for _, basicMember := range basicMembers {
+		// Get volunteer details
+		volunteerService := NewVolunteerService(s.db)
+		volunteer, err := volunteerService.GetByID(basicMember.VolunteerID)
+		if err != nil {
+			// If volunteer not found, skip this member
+			continue
+		}
+
+		// Get user details for email
+		userService := NewUserService(s.db)
+		user, err := userService.GetByID(volunteer.UserID)
+		if err != nil {
+			// If user not found, skip this member
+			continue
+		}
+
+		// Create enriched member
+		member := TeamMemberWithDetails{
+			ProjectTeamMember: basicMember,
+			VolunteerName:     volunteer.Name,
+			VolunteerEmail:    user.Email,
+		}
+		members = append(members, member)
+	}
+
+	return members, nil
+}
+
 // AddTeamMember adds a volunteer to a project team
 func (s *ProjectService) AddTeamMember(projectID, volunteerID uuid.UUID, status TeamMemberStatus) error {
 	_, err := s.db.Exec(projectAddTeamMemberQuery, uuid.New(), projectID, volunteerID, status)

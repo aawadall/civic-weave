@@ -3,12 +3,12 @@ package models
 // Query constants for MessageService
 const (
 	messageCreateQuery = `
-		INSERT INTO project_messages (id, project_id, sender_id, message_text)
-		VALUES ($1, $2, $3, $4)
+		INSERT INTO project_messages (id, project_id, sender_id, message_text, task_id, message_type)
+		VALUES ($1, $2, $3, $4, $5, $6)
 		RETURNING created_at`
 
 	messageGetByIDQuery = `
-		SELECT id, project_id, sender_id, message_text, created_at, edited_at, deleted_at
+		SELECT id, project_id, sender_id, message_text, task_id, message_type, created_at, edited_at, deleted_at
 		FROM project_messages WHERE id = $1`
 
 	messageListByProjectQuery = `

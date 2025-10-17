@@ -13,6 +13,8 @@ type ProjectMessage struct {
 	ProjectID   uuid.UUID  `json:"project_id" db:"project_id"`
 	SenderID    uuid.UUID  `json:"sender_id" db:"sender_id"`
 	MessageText string     `json:"message_text" db:"message_text"`
+	TaskID      *uuid.UUID `json:"task_id,omitempty" db:"task_id"`
+	MessageType string     `json:"message_type" db:"message_type"`
 	CreatedAt   time.Time  `json:"created_at" db:"created_at"`
 	EditedAt    *time.Time `json:"edited_at,omitempty" db:"edited_at"`
 	DeletedAt   *time.Time `json:"deleted_at,omitempty" db:"deleted_at"`
@@ -52,7 +54,11 @@ func NewMessageService(db *sql.DB) *MessageService {
 // Create creates a new message
 func (s *MessageService) Create(message *ProjectMessage) error {
 	message.ID = uuid.New()
-	return s.db.QueryRow(messageCreateQuery, message.ID, message.ProjectID, message.SenderID, message.MessageText).
+	// Set default message type if not specified
+	if message.MessageType == "" {
+		message.MessageType = "general"
+	}
+	return s.db.QueryRow(messageCreateQuery, message.ID, message.ProjectID, message.SenderID, message.MessageText, message.TaskID, message.MessageType).
 		Scan(&message.CreatedAt)
 }
 
@@ -236,4 +242,16 @@ func (s *MessageService) CanUserEdit(messageID, userID uuid.UUID) (bool, error) 
 	}
 
 	return canEdit, nil
+}
+
+// CreateTaskNotification creates a task-related notification message
+func (s *MessageService) CreateTaskNotification(projectID, senderID, taskID uuid.UUID, messageType, messageText string) error {
+	message := &ProjectMessage{
+		ProjectID:   projectID,
+		SenderID:    senderID,
+		MessageText: messageText,
+		TaskID:      &taskID,
+		MessageType: messageType,
+	}
+	return s.Create(message)
 }

@@ -470,6 +470,50 @@ func (h *ProjectHandler) GetProjectTeamMembers(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"team_members": teamMembers})
 }
 
+// GetProjectTeamMembersWithDetails handles GET /api/projects/:id/team-members-with-details
+func (h *ProjectHandler) GetProjectTeamMembersWithDetails(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid project ID"})
+		return
+	}
+
+	// Get user context
+	userCtx, exists := middleware.GetUserFromContext(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found in context"})
+		return
+	}
+
+	// Check if user has permission to view team members (team_lead, admin, or team member)
+	isTeamLead, err := h.service.IsTeamLead(id, userCtx.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check team lead status"})
+		return
+	}
+
+	isTeamMember, err := h.service.IsTeamMember(id, userCtx.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check team membership"})
+		return
+	}
+
+	if !userCtx.HasRole("admin") && !isTeamLead && !isTeamMember {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Insufficient permissions to view team members"})
+		return
+	}
+
+	// Get team members with volunteer details
+	teamMembers, err := h.service.GetProjectTeamMembersWithDetails(id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get team members"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"team_members": teamMembers})
+}
+
 // AddTeamMember handles POST /api/projects/:id/team-members
 func (h *ProjectHandler) AddTeamMember(c *gin.Context) {
 	projectIDStr := c.Param("id")

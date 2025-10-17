@@ -29,6 +29,24 @@ db-seed:
 db-backfill-skills:
 	cd backend && go run scripts/backfill_skill_vectors.go
 
+# Remote database deployment
+db-deploy-status:
+	./scripts/deploy-db.sh --status
+
+db-deploy-dry:
+	./scripts/deploy-db.sh --dry-run
+
+db-deploy:
+	./scripts/deploy-db.sh
+
+db-deploy-version:
+	@read -p "Enter target version (e.g., 011): " version; \
+	./scripts/deploy-db.sh --version $$version
+
+db-rollback:
+	@read -p "Enter rollback version (e.g., 010): " version; \
+	./scripts/deploy-db.sh --rollback $$version
+
 # Batch jobs
 job-calculate-matches:
 	cd backend && venv/bin/python jobs/calculate_matches.py
