@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import api from '../../services/api'
 
 export default function ProjectsListPage() {
   const { user, hasAnyRole } = useAuth()
+  const location = useLocation()
   const [projects, setProjects] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -14,6 +15,15 @@ export default function ProjectsListPage() {
   useEffect(() => {
     fetchProjects()
   }, [])
+
+  // Refresh projects when returning from detail page (detected by state change)
+  useEffect(() => {
+    if (location.state?.refreshProjects) {
+      fetchProjects()
+      // Clear the refresh flag to prevent unnecessary re-fetches
+      window.history.replaceState({}, document.title, location.pathname)
+    }
+  }, [location])
 
   const fetchProjects = async () => {
     try {

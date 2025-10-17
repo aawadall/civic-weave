@@ -9,6 +9,7 @@ import {
   isFieldEditable 
 } from '../../utils/projectLifecycle'
 import DebugInfo from '../../components/DebugInfo'
+import SkillChipInput from '../../components/SkillChipInput'
 
 export default function EditProjectPage() {
   const { id } = useParams()
@@ -21,7 +22,6 @@ export default function EditProjectPage() {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    required_skills: [],
     location_address: '',
     start_date: '',
     end_date: '',
@@ -29,10 +29,13 @@ export default function EditProjectPage() {
     budget_total: '',
     budget_spent: ''
   })
+  const [projectSkills, setProjectSkills] = useState([])
+  const [skillsLoading, setSkillsLoading] = useState(false)
 
   useEffect(() => {
     if (id) {
       fetchProject()
+      fetchProjectSkills()
     }
   }, [id])
 
@@ -48,7 +51,6 @@ export default function EditProjectPage() {
       setFormData({
         title: projectData.title || '',
         description: projectData.description || '',
-        required_skills: projectData.required_skills || [],
         location_address: projectData.location_address || '',
         start_date: projectData.start_date ? new Date(projectData.start_date).toISOString().split('T')[0] : '',
         end_date: projectData.end_date ? new Date(projectData.end_date).toISOString().split('T')[0] : '',
@@ -64,6 +66,23 @@ export default function EditProjectPage() {
     }
   }
 
+  const fetchProjectSkills = async () => {
+    try {
+      setSkillsLoading(true)
+      const response = await api.get(`/projects/${id}/skills`)
+      const skills = response.data.skills || []
+      setProjectSkills(skills.map(skill => skill.skill_name))
+    } catch (err) {
+      console.error('Error fetching project skills:', err)
+      // If the endpoint doesn't exist yet or returns error, fall back to legacy field
+      if (project?.required_skills) {
+        setProjectSkills(project.required_skills)
+      }
+    } finally {
+      setSkillsLoading(false)
+    }
+  }
+
   const handleInputChange = (e) => {
     const { name, value } = e.target
     setFormData(prev => ({
@@ -72,12 +91,8 @@ export default function EditProjectPage() {
     }))
   }
 
-  const handleSkillsChange = (e) => {
-    const skills = e.target.value.split(',').map(skill => skill.trim()).filter(skill => skill)
-    setFormData(prev => ({
-      ...prev,
-      required_skills: skills
-    }))
+  const handleSkillsChange = (newSkills) => {
+    setProjectSkills(newSkills)
   }
 
   const handleSubmit = async (e) => {
@@ -96,7 +111,21 @@ export default function EditProjectPage() {
         team_lead_id: formData.team_lead_id || null
       }
 
+      // Update project basic info
       await api.put(`/projects/${id}`, updateData)
+
+      // Update project skills separately if they can be edited
+      if (isFieldEditable('required_skills', currentStatus) || isAdmin) {
+        try {
+          await api.put(`/projects/${id}/skills`, {
+            skill_names: projectSkills
+          })
+        } catch (skillsErr) {
+          console.error('Error updating project skills:', skillsErr)
+          // Don't fail the entire form submission for skills error
+        }
+      }
+
       navigate(`/projects/${id}`)
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to update project')
@@ -279,21 +308,24 @@ export default function EditProjectPage() {
                     <span className="text-xs text-gray-500 ml-2">(Locked in {getStatusLabel(currentStatus)} stage)</span>
                   )}
                 </label>
-                <input
-                  type="text"
-                  value={formData.required_skills.join(', ')}
-                  onChange={handleSkillsChange}
-                  disabled={!isFieldEditable('required_skills', currentStatus) && !isAdmin}
-                  className={`w-full px-3 py-2 border rounded-md ${
-                    (!isFieldEditable('required_skills', currentStatus) && !isAdmin) 
-                      ? 'bg-gray-100 border-gray-300 text-gray-500' 
-                      : 'border-gray-300 focus:ring-primary-500 focus:border-primary-500'
-                  }`}
-                  placeholder="Enter skills separated by commas"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Separate multiple skills with commas
-                </p>
+                {skillsLoading ? (
+                  <div className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100">
+                    <span className="text-gray-500">Loading skills...</span>
+                  </div>
+                ) : (
+                  <SkillChipInput
+                    selectedSkills={projectSkills}
+                    onChange={handleSkillsChange}
+                    disabled={!isFieldEditable('required_skills', currentStatus) && !isAdmin}
+                    maxSkills={50}
+                    placeholder="Add required skills..."
+                  />
+                )}
+                {!isFieldEditable('required_skills', currentStatus) && !isAdmin && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    Skills cannot be changed once project moves beyond draft stage
+                  </p>
+                )}
               </div>
 
               {/* Location */}

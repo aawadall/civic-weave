@@ -40,6 +40,15 @@ type InitiativeRequiredSkill struct {
 	SkillName string `json:"skill_name" db:"skill_name"`
 }
 
+// ProjectRequiredSkill represents a required skill for a project
+type ProjectRequiredSkill struct {
+	ProjectID uuid.UUID `json:"project_id" db:"project_id"`
+	SkillID   int       `json:"skill_id" db:"skill_id"`
+	AddedAt   time.Time `json:"added_at" db:"added_at"`
+	// Joined fields
+	SkillName string `json:"skill_name" db:"skill_name"`
+}
+
 // VolunteerInitiativeMatch represents pre-calculated match scores
 type VolunteerInitiativeMatch struct {
 	VolunteerID       uuid.UUID `json:"volunteer_id" db:"volunteer_id"`
@@ -278,6 +287,66 @@ func (s *SkillTaxonomyService) UpdateInitiativeSkills(initiativeID uuid.UUID, sk
 		`, initiativeID, skillID)
 		if err != nil {
 			return fmt.Errorf("failed to insert initiative skill %d: %w", skillID, err)
+		}
+	}
+
+	return tx.Commit()
+}
+
+// GetProjectSkills retrieves all required skills for a project
+func (s *SkillTaxonomyService) GetProjectSkills(projectID uuid.UUID) ([]ProjectRequiredSkill, error) {
+	query := `
+		SELECT prs.project_id, prs.skill_id, prs.added_at, st.skill_name
+		FROM project_required_skills prs
+		JOIN skill_taxonomy st ON prs.skill_id = st.id
+		WHERE prs.project_id = $1
+		ORDER BY st.skill_name
+	`
+
+	rows, err := s.db.Query(query, projectID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query project skills: %w", err)
+	}
+	defer rows.Close()
+
+	var skills []ProjectRequiredSkill
+	for rows.Next() {
+		var skill ProjectRequiredSkill
+		err := rows.Scan(&skill.ProjectID, &skill.SkillID, &skill.AddedAt, &skill.SkillName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan project skill: %w", err)
+		}
+		skills = append(skills, skill)
+	}
+
+	return skills, rows.Err()
+}
+
+// UpdateProjectSkills replaces all required skills for a project
+func (s *SkillTaxonomyService) UpdateProjectSkills(projectID uuid.UUID, skillIDs []int) error {
+	// Start transaction
+	tx, err := s.db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	// Delete existing required skills
+	_, err = tx.Exec(`
+		DELETE FROM project_required_skills WHERE project_id = $1
+	`, projectID)
+	if err != nil {
+		return fmt.Errorf("failed to delete existing project skills: %w", err)
+	}
+
+	// Insert new required skills
+	for _, skillID := range skillIDs {
+		_, err = tx.Exec(`
+			INSERT INTO project_required_skills (project_id, skill_id)
+			VALUES ($1, $2)
+		`, projectID, skillID)
+		if err != nil {
+			return fmt.Errorf("failed to insert project skill %d: %w", skillID, err)
 		}
 	}
 

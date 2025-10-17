@@ -190,3 +190,8 @@ func (s *UserService) ListAllUsersWithNames() ([]UserWithName, error) {
 
 	return users, nil
 }
+
+// GetDB returns the database connection (needed for creating other services)
+func (s *UserService) GetDB() *sql.DB {
+	return s.db
+}

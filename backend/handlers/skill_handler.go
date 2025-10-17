@@ -335,3 +335,76 @@ func (h *SkillHandler) UpdateInitiativeSkills(c *gin.Context) {
 		"skills_added": len(skillIDs),
 	})
 }
+
+// GetProjectSkills handles GET /api/projects/:id/skills
+func (h *SkillHandler) GetProjectSkills(c *gin.Context) {
+	projectIDStr := c.Param("id")
+	projectID, err := uuid.Parse(projectIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid project ID"})
+		return
+	}
+
+	skills, err := h.taxonomyService.GetProjectSkills(projectID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve project skills"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"skills": skills,
+		"count":  len(skills),
+	})
+}
+
+// UpdateProjectSkills handles PUT /api/projects/:id/skills
+func (h *SkillHandler) UpdateProjectSkills(c *gin.Context) {
+	projectIDStr := c.Param("id")
+	projectID, err := uuid.Parse(projectIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid project ID"})
+		return
+	}
+
+	type Request struct {
+		SkillNames []string `json:"skill_names" binding:"required"`
+	}
+
+	var req Request
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if len(req.SkillNames) > 50 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Maximum 50 skills allowed"})
+		return
+	}
+
+	// Validate skill names
+	for _, name := range req.SkillNames {
+		if len(name) < 2 || len(name) > 100 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Each skill name must be between 2 and 100 characters"})
+			return
+		}
+	}
+
+	// Resolve skill names to IDs
+	skillIDs, err := h.taxonomyService.ResolveSkillNames(req.SkillNames)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to resolve skill names"})
+		return
+	}
+
+	// Update project skills
+	err = h.taxonomyService.UpdateProjectSkills(projectID, skillIDs)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update project skills"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":      "Project skills updated successfully",
+		"skills_added": len(skillIDs),
+	})
+}

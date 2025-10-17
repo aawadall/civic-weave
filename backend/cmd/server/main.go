@@ -369,6 +369,10 @@ func main() {
 				// Initiative skill management
 				protected.GET("/initiatives/:id/skills", skillHandler.GetInitiativeSkills)
 				protected.PUT("/initiatives/:id/skills", skillHandler.UpdateInitiativeSkills)
+
+				// Project skill management
+				protected.GET("/projects/:id/skills", skillHandler.GetProjectSkills)
+				protected.PUT("/projects/:id/skills", skillHandler.UpdateProjectSkills)
 			}
 
 			// Skill claim routes (legacy - keeping for backward compatibility)
