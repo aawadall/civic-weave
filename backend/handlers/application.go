@@ -87,10 +87,24 @@ func (h *ApplicationHandler) CreateApplication(c *gin.Context) {
 		return
 	}
 
-	// Get volunteer ID from JWT context
+	// Get user ID from JWT context
 	userCtx, exists := middleware.GetUserFromContext(c)
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found in context"})
+		return
+	}
+
+	// Check if user is a volunteer
+	if !userCtx.HasRole("volunteer") {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Only volunteers can apply to projects"})
+		return
+	}
+
+	// Get volunteer ID from user ID
+	volunteerService := models.NewVolunteerService(h.service.GetDB())
+	volunteer, err := volunteerService.GetByUserID(userCtx.ID)
+	if err != nil || volunteer == nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Volunteer profile not found"})
 		return
 	}
 
@@ -102,7 +116,7 @@ func (h *ApplicationHandler) CreateApplication(c *gin.Context) {
 	}
 
 	// Check if application already exists
-	existing, err := h.service.GetByProjectAndVolunteer(projectID, userCtx.ID)
+	existing, err := h.service.GetByProjectAndVolunteer(projectID, volunteer.ID)
 	if err == nil && existing != nil {
 		c.JSON(http.StatusConflict, gin.H{"error": "Application already exists"})
 		return
@@ -110,7 +124,7 @@ func (h *ApplicationHandler) CreateApplication(c *gin.Context) {
 
 	application := &models.Application{
 		ProjectID:   projectID,
-		VolunteerID: userCtx.ID,
+		VolunteerID: volunteer.ID,
 		Status:      "pending",
 		AdminNotes:  req.Message, // Store volunteer message in admin_notes for now
 	}

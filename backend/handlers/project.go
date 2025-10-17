@@ -142,16 +142,13 @@ func (h *ProjectHandler) CreateProject(c *gin.Context) {
 		}
 	}
 
-	// Set default status
-	status := req.Status
-	if status == "" {
-		status = "draft"
-	}
-
 	// Set default project status
 	projectStatus := models.ProjectStatusDraft
 	if req.ProjectStatus != "" {
 		projectStatus = models.ProjectStatus(req.ProjectStatus)
+	} else if req.Status != "" {
+		// Handle legacy status field if provided
+		projectStatus = models.ProjectStatus(req.Status)
 	}
 
 	// Parse team lead ID if provided
@@ -171,7 +168,6 @@ func (h *ProjectHandler) CreateProject(c *gin.Context) {
 		LocationAddress:  req.LocationAddress,
 		StartDate:        startDate,
 		EndDate:          endDate,
-		Status:           status,
 		ProjectStatus:    projectStatus,
 		CreatedByAdminID: userCtx.ID,
 		TeamLeadID:       teamLeadID,

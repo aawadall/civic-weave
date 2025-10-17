@@ -168,11 +168,15 @@ export default function ProjectsListPage() {
                 <div className="mb-4">
                   <h4 className="text-sm font-medium text-secondary-900 mb-2">Required Skills:</h4>
                   <div className="flex flex-wrap gap-1">
-                    {project.required_skills.slice(0, 3).map((skill, index) => (
-                      <span key={index} className="px-2 py-1 bg-primary-100 text-primary-800 text-xs rounded">
-                        {skill}
-                      </span>
-                    ))}
+                    {project.required_skills.slice(0, 3).map((skill, index) => {
+                      const skillName = typeof skill === 'string' ? skill : skill.name
+                      const skillKey = typeof skill === 'string' ? skill : skill.id || index
+                      return (
+                        <span key={skillKey} className="px-2 py-1 bg-primary-100 text-primary-800 text-xs rounded">
+                          {skillName}
+                        </span>
+                      )
+                    })}
                     {project.required_skills.length > 3 && (
                       <span className="px-2 py-1 bg-secondary-100 text-secondary-600 text-xs rounded">
                         +{project.required_skills.length - 3} more

@@ -231,14 +231,18 @@ export default function VolunteerPortal() {
                 {initiative.required_skills && initiative.required_skills.length > 0 && (
                   <div className="mb-4">
                     <div className="flex flex-wrap gap-1">
-                      {initiative.required_skills.slice(0, 3).map(skill => (
-                        <span 
-                          key={skill}
-                          className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-primary-100 text-primary-800"
-                        >
-                          {skill}
-                        </span>
-                      ))}
+                      {initiative.required_skills.slice(0, 3).map((skill, index) => {
+                        const skillName = typeof skill === 'string' ? skill : skill.name
+                        const skillKey = typeof skill === 'string' ? skill : skill.id || index
+                        return (
+                          <span 
+                            key={skillKey}
+                            className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-primary-100 text-primary-800"
+                          >
+                            {skillName}
+                          </span>
+                        )
+                      })}
                       {initiative.required_skills.length > 3 && (
                         <span className="text-xs text-secondary-500">
                           +{initiative.required_skills.length - 3} more

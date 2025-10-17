@@ -95,12 +95,19 @@ export default function ProjectDetailPage() {
   const handleApply = async () => {
     try {
       setApplying(true)
-      await api.post(`/projects/${id}/apply`)
+      await api.post('/applications', {
+        project_id: id,
+        message: 'I would like to volunteer for this project.'
+      })
       // Refresh project data to show updated application status
       fetchProjectDetails()
     } catch (err) {
       console.error('Error applying to project:', err)
-      alert('Failed to apply to project. Please try again.')
+      if (err.response?.status === 409) {
+        alert('You have already applied to this project.')
+      } else {
+        alert('Failed to apply to project. Please try again.')
+      }
     } finally {
       setApplying(false)
     }
@@ -140,7 +147,7 @@ export default function ProjectDetailPage() {
   }
 
   const canApply = () => {
-    return hasRole('volunteer') && project?.status === 'recruiting'
+    return hasRole('volunteer') && project?.project_status === 'recruiting'
   }
 
   const handleStatusChange = (updatedProject) => {

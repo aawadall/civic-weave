@@ -43,7 +43,6 @@ type Project struct {
 	LocationAddress   string                 `json:"location_address" db:"location_address"`
 	StartDate         *time.Time             `json:"start_date" db:"start_date"`
 	EndDate           *time.Time             `json:"end_date" db:"end_date"`
-	Status            string                 `json:"status" db:"status"`
 	ProjectStatus     ProjectStatus          `json:"project_status" db:"project_status"`
 	CreatedByAdminID  uuid.UUID              `json:"created_by_admin_id" db:"created_by_admin_id"`
 	TeamLeadID        *uuid.UUID             `json:"team_lead_id" db:"team_lead_id"`
@@ -97,7 +96,7 @@ func (s *ProjectService) Create(project *Project) error {
 
 	return s.db.QueryRow(projectCreateQuery, project.ID, project.Title, project.Description, skillsJSON,
 		project.LocationLat, project.LocationLng, project.LocationAddress, project.StartDate,
-		project.EndDate, project.Status, project.ProjectStatus, project.CreatedByAdminID,
+		project.EndDate, project.ProjectStatus, project.CreatedByAdminID,
 		project.TeamLeadID, project.AutoNotifyMatches).Scan(&project.CreatedAt, &project.UpdatedAt)
 }
 
@@ -108,7 +107,7 @@ func (s *ProjectService) GetByID(id uuid.UUID) (*Project, error) {
 
 	err := s.db.QueryRow(projectGetByIDQuery, id).Scan(&project.ID, &project.Title, &project.Description,
 		&skillsJSON, &project.LocationLat, &project.LocationLng, &project.LocationAddress,
-		&project.StartDate, &project.EndDate, &project.Status, &project.ProjectStatus,
+		&project.StartDate, &project.EndDate, &project.ProjectStatus,
 		&project.CreatedByAdminID, &project.TeamLeadID, &project.AutoNotifyMatches, &project.CreatedAt, &project.UpdatedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -117,10 +116,27 @@ func (s *ProjectService) GetByID(id uuid.UUID) (*Project, error) {
 		return nil, err
 	}
 
-	// Parse required skills JSON
-	if err := ParseJSONArray(skillsJSON, &project.RequiredSkills); err != nil {
+	// Parse required skills JSON - can be objects with id/name or simple strings
+	var skillData []interface{}
+	if err := json.Unmarshal([]byte(skillsJSON), &skillData); err != nil {
 		return nil, err
 	}
+
+	// Convert to skill names (handle both object and string formats)
+	var skillNames []string
+	for _, skillItem := range skillData {
+		switch v := skillItem.(type) {
+		case string:
+			// Legacy format: simple string
+			skillNames = append(skillNames, v)
+		case map[string]interface{}:
+			// New format: object with id and name
+			if name, ok := v["name"].(string); ok {
+				skillNames = append(skillNames, name)
+			}
+		}
+	}
+	project.RequiredSkills = skillNames
 
 	return project, nil
 }
@@ -211,7 +227,7 @@ func (s *ProjectService) List(limit, offset int, status *string, skills []string
 		var skillsJSON string
 		err := rows.Scan(&project.ID, &project.Title, &project.Description,
 			&project.LocationLat, &project.LocationLng, &project.LocationAddress,
-			&project.StartDate, &project.EndDate, &project.Status, &project.ProjectStatus,
+			&project.StartDate, &project.EndDate, &project.ProjectStatus,
 			&project.CreatedByAdminID, &project.TeamLeadID, &project.AutoNotifyMatches, &project.CreatedAt, &project.UpdatedAt,
 			&skillsJSON)
 		if err != nil {
@@ -219,18 +235,25 @@ func (s *ProjectService) List(limit, offset int, status *string, skills []string
 			return nil, err
 		}
 
-		// Parse required skills JSON - now contains objects with id and name
-		var skillObjects []map[string]interface{}
-		if err := json.Unmarshal([]byte(skillsJSON), &skillObjects); err != nil {
+		// Parse required skills JSON - can be objects with id/name or simple strings
+		var skillData []interface{}
+		if err := json.Unmarshal([]byte(skillsJSON), &skillData); err != nil {
 			log.Printf("❌ PROJECT_LIST_PARSE: Failed to parse skills for project %s: %v", project.ID, err)
 			return nil, err
 		}
 
-		// Convert skill objects to skill names
+		// Convert to skill names (handle both object and string formats)
 		var skillNames []string
-		for _, skillObj := range skillObjects {
-			if name, ok := skillObj["name"].(string); ok {
-				skillNames = append(skillNames, name)
+		for _, skillItem := range skillData {
+			switch v := skillItem.(type) {
+			case string:
+				// Legacy format: simple string
+				skillNames = append(skillNames, v)
+			case map[string]interface{}:
+				// New format: object with id and name
+				if name, ok := v["name"].(string); ok {
+					skillNames = append(skillNames, name)
+				}
 			}
 		}
 		project.RequiredSkills = skillNames
@@ -256,24 +279,31 @@ func (s *ProjectService) ListByTeamLead(teamLeadID uuid.UUID, limit, offset int)
 		var skillsJSON string
 		err := rows.Scan(&project.ID, &project.Title, &project.Description,
 			&project.LocationLat, &project.LocationLng, &project.LocationAddress,
-			&project.StartDate, &project.EndDate, &project.Status, &project.ProjectStatus,
+			&project.StartDate, &project.EndDate, &project.ProjectStatus,
 			&project.CreatedByAdminID, &project.TeamLeadID, &project.AutoNotifyMatches, &project.CreatedAt, &project.UpdatedAt,
 			&skillsJSON)
 		if err != nil {
 			return nil, err
 		}
 
-		// Parse required skills JSON - now contains objects with id and name
-		var skillObjects []map[string]interface{}
-		if err := json.Unmarshal([]byte(skillsJSON), &skillObjects); err != nil {
+		// Parse required skills JSON - can be objects with id/name or simple strings
+		var skillData []interface{}
+		if err := json.Unmarshal([]byte(skillsJSON), &skillData); err != nil {
 			return nil, err
 		}
 
-		// Convert skill objects to skill names
+		// Convert to skill names (handle both object and string formats)
 		var skillNames []string
-		for _, skillObj := range skillObjects {
-			if name, ok := skillObj["name"].(string); ok {
-				skillNames = append(skillNames, name)
+		for _, skillItem := range skillData {
+			switch v := skillItem.(type) {
+			case string:
+				// Legacy format: simple string
+				skillNames = append(skillNames, v)
+			case map[string]interface{}:
+				// New format: object with id and name
+				if name, ok := v["name"].(string); ok {
+					skillNames = append(skillNames, name)
+				}
 			}
 		}
 		project.RequiredSkills = skillNames
@@ -293,7 +323,7 @@ func (s *ProjectService) Update(project *Project) error {
 
 	return s.db.QueryRow(projectUpdateQuery, project.ID, project.Title, project.Description, skillsJSON,
 		project.LocationLat, project.LocationLng, project.LocationAddress, project.StartDate,
-		project.EndDate, project.Status, project.ProjectStatus, project.TeamLeadID, project.AutoNotifyMatches).
+		project.EndDate, project.ProjectStatus, project.TeamLeadID, project.AutoNotifyMatches).
 		Scan(&project.UpdatedAt)
 }
 
@@ -415,24 +445,31 @@ func (s *ProjectService) GetActiveProjects() ([]Project, error) {
 		var skillsJSON string
 		err := rows.Scan(&project.ID, &project.Title, &project.Description,
 			&project.LocationLat, &project.LocationLng, &project.LocationAddress,
-			&project.StartDate, &project.EndDate, &project.Status, &project.ProjectStatus,
+			&project.StartDate, &project.EndDate, &project.ProjectStatus,
 			&project.CreatedByAdminID, &project.TeamLeadID, &project.AutoNotifyMatches, &project.CreatedAt, &project.UpdatedAt,
 			&skillsJSON)
 		if err != nil {
 			return nil, err
 		}
 
-		// Parse required skills JSON - now contains objects with id and name
-		var skillObjects []map[string]interface{}
-		if err := json.Unmarshal([]byte(skillsJSON), &skillObjects); err != nil {
+		// Parse required skills JSON - can be objects with id/name or simple strings
+		var skillData []interface{}
+		if err := json.Unmarshal([]byte(skillsJSON), &skillData); err != nil {
 			return nil, err
 		}
 
-		// Convert skill objects to skill names
+		// Convert to skill names (handle both object and string formats)
 		var skillNames []string
-		for _, skillObj := range skillObjects {
-			if name, ok := skillObj["name"].(string); ok {
-				skillNames = append(skillNames, name)
+		for _, skillItem := range skillData {
+			switch v := skillItem.(type) {
+			case string:
+				// Legacy format: simple string
+				skillNames = append(skillNames, v)
+			case map[string]interface{}:
+				// New format: object with id and name
+				if name, ok := v["name"].(string); ok {
+					skillNames = append(skillNames, name)
+				}
 			}
 		}
 		project.RequiredSkills = skillNames

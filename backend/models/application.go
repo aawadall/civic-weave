@@ -28,6 +28,11 @@ func NewApplicationService(db *sql.DB) *ApplicationService {
 	return &ApplicationService{db: db}
 }
 
+// GetDB returns the database connection
+func (s *ApplicationService) GetDB() *sql.DB {
+	return s.db
+}
+
 // Create creates a new application
 func (s *ApplicationService) Create(application *Application) error {
 	application.ID = uuid.New()
