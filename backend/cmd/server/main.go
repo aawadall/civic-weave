@@ -340,6 +340,7 @@ func main() {
 				protected.GET("/tasks/:id/time-logs", taskHandler.GetTaskTimeLogs)
 
 				// Task status transitions
+				protected.POST("/tasks/:id/start", taskHandler.StartTask)
 				protected.POST("/tasks/:id/mark-blocked", taskHandler.MarkTaskBlocked)
 				protected.POST("/tasks/:id/request-takeover", taskHandler.RequestTaskTakeover)
 				protected.POST("/tasks/:id/mark-done", taskHandler.MarkTaskDone)

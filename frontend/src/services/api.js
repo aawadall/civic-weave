@@ -169,6 +169,10 @@ export const getTaskTimeLogs = (taskId) => {
 }
 
 // Task Status Transitions API
+export const startTask = (taskId) => {
+  return api.post(`/tasks/${taskId}/start`)
+}
+
 export const markTaskBlocked = (taskId, reason) => {
   return api.post(`/tasks/${taskId}/mark-blocked`, { reason })
 }

@@ -7,8 +7,18 @@ import {
   CalendarIcon,
   UserIcon
 } from '@heroicons/react/24/outline'
+import { startTask } from '../services/api'
 
-const TaskListItem = ({ task, showProject = true, showActions = true }) => {
+const TaskListItem = ({ task, showProject = true, showActions = true, onTaskUpdated }) => {
+  const handleStartTask = async () => {
+    try {
+      await startTask(task.id)
+      onTaskUpdated?.()
+    } catch (error) {
+      console.error('Error starting task:', error)
+      alert('Failed to start task')
+    }
+  }
   const getStatusColor = (status) => {
     switch (status) {
       case 'todo':
@@ -155,7 +165,10 @@ const TaskListItem = ({ task, showProject = true, showActions = true }) => {
               </Link>
               
               {task.status === 'todo' && (
-                <button className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                <button 
+                  onClick={handleStartTask}
+                  className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                >
                   Start Task
                 </button>
               )}

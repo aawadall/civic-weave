@@ -899,6 +899,58 @@ func (h *TaskHandler) MarkTaskDone(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Task marked as done"})
 }
 
+// StartTask handles POST /api/tasks/:id/start (for volunteers to start working on a task)
+func (h *TaskHandler) StartTask(c *gin.Context) {
+	taskIDStr := c.Param("id")
+	taskID, err := uuid.Parse(taskIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid task ID"})
+		return
+	}
+
+	// Get user context
+	userCtx, exists := middleware.GetUserFromContext(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found in context"})
+		return
+	}
+
+	// Get user's volunteer profile
+	volunteer, err := h.volunteerService.GetByUserID(userCtx.ID)
+	if err != nil || volunteer == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Volunteer profile not found"})
+		return
+	}
+
+	// Get the task
+	task, err := h.taskService.GetByID(taskID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
+		return
+	}
+
+	// Check if task is assigned to this volunteer
+	if task.AssigneeID == nil || *task.AssigneeID != volunteer.ID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Task is not assigned to you"})
+		return
+	}
+
+	// Check if task is in todo status
+	if task.Status != "todo" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Task is not in todo status"})
+		return
+	}
+
+	// Update task status to in_progress
+	err = h.taskService.UpdateStatus(taskID, "in_progress")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to start task"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Task started successfully"})
+}
+
 // AssignTask handles PUT /api/tasks/:id/assign (for TLs to assign tasks to volunteers)
 func (h *TaskHandler) AssignTask(c *gin.Context) {
 	taskIDStr := c.Param("id")
@@ -965,4 +1017,3 @@ func (h *TaskHandler) AssignTask(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "Task assignment updated successfully", "task": task})
 }
-
