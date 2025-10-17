@@ -70,4 +70,17 @@ export const markTaskDone = (taskId, completionNote) => {
   return api.post(`/tasks/${taskId}/mark-done`, { completion_note: completionNote })
 }
 
+// Task Assignment API
+export const selfAssignTask = (taskId) => {
+  return api.post(`/tasks/${taskId}/assign`)
+}
+
+export const assignTask = (taskId, volunteerId) => {
+  return api.put(`/tasks/${taskId}/assign`, { volunteer_id: volunteerId })
+}
+
+export const unassignTask = (taskId) => {
+  return api.put(`/tasks/${taskId}/assign`, { volunteer_id: null })
+}
+
 export default api

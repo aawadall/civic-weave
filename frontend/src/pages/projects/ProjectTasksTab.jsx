@@ -10,6 +10,7 @@ export default function ProjectTasksTab({ projectId, isProjectOwner }) {
   const { user } = useAuth()
   const [tasks, setTasks] = useState([])
   const [unassignedTasks, setUnassignedTasks] = useState([])
+  const [teamMembers, setTeamMembers] = useState([])
   const [loading, setLoading] = useState(true)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [selectedTask, setSelectedTask] = useState(null)
@@ -19,11 +20,15 @@ export default function ProjectTasksTab({ projectId, isProjectOwner }) {
     description: '',
     priority: 'medium',
     due_date: '',
-    labels: []
+    labels: [],
+    assignee_id: null
   })
 
   useEffect(() => {
     fetchTasks()
+    if (isProjectOwner) {
+      fetchTeamMembers()
+    }
     if (!isProjectOwner) {
       fetchUnassignedTasks()
     }
@@ -50,6 +55,15 @@ export default function ProjectTasksTab({ projectId, isProjectOwner }) {
     }
   }
 
+  const fetchTeamMembers = async () => {
+    try {
+      const response = await api.get(`/projects/${projectId}/team-members`)
+      setTeamMembers(response.data.team_members || [])
+    } catch (error) {
+      console.error('Error fetching team members:', error)
+    }
+  }
+
   const handleCreateTask = async (e) => {
     e.preventDefault()
     try {
@@ -59,6 +73,11 @@ export default function ProjectTasksTab({ projectId, isProjectOwner }) {
         description: newTask.description,
         priority: newTask.priority,
         labels: newTask.labels || []
+      }
+      
+      // Only include assignee_id if it's provided
+      if (newTask.assignee_id) {
+        taskData.assignee_id = newTask.assignee_id
       }
       
       // Only include due_date if it's provided and not empty
@@ -71,7 +90,7 @@ export default function ProjectTasksTab({ projectId, isProjectOwner }) {
       
       await api.post(`/projects/${projectId}/tasks`, taskData)
       setShowCreateModal(false)
-      setNewTask({ title: '', description: '', priority: 'medium', due_date: '', labels: [] })
+      setNewTask({ title: '', description: '', priority: 'medium', due_date: '', labels: [], assignee_id: null })
       fetchTasks()
     } catch (error) {
       console.error('Error creating task:', error)
@@ -273,6 +292,27 @@ export default function ProjectTasksTab({ projectId, isProjectOwner }) {
                     />
                   </div>
                 </div>
+
+                {/* Assignee Selection - Only for TLs */}
+                {isProjectOwner && teamMembers.length > 0 && (
+                  <div>
+                    <label className="block text-sm font-medium text-secondary-900 mb-2">
+                      Assign to <span className="text-secondary-500 text-sm">(optional)</span>
+                    </label>
+                    <select
+                      value={newTask.assignee_id || ''}
+                      onChange={(e) => setNewTask({ ...newTask, assignee_id: e.target.value || null })}
+                      className="w-full px-4 py-2 border border-secondary-300 rounded-lg focus:ring-2 focus:ring-primary-500"
+                    >
+                      <option value="">Unassigned</option>
+                      {teamMembers.map(member => (
+                        <option key={member.volunteer_id} value={member.volunteer_id}>
+                          {member.volunteer_name || member.volunteer_email}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
                 <div className="flex justify-end gap-4">
                   <button

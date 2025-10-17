@@ -880,3 +880,127 @@ func (h *TaskHandler) MarkTaskDone(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Task marked as done"})
 }
 
+// SelfAssignTask handles POST /api/tasks/:id/assign
+func (h *TaskHandler) SelfAssignTask(c *gin.Context) {
+	taskIDStr := c.Param("id")
+	taskID, err := uuid.Parse(taskIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid task ID"})
+		return
+	}
+
+	// Get user context
+	userCtx, exists := middleware.GetUserFromContext(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found in context"})
+		return
+	}
+
+	// Get volunteer for this user
+	volunteer, err := h.volunteerService.GetByUserID(userCtx.ID)
+	if err != nil || volunteer == nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": "User is not a volunteer"})
+		return
+	}
+
+	// Get task to verify it exists and is unassigned
+	task, err := h.taskService.GetByID(taskID)
+	if err != nil || task == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
+		return
+	}
+
+	if task.AssigneeID != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Task is already assigned"})
+		return
+	}
+
+	// Check if volunteer is a team member of the project
+	isTeamMember, err := h.projectService.IsTeamMember(task.ProjectID, userCtx.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check team membership"})
+		return
+	}
+
+	if !isTeamMember {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Only team members can self-assign tasks"})
+		return
+	}
+
+	// Assign task to volunteer
+	task.AssigneeID = &volunteer.ID
+	if err := h.taskService.Update(task); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to assign task"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Task assigned successfully", "task": task})
+}
+
+// AssignTask handles PUT /api/tasks/:id/assign (for TLs to assign tasks to volunteers)
+func (h *TaskHandler) AssignTask(c *gin.Context) {
+	taskIDStr := c.Param("id")
+	taskID, err := uuid.Parse(taskIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid task ID"})
+		return
+	}
+
+	var req struct {
+		VolunteerID *uuid.UUID `json:"volunteer_id"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Get user context
+	userCtx, exists := middleware.GetUserFromContext(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found in context"})
+		return
+	}
+
+	// Get task to verify it exists
+	task, err := h.taskService.GetByID(taskID)
+	if err != nil || task == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
+		return
+	}
+
+	// Check if user is team lead for this project
+	isTeamLead, err := h.projectService.IsTeamLead(task.ProjectID, userCtx.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check team lead status"})
+		return
+	}
+
+	if !userCtx.HasRole("admin") && !isTeamLead {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Only project team lead can assign tasks"})
+		return
+	}
+
+	// If volunteer_id is provided, verify they are a team member
+	if req.VolunteerID != nil {
+		isTeamMember, err := h.projectService.IsTeamMember(task.ProjectID, *req.VolunteerID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check team membership"})
+			return
+		}
+
+		if !isTeamMember {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Volunteer is not a team member of this project"})
+			return
+		}
+	}
+
+	// Assign task
+	task.AssigneeID = req.VolunteerID
+	if err := h.taskService.Update(task); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to assign task"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Task assignment updated successfully", "task": task})
+}
+

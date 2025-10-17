@@ -313,6 +313,7 @@ func main() {
 				protected.PUT("/tasks/:id", taskHandler.UpdateTask)
 				protected.DELETE("/tasks/:id", taskHandler.DeleteTask)
 				protected.POST("/tasks/:id/assign", taskHandler.SelfAssignTask)
+				protected.PUT("/tasks/:id/assign", taskHandler.AssignTask)
 				protected.POST("/tasks/:id/updates", taskHandler.AddTaskUpdate)
 				
 				// Task comments
