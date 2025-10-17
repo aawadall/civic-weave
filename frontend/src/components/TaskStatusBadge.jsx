@@ -3,12 +3,16 @@ export default function TaskStatusBadge({ status }) {
     todo: 'bg-gray-100 text-gray-800',
     in_progress: 'bg-blue-100 text-blue-800',
     done: 'bg-green-100 text-green-800',
+    blocked: 'bg-red-100 text-red-800',
+    takeover_requested: 'bg-orange-100 text-orange-800',
   }
 
   const labels = {
     todo: 'To Do',
     in_progress: 'In Progress',
     done: 'Done',
+    blocked: 'Blocked',
+    takeover_requested: 'Takeover Requested',
   }
 
   return (

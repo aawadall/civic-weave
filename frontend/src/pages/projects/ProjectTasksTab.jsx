@@ -4,6 +4,7 @@ import api from '../../services/api'
 import TaskCard from '../../components/TaskCard'
 import TaskStatusBadge from '../../components/TaskStatusBadge'
 import PriorityBadge from '../../components/PriorityBadge'
+import TaskDetailModal from '../../components/TaskDetailModal'
 
 export default function ProjectTasksTab({ projectId, isProjectOwner }) {
   const { user } = useAuth()
@@ -12,6 +13,7 @@ export default function ProjectTasksTab({ projectId, isProjectOwner }) {
   const [loading, setLoading] = useState(true)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [selectedTask, setSelectedTask] = useState(null)
+  const [showTaskDetailModal, setShowTaskDetailModal] = useState(false)
   const [newTask, setNewTask] = useState({
     title: '',
     description: '',
@@ -82,6 +84,18 @@ export default function ProjectTasksTab({ projectId, isProjectOwner }) {
     }
   }
 
+  const handleTaskClick = (task) => {
+    setSelectedTask(task)
+    setShowTaskDetailModal(true)
+  }
+
+  const handleTaskUpdated = () => {
+    fetchTasks()
+    if (!isProjectOwner) {
+      fetchUnassignedTasks()
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -124,7 +138,7 @@ export default function ProjectTasksTab({ projectId, isProjectOwner }) {
                 <TaskCard
                   key={task.id}
                   task={task}
-                  onClick={() => setSelectedTask(task)}
+                  onClick={() => handleTaskClick(task)}
                   onStatusChange={handleStatusChange}
                   canEdit={false}
                 />
@@ -148,7 +162,7 @@ export default function ProjectTasksTab({ projectId, isProjectOwner }) {
                 <TaskCard
                   key={task.id}
                   task={task}
-                  onClick={() => setSelectedTask(task)}
+                  onClick={() => handleTaskClick(task)}
                   onStatusChange={handleStatusChange}
                   canEdit={false}
                 />
@@ -172,7 +186,7 @@ export default function ProjectTasksTab({ projectId, isProjectOwner }) {
                 <TaskCard
                   key={task.id}
                   task={task}
-                  onClick={() => setSelectedTask(task)}
+                  onClick={() => handleTaskClick(task)}
                   canEdit={false}
                 />
               ))}
@@ -277,7 +291,7 @@ export default function ProjectTasksTab({ projectId, isProjectOwner }) {
               <TaskCard
                 key={task.id}
                 task={task}
-                onClick={() => setSelectedTask(task)}
+                onClick={() => handleTaskClick(task)}
                 onStatusChange={handleStatusChange}
                 canEdit={true}
               />
@@ -300,7 +314,7 @@ export default function ProjectTasksTab({ projectId, isProjectOwner }) {
               <div key={task.id} className="relative">
                 <TaskCard
                   task={task}
-                  onClick={() => setSelectedTask(task)}
+                  onClick={() => handleTaskClick(task)}
                 />
                 <button
                   onClick={() => handleSelfAssign(task.id)}
@@ -313,6 +327,17 @@ export default function ProjectTasksTab({ projectId, isProjectOwner }) {
           </div>
         </div>
       )}
+
+      {/* Task Detail Modal */}
+      <TaskDetailModal
+        task={selectedTask}
+        isOpen={showTaskDetailModal}
+        onClose={() => {
+          setShowTaskDetailModal(false)
+          setSelectedTask(null)
+        }}
+        onTaskUpdated={handleTaskUpdated}
+      />
     </div>
   )
 }
