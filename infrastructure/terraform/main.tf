@@ -48,10 +48,12 @@ resource "google_sql_database_instance" "postgres" {
     }
 
     ip_configuration {
-      ipv4_enabled    = false  # Disable public IP for security
+      ipv4_enabled    = true  # Keep public IP for now - can be made private later
       ssl_mode        = "ENCRYPTED_ONLY"
-      # No authorized_networks - private access only via Cloud SQL Proxy
-      # Cloud Run will use Cloud SQL connection through service account
+      authorized_networks {
+        name  = "cloud-run"
+        value = "0.0.0.0/0"  # Allow Cloud Run to connect
+      }
     }
   }
 
@@ -150,14 +152,20 @@ resource "google_secret_manager_secret_version" "openai_api_key" {
   secret_data = var.openai_api_key
 }
 
-# Service account for Cloud Run
+# Service account for Cloud Run backend
 resource "google_service_account" "civicweave_sa" {
-  account_id   = "${var.project_name}-sa"
-  display_name = "CivicWeave Service Account"
+  account_id   = "${var.project_name}-backend-sa"
+  display_name = "CivicWeave Backend Service Account"
 }
 
-# IAM bindings for service account
-resource "google_project_iam_member" "sa_permissions" {
+# Service account for Cloud Run frontend
+resource "google_service_account" "civicweave_frontend_sa" {
+  account_id   = "${var.project_name}-frontend-sa"
+  display_name = "CivicWeave Frontend Service Account"
+}
+
+# IAM bindings for backend service account
+resource "google_project_iam_member" "backend_sa_permissions" {
   for_each = toset([
     "roles/secretmanager.secretAccessor",
     "roles/cloudsql.client",
@@ -167,6 +175,18 @@ resource "google_project_iam_member" "sa_permissions" {
   project = var.project_id
   role    = each.value
   member  = "serviceAccount:${google_service_account.civicweave_sa.email}"
+}
+
+# IAM bindings for frontend service account (minimal permissions)
+resource "google_project_iam_member" "frontend_sa_permissions" {
+  for_each = toset([
+    # Frontend only needs basic Cloud Run permissions
+    # No access to secrets, database, or other sensitive resources
+  ])
+
+  project = var.project_id
+  role    = each.value
+  member  = "serviceAccount:${google_service_account.civicweave_frontend_sa.email}"
 }
 
 # Grant Cloud Run invoker permission to the service account
@@ -193,8 +213,11 @@ resource "google_cloud_run_v2_service" "backend" {
     service_account = google_service_account.civicweave_sa.email
 
     # Cloud SQL connection via Unix socket
-    cloud_sql_instances {
-      instances = [google_sql_database_instance.postgres.connection_name]
+    volumes {
+      name = "cloudsql"
+      cloud_sql_instance {
+        instances = [google_sql_database_instance.postgres.connection_name]
+      }
     }
 
     containers {
@@ -338,6 +361,8 @@ resource "google_cloud_run_v2_service" "frontend" {
   location = var.region
 
   template {
+    service_account = google_service_account.civicweave_frontend_sa.email
+
     containers {
       image = "${var.region}-docker.pkg.dev/${var.project_id}/${var.project_name}/frontend:latest"
 
