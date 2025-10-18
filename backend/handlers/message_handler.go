@@ -17,13 +17,15 @@ import (
 type MessageHandler struct {
 	messageService *models.MessageService
 	projectService *models.ProjectService
+	userService    *models.UserService
 }
 
 // NewMessageHandler creates a new message handler
-func NewMessageHandler(messageService *models.MessageService, projectService *models.ProjectService) *MessageHandler {
+func NewMessageHandler(messageService *models.MessageService, projectService *models.ProjectService, userService *models.UserService) *MessageHandler {
 	return &MessageHandler{
 		messageService: messageService,
 		projectService: projectService,
+		userService:    userService,
 	}
 }
 
@@ -518,7 +520,23 @@ func (h *MessageHandler) SendUniversalMessage(c *gin.Context) {
 	}
 
 	// Validate recipient exists and user has permission
-	if req.RecipientType == "team" || req.RecipientType == "project" {
+	if req.RecipientType == "user" {
+		// Check if recipient user exists
+		recipientUser, err := h.userService.GetByID(recipientID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate recipient"})
+			return
+		}
+		if recipientUser == nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Recipient user does not exist"})
+			return
+		}
+		// Prevent self-messaging
+		if recipientID == userCtx.ID {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot send message to yourself"})
+			return
+		}
+	} else if req.RecipientType == "team" || req.RecipientType == "project" {
 		// Check if user is team member
 		isTeamMember, err := h.projectService.IsTeamMember(recipientID, userCtx.ID)
 		if err != nil {

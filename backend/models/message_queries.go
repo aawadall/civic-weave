@@ -130,7 +130,11 @@ const (
 		WITH conversation_summary AS (
 			SELECT 
 				CASE 
-					WHEN pm.recipient_user_id IS NOT NULL THEN pm.recipient_user_id
+					WHEN pm.recipient_user_id IS NOT NULL THEN 
+						CASE 
+							WHEN pm.sender_id < pm.recipient_user_id THEN pm.sender_id
+							ELSE pm.recipient_user_id
+						END
 					WHEN pm.recipient_team_id IS NOT NULL THEN pm.recipient_team_id
 					ELSE pm.project_id
 				END as conversation_id,
@@ -140,7 +144,11 @@ const (
 					ELSE 'project'
 				END as conversation_type,
 				CASE 
-					WHEN pm.recipient_user_id IS NOT NULL THEN COALESCE(recipient_v.name, recipient_a.name, recipient_u.email)
+					WHEN pm.recipient_user_id IS NOT NULL THEN 
+						CASE 
+							WHEN pm.sender_id = $1 THEN COALESCE(recipient_v.name, recipient_a.name, recipient_u.email)
+							ELSE COALESCE(sender_v.name, sender_a.name, sender_u.email)
+						END
 					WHEN pm.recipient_team_id IS NOT NULL THEN p.title
 					ELSE p.title
 				END as conversation_title,
