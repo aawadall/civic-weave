@@ -95,6 +95,10 @@ export const getUniversalUnreadCount = () => {
   return api.get('/messages/unread-count')
 }
 
+export const markMessageAsRead = (messageId) => {
+  return api.post(`/messages/${messageId}/read`)
+}
+
 // Broadcast API
 export const getBroadcasts = (params = {}) => {
   return api.get('/broadcasts', { params })
