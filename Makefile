@@ -1,4 +1,4 @@
-.PHONY: dev-up dev-down db-migrate db-seed test lint clean fetch-secrets setup-gcp deploy-infra deploy-app configure-cloud-run build-dev build-push build-push-prod help
+.PHONY: dev-up dev-down db-migrate db-seed test lint clean fetch-secrets setup-gcp deploy-infra deploy-app configure-cloud-run build-dev build-push build-push-prod help db-agent-dev db-client-ping db-deploy-v3 db-keygen
 
 # Development commands
 dev-up:
@@ -83,6 +83,56 @@ db-deploy-version:
 db-rollback:
 	@read -p "Enter rollback version (e.g., 010): " version; \
 	./scripts/deploy-db.sh --rollback $$version
+
+# gRPC Database Agent System (v3)
+db-agent-dev:
+	cd backend && go run cmd/db-agent/main.go -port=50051 -host=localhost
+
+db-client-ping:
+	cd backend && go run cmd/db-client/main.go -command=ping -agent=localhost:50051
+
+db-deploy-v3:
+	cd backend && go run cmd/db-client/main.go -command=deploy -manifest=./manifest -database=prod -agent=localhost:50051
+
+db-keygen:
+	cd backend && go run cmd/db-keygen/main.go -server -description="Development Server Key"
+
+db-keygen-client:
+	cd backend && go run cmd/db-keygen/main.go -client -agent-url=localhost:50051 -description="Development Client Key"
+
+db-compare-v3:
+	cd backend && go run cmd/db-client/main.go -command=compare -manifest=./manifest -database=prod -agent=localhost:50051
+
+db-download-v3:
+	cd backend && go run cmd/db-client/main.go -command=download -database=prod -output=./manifest -agent=localhost:50051
+
+db-history-v3:
+	cd backend && go run cmd/db-client/main.go -command=history -database=prod -agent=localhost:50051
+
+db-bootstrap-v3:
+	cd backend && go run cmd/db-client/main.go -command=bootstrap -manifest=./manifest -database=new-db -agent=localhost:50051
+
+# Cloud Deployment Commands
+db-agent-docker:
+	cd backend && ./scripts/setup-agent.sh setup
+
+db-agent-docker-stop:
+	cd backend && ./scripts/setup-agent.sh stop
+
+db-agent-docker-logs:
+	cd backend && ./scripts/setup-agent.sh logs
+
+db-agent-k8s:
+	cd backend && ./scripts/deploy-k8s.sh deploy
+
+db-agent-k8s-update:
+	cd backend && ./scripts/deploy-k8s.sh update
+
+db-agent-k8s-status:
+	cd backend && ./scripts/deploy-k8s.sh status
+
+db-agent-k8s-cleanup:
+	cd backend && ./scripts/deploy-k8s.sh cleanup
 
 # Batch jobs
 job-calculate-matches:
@@ -260,6 +310,26 @@ help:
 	@echo "  db-schema-state    - Show current database schema state"
 	@echo "  db-drift-detect    - Detect schema drift from expected state"
 	@echo "  db-validate-state  - Validate database matches intended state for version"
+	@echo ""
+	@echo "gRPC Database Agent System (v3):"
+	@echo "  db-agent-dev      - Run agent server locally"
+	@echo "  db-client-ping    - Test connection to agent"
+	@echo "  db-keygen         - Generate server API keys"
+	@echo "  db-keygen-client  - Generate client API keys"
+	@echo "  db-deploy-v3      - Deploy using new gRPC system"
+	@echo "  db-compare-v3     - Compare manifest to live database"
+	@echo "  db-download-v3    - Download current schema as manifest"
+	@echo "  db-history-v3     - Get deployment history"
+	@echo "  db-bootstrap-v3   - Initialize new database"
+	@echo ""
+	@echo "Cloud Deployment:"
+	@echo "  db-agent-docker   - Deploy agent with Docker Compose"
+	@echo "  db-agent-docker-stop - Stop Docker Compose deployment"
+	@echo "  db-agent-docker-logs - View Docker Compose logs"
+	@echo "  db-agent-k8s      - Deploy agent to Kubernetes"
+	@echo "  db-agent-k8s-update - Update Kubernetes deployment"
+	@echo "  db-agent-k8s-status - Show Kubernetes deployment status"
+	@echo "  db-agent-k8s-cleanup - Remove Kubernetes deployment"
 	@echo ""
 	@echo "Batch Jobs:"
 	@echo "  job-setup-python      - Set up Python environment for batch jobs"
