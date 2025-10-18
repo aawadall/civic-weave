@@ -142,13 +142,30 @@ db-agent-gcloud-update:
 	cd backend && ./scripts/deploy-gcloud.sh update
 
 db-agent-gcloud-status:
-	cd backend && ./scripts/deploy-gcloud.sh status
+	cd backend && PROJECT_ID=civicweave-474622 ./scripts/deploy-gcloud.sh status
 
 db-agent-gcloud-logs:
-	cd backend && ./scripts/deploy-gcloud.sh logs
+	cd backend && PROJECT_ID=civicweave-474622 ./scripts/deploy-gcloud.sh logs
 
 db-agent-gcloud-cleanup:
 	cd backend && ./scripts/deploy-gcloud.sh cleanup
+
+# Test deployed Cloud Run agent
+db-agent-test-ping:
+	@echo "Testing deployed agent..."
+	@curl -s "https://db-agent-162941711179.us-central1.run.app/ping" | jq . || echo "Failed to connect to agent"
+
+db-agent-test-compare:
+	@echo "Testing compare endpoint..."
+	@curl -s -X POST "https://db-agent-162941711179.us-central1.run.app/compare" \
+		-H "Content-Type: application/json" \
+		-d '{"database_name": "test", "manifest_data": "{}"}' | jq . || echo "Failed to test compare"
+
+db-agent-test-all:
+	@echo "Running all agent tests..."
+	@$(MAKE) db-agent-test-ping
+	@$(MAKE) db-agent-test-compare
+	@echo "All tests completed!"
 
 # Batch jobs
 job-calculate-matches:
@@ -353,6 +370,11 @@ help:
 	@echo "  db-agent-gcloud-status - Show Cloud Run deployment status"
 	@echo "  db-agent-gcloud-logs   - View Cloud Run logs"
 	@echo "  db-agent-gcloud-cleanup - Remove Cloud Run deployment"
+	@echo ""
+	@echo "Test Deployed Agent:"
+	@echo "  db-agent-test-ping     - Test agent ping endpoint"
+	@echo "  db-agent-test-compare  - Test agent compare endpoint"
+	@echo "  db-agent-test-all      - Run all agent tests"
 	@echo ""
 	@echo "Batch Jobs:"
 	@echo "  job-setup-python      - Set up Python environment for batch jobs"

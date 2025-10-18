@@ -238,6 +238,12 @@ show_help() {
 }
 
 show_status() {
+    if [ -z "$PROJECT_ID" ] || [ "$PROJECT_ID" = "your-project-id" ]; then
+        log_error "Please set PROJECT_ID environment variable"
+        echo "export PROJECT_ID=civicweave-474622"
+        exit 1
+    fi
+    
     log_info "Deployment Status:"
     echo ""
     
@@ -262,7 +268,7 @@ case "${1:-deploy}" in
     "deploy")
         if [ -z "$PROJECT_ID" ] || [ "$PROJECT_ID" = "your-project-id" ]; then
             log_error "Please set PROJECT_ID environment variable"
-            echo "export PROJECT_ID=your-actual-project-id"
+            echo "export PROJECT_ID=civicweave-474622"
             exit 1
         fi
         
