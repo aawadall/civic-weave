@@ -1,0 +1,21 @@
+steps:
+  # Build and push the Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: [
+      'build',
+      '-f', 'Dockerfile.agent',
+      '-t', 'gcr.io/$PROJECT_ID/db-agent:latest',
+      '.'
+    ]
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/db-agent:latest']
+
+# Store images in Google Container Registry
+images:
+  - 'gcr.io/$PROJECT_ID/db-agent:latest'
+
+# Build options
+options:
+  machineType: 'E2_HIGHCPU_8'
+  diskSizeGb: 100
+  logging: CLOUD_LOGGING_ONLY

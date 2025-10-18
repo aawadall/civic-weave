@@ -1,0 +1,142 @@
+version: '3.8'
+
+services:
+  # Database Agent Server
+  db-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile.agent
+    container_name: db-agent
+    ports:
+      - "50051:50051"
+    environment:
+      # Agent Configuration
+      - AGENT_HOST=0.0.0.0
+      - AGENT_PORT=50051
+      - AGENT_TLS=false  # Set to true for production with certs
+      
+      # Metadata Database Configuration
+      - METADB_HOST=metadata-db
+      - METADB_PORT=5432
+      - METADB_USER=db_agent_user
+      - METADB_PASSWORD=secure_password
+      - METADB_NAME=db_agent_metadata
+      - METADB_SSL_MODE=disable
+      
+      # Security Configuration
+      - ENABLE_AUTH=true
+      - ENABLE_RATE_LIMIT=true
+      - RATE_LIMIT_RPS=100
+      - LOG_LEVEL=info
+    volumes:
+      # Mount keys directory (generate keys first)
+      - ./keys/server:/app/keys/server:ro
+      - ./keys/client:/app/keys/client:ro
+      # Mount config directory
+      - ./config:/app/config:ro
+    depends_on:
+      metadata-db:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - db-agent-network
+    healthcheck:
+      test: ["./db-client", "-command=ping", "-agent=localhost:50051", "-headless"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Metadata Database (PostgreSQL)
+  metadata-db:
+    image: postgres:15-alpine
+    container_name: db-agent-metadata
+    environment:
+      POSTGRES_DB: db_agent_metadata
+      POSTGRES_USER: db_agent_user
+      POSTGRES_PASSWORD: secure_password
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
+    volumes:
+      - metadata_data:/var/lib/postgresql/data
+      # Initialize with schema
+      - ./pkg/metadb/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      # Sample seed data
+      - ./pkg/metadb/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+    ports:
+      - "5433:5432"  # Expose on different port to avoid conflicts
+    restart: unless-stopped
+    networks:
+      - db-agent-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U db_agent_user -d db_agent_metadata"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # Redis for caching (optional)
+  redis:
+    image: redis:7-alpine
+    container_name: db-agent-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - db-agent-network
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Prometheus for metrics (optional)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: db-agent-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    restart: unless-stopped
+    networks:
+      - db-agent-network
+
+  # Grafana for dashboards (optional)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: db-agent-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    restart: unless-stopped
+    networks:
+      - db-agent-network
+
+networks:
+  db-agent-network:
+    driver: bridge
+
+volumes:
+  metadata_data:
+    driver: local
+  redis_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local

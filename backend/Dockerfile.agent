@@ -1,0 +1,57 @@
+# Multi-stage build for Database Agent
+FROM golang:1.22-alpine AS builder
+
+# Install build dependencies
+RUN apk add --no-cache git ca-certificates tzdata
+
+# Set working directory
+WORKDIR /app
+
+# Copy go mod files
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy source code
+COPY . .
+
+# Build the agent binary
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+    -ldflags='-w -s -extldflags "-static"' \
+    -a -installsuffix cgo \
+    -o db-agent ./cmd/db-agent-simple
+
+# Skip client build for now
+
+# Final stage
+FROM alpine:3.18
+
+# Install runtime dependencies
+RUN apk --no-cache add ca-certificates tzdata wget
+
+# Create non-root user
+RUN addgroup -g 1001 -S dbagent && \
+    adduser -u 1001 -S dbagent -G dbagent
+
+# Set working directory
+WORKDIR /app
+
+# Copy binaries from builder stage
+COPY --from=builder /app/db-agent .
+# Skip client copy for now
+
+# Create directories for keys and config
+RUN mkdir -p /app/keys/server /app/keys/client /app/config && \
+    chown -R dbagent:dbagent /app
+
+# Switch to non-root user
+USER dbagent
+
+# Expose gRPC port
+EXPOSE 50051
+
+# Health check using our client
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD ["wget", "--quiet", "--tries=1", "--spider", "http://localhost:50051/ping"] || exit 1
+
+# Default command
+CMD ["./db-agent", "-port=50051", "-host=0.0.0.0"]

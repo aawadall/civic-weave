@@ -1,0 +1,116 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: db-agent
+  namespace: db-agent
+  labels:
+    app: db-agent
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: db-agent
+  template:
+    metadata:
+      labels:
+        app: db-agent
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+      - name: db-agent
+        image: your-registry/db-agent:latest
+        imagePullPolicy: Always
+        ports:
+        - name: grpc
+          containerPort: 50051
+          protocol: TCP
+        - name: metrics
+          containerPort: 9090
+          protocol: TCP
+        envFrom:
+        - configMapRef:
+            name: db-agent-config
+        - secretRef:
+            name: db-agent-secrets
+        volumeMounts:
+        - name: tls-certs
+          mountPath: /etc/ssl/certs
+          readOnly: true
+        - name: tls-keys
+          mountPath: /etc/ssl/private
+          readOnly: true
+        - name: api-keys
+          mountPath: /app/keys
+          readOnly: true
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - "./db-client -command=ping -agent=localhost:50051 -headless"
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - "./db-client -command=ping -agent=localhost:50051 -headless"
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1001
+          runAsGroup: 1001
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+      volumes:
+      - name: tls-certs
+        secret:
+          secretName: db-agent-tls
+          items:
+          - key: tls.crt
+            path: agent.crt
+      - name: tls-keys
+        secret:
+          secretName: db-agent-tls
+          items:
+          - key: tls.key
+            path: agent.key
+      - name: api-keys
+        secret:
+          secretName: db-agent-secrets
+          items:
+          - key: API_KEY
+            path: server/api.key
+      securityContext:
+        fsGroup: 1001
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - db-agent
+              topologyKey: kubernetes.io/hostname

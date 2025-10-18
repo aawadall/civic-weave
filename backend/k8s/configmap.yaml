@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: db-agent-config
+  namespace: db-agent
+  labels:
+    app: db-agent
+data:
+  # Agent Configuration
+  AGENT_HOST: "0.0.0.0"
+  AGENT_PORT: "50051"
+  AGENT_TLS: "true"
+  
+  # Metadata Database Configuration
+  METADB_HOST: "metadata-db.db-agent.svc.cluster.local"
+  METADB_PORT: "5432"
+  METADB_NAME: "db_agent_metadata"
+  METADB_SSL_MODE: "require"
+  
+  # Security Configuration
+  ENABLE_AUTH: "true"
+  ENABLE_RATE_LIMIT: "true"
+  RATE_LIMIT_RPS: "100"
+  LOG_LEVEL: "info"
+  
+  # Redis Configuration
+  REDIS_HOST: "redis.db-agent.svc.cluster.local"
+  REDIS_PORT: "6379"
+  
+  # Monitoring Configuration
+  PROMETHEUS_ENABLED: "true"
+  METRICS_PORT: "9090"

@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: db-agent
+  labels:
+    name: db-agent
+    app: database-agent

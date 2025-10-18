@@ -1,0 +1,94 @@
+syntax = "proto3";
+
+package dbagent;
+
+option go_package = "civicweave/backend/proto/dbagent";
+
+// Database Agent Service
+service DatabaseAgent {
+    // Health check
+    rpc Ping(PingRequest) returns (PingResponse);
+    
+    // Compare manifest to live database
+    rpc CompareManifest(CompareManifestRequest) returns (CompareManifestResponse);
+    
+    // Download live schema as manifest
+    rpc DownloadManifest(DownloadManifestRequest) returns (DownloadManifestResponse);
+    
+    // Deploy manifest to database
+    rpc DeployManifest(DeployManifestRequest) returns (DeployManifestResponse);
+    
+    // Get deployment history
+    rpc GetDeploymentHistory(DeploymentHistoryRequest) returns (DeploymentHistoryResponse);
+    
+    // Bootstrap new database
+    rpc Bootstrap(BootstrapRequest) returns (BootstrapResponse);
+}
+
+// Request/Response messages
+message PingRequest {}
+
+message PingResponse {
+    string status = 1;
+    string version = 2;
+    int64 timestamp = 3;
+}
+
+message CompareManifestRequest {
+    string database_name = 1;
+    string manifest_data = 2;
+}
+
+message CompareManifestResponse {
+    bool has_differences = 1;
+    repeated string differences = 2;
+}
+
+message DownloadManifestRequest {
+    string database_name = 1;
+    bool include_data = 2;
+}
+
+message DownloadManifestResponse {
+    string manifest_data = 1;
+    string checksum = 2;
+}
+
+message DeployManifestRequest {
+    string database_name = 1;
+    string manifest_data = 2;
+    bool dry_run = 3;
+}
+
+message DeployManifestResponse {
+    bool success = 1;
+    string message = 2;
+    repeated string executed_migrations = 3;
+}
+
+message DeploymentHistoryRequest {
+    string database_name = 1;
+    int32 limit = 2;
+}
+
+message DeploymentHistoryResponse {
+    repeated DeploymentVersion deployments = 1;
+}
+
+message BootstrapRequest {
+    string database_name = 1;
+    string manifest_data = 2;
+}
+
+message BootstrapResponse {
+    bool success = 1;
+    string message = 2;
+    int64 execution_time = 3;
+}
+
+message DeploymentVersion {
+    string version = 1;
+    int64 deployed_at = 2;
+    string deployed_by = 3;
+    string checksum = 4;
+}
