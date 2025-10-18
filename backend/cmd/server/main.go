@@ -225,7 +225,7 @@ func main() {
 		broadcastService = models.NewBroadcastService(db)
 		resourceService = models.NewResourceService(db)
 		taskHandler = handlers.NewTaskHandler(taskService, projectService, volunteerService, messageService)
-		messageHandler = handlers.NewMessageHandler(messageService, projectService)
+		messageHandler = handlers.NewMessageHandler(messageService, projectService, userService)
 		userDashboardHandler = handlers.NewUserDashboardHandler(
 			projectService,
 			taskService,

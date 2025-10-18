@@ -85,8 +85,29 @@ func (s *MessageService) Create(message *ProjectMessage) error {
 	if message.MessageType == "" {
 		message.MessageType = "general"
 	}
-	return s.db.QueryRow(messageCreateQuery, message.ID, message.ProjectID, message.SenderID, message.MessageText, message.TaskID, message.MessageType).
+
+	// Start transaction to create message and auto-record sender read receipt
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// Insert the message
+	err = tx.QueryRow(messageCreateQuery, message.ID, message.ProjectID, message.SenderID, message.MessageText, message.TaskID, message.MessageType).
 		Scan(&message.CreatedAt)
+	if err != nil {
+		return err
+	}
+
+	// Auto-record read receipt for sender
+	_, err = tx.Exec(messageMarkAsReadQuery, message.SenderID, message.ID)
+	if err != nil {
+		return err
+	}
+
+	// Commit transaction
+	return tx.Commit()
 }
 
 // GetByID retrieves a message by ID
@@ -302,16 +323,43 @@ func (s *MessageService) CreateUniversalMessage(message *ProjectMessage) error {
 		message.MessageType = "general"
 	}
 
+	subjectStr := "nil"
+	if message.Subject != nil {
+		subjectStr = *message.Subject
+	}
 	log.Printf("DEBUG: CreateUniversalMessage - ID: %s, ProjectID: %v, SenderID: %s, RecipientUserID: %v, RecipientTeamID: %v, Subject: %s, MessageText: %s, TaskID: %v, MessageType: %s, MessageScope: %s",
-		message.ID, message.ProjectID, message.SenderID, message.RecipientUserID, message.RecipientTeamID, message.Subject, message.MessageText, message.TaskID, message.MessageType, message.MessageScope)
+		message.ID, message.ProjectID, message.SenderID, message.RecipientUserID, message.RecipientTeamID, subjectStr, message.MessageText, message.TaskID, message.MessageType, message.MessageScope)
 
-	err := s.db.QueryRow(messageCreateUniversalQuery, message.ID, message.ProjectID, message.SenderID,
+	// Start transaction to create message and auto-record sender read receipt
+	tx, err := s.db.Begin()
+	if err != nil {
+		log.Printf("DEBUG: Failed to begin transaction in CreateUniversalMessage: %v", err)
+		return err
+	}
+	defer tx.Rollback()
+
+	// Insert the message
+	err = tx.QueryRow(messageCreateUniversalQuery, message.ID, message.ProjectID, message.SenderID,
 		message.RecipientUserID, message.RecipientTeamID, message.Subject, message.MessageText,
 		message.TaskID, message.MessageType, message.MessageScope).
 		Scan(&message.CreatedAt)
 
 	if err != nil {
 		log.Printf("DEBUG: Database error in CreateUniversalMessage: %v", err)
+		return err
+	}
+
+	// Auto-record read receipt for sender
+	_, err = tx.Exec(messageMarkAsReadQuery, message.SenderID, message.ID)
+	if err != nil {
+		log.Printf("DEBUG: Failed to record sender read receipt in CreateUniversalMessage: %v", err)
+		return err
+	}
+
+	// Commit transaction
+	err = tx.Commit()
+	if err != nil {
+		log.Printf("DEBUG: Failed to commit transaction in CreateUniversalMessage: %v", err)
 		return err
 	}
 
