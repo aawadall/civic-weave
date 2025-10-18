@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	"civicweave/backend/config"
 	"civicweave/backend/database"
@@ -21,7 +22,7 @@ func main() {
 
 	// Parse command line arguments
 	var (
-		command            = flag.String("command", "up", "Migration command: up, down, status, compatibility, validate, check")
+		command            = flag.String("command", "up", "Migration command: up, down, status, compatibility, validate, check, schema-state, drift-detect, validate-state")
 		targetVersion      = flag.String("version", "", "Target version for rollback")
 		runtimeVersion     = flag.String("runtime-version", "1.0.0", "Runtime version for compatibility checking")
 		dryRun             = flag.Bool("dry-run", false, "Show what would be done without executing")
@@ -64,6 +65,15 @@ func main() {
 			fmt.Println(message)
 		}
 		os.Exit(exitCode)
+	case "schema-state":
+		err = showSchemaState(db, *quiet)
+	case "drift-detect":
+		err = detectSchemaDrift(db, *quiet)
+	case "validate-state":
+		if *targetVersion == "" {
+			log.Fatal("Target version is required for state validation")
+		}
+		err = validateIntendedState(db, *targetVersion, *quiet)
 	default:
 		log.Fatalf("Unknown command: %s", *command)
 	}
@@ -179,4 +189,124 @@ func validateMigrations(db *sql.DB, quiet bool) error {
 
 func checkMigrationHealth(db *sql.DB, runtimeVersion string, quiet bool) (int, string, error) {
 	return database.CheckMigrationHealth(db, runtimeVersion)
+}
+
+func showSchemaState(db *sql.DB, quiet bool) error {
+	state, err := database.GetCurrentSchemaState(db)
+	if err != nil {
+		return err
+	}
+
+	if quiet {
+		// JSON output for programmatic use
+		fmt.Printf(`{"checksum":"%s","tables":%d,"indexes":%d,"functions":%d}`,
+			state.Checksum, len(state.Tables), len(state.Indexes), len(state.Functions))
+		return nil
+	}
+
+	// Human-readable output
+	fmt.Println("📊 Database Schema State")
+	fmt.Println("=" + fmt.Sprintf("%*s", 30, "="))
+	fmt.Printf("Schema Checksum: %s\n", state.Checksum)
+	fmt.Printf("Tables: %d\n", len(state.Tables))
+	fmt.Printf("Indexes: %d\n", len(state.Indexes))
+	fmt.Printf("Functions: %d\n", len(state.Functions))
+
+	if len(state.Tables) > 0 {
+		fmt.Println("\n📋 Tables:")
+		for _, table := range state.Tables {
+			fmt.Printf("  📄 %s (%d columns) - %s\n", table.Name, len(table.Columns), table.Checksum[:8])
+		}
+	}
+
+	if len(state.Indexes) > 0 {
+		fmt.Println("\n🔍 Indexes:")
+		for _, index := range state.Indexes {
+			unique := ""
+			if index.IsUnique {
+				unique = " (unique)"
+			}
+			fmt.Printf("  📇 %s.%s%s - %s\n", index.TableName, index.Name, unique, strings.Join(index.Columns, ", "))
+		}
+	}
+
+	if len(state.Functions) > 0 {
+		fmt.Println("\n⚙️  Functions:")
+		for _, function := range state.Functions {
+			fmt.Printf("  🔧 %s - %s\n", function.Name, function.Checksum[:8])
+		}
+	}
+
+	return nil
+}
+
+func detectSchemaDrift(db *sql.DB, quiet bool) error {
+	comparison, err := database.DetectSchemaDrift(db)
+	if err != nil {
+		return err
+	}
+
+	if quiet {
+		// JSON output for programmatic use
+		fmt.Printf(`{"is_identical":%t,"checksum_match":%t,"drift_detected":%t}`,
+			comparison.IsIdentical, comparison.ChecksumMatch, !comparison.IsIdentical)
+		return nil
+	}
+
+	// Human-readable output
+	fmt.Println("🔍 Schema Drift Detection")
+	fmt.Println("=" + fmt.Sprintf("%*s", 30, "="))
+
+	if comparison.IsIdentical {
+		fmt.Println("✅ No schema drift detected")
+		fmt.Println("📊 Schema is consistent with expected state")
+	} else {
+		fmt.Println("⚠️  Schema drift detected")
+		fmt.Printf("📊 Local checksum:  %s\n", comparison.LocalChecksum)
+		fmt.Printf("📊 Remote checksum: %s\n", comparison.RemoteChecksum)
+	}
+
+	if len(comparison.Differences) > 0 {
+		fmt.Println("\n📋 Differences:")
+		for _, diff := range comparison.Differences {
+			fmt.Printf("  • %s\n", diff)
+		}
+	}
+
+	if len(comparison.MissingTables) > 0 {
+		fmt.Println("\n❌ Missing Tables:")
+		for _, table := range comparison.MissingTables {
+			fmt.Printf("  • %s\n", table)
+		}
+	}
+
+	if len(comparison.ExtraTables) > 0 {
+		fmt.Println("\n➕ Extra Tables:")
+		for _, table := range comparison.ExtraTables {
+			fmt.Printf("  • %s\n", table)
+		}
+	}
+
+	if len(comparison.SchemaDrift) > 0 {
+		fmt.Println("\n🔄 Schema Drift:")
+		for _, drift := range comparison.SchemaDrift {
+			fmt.Printf("  • %s\n", drift)
+		}
+	}
+
+	return nil
+}
+
+func validateIntendedState(db *sql.DB, targetVersion string, quiet bool) error {
+	err := database.ValidateIntendedState(db, targetVersion)
+	if err != nil {
+		return err
+	}
+
+	if !quiet {
+		fmt.Printf("✅ Database state validated for version %s\n", targetVersion)
+		fmt.Println("📊 Database matches intended state")
+	}
+
+	return nil
 }

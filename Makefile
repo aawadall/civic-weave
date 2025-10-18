@@ -49,6 +49,17 @@ db-migrate-rollback:
 	@read -p "Enter target version (e.g., 1.0.0): " version; \
 	cd backend && go run cmd/migrate/main.go -command=down -version=$$version
 
+# Schema state validation
+db-schema-state:
+	cd backend && go run cmd/migrate/main.go -command=schema-state
+
+db-drift-detect:
+	cd backend && go run cmd/migrate/main.go -command=drift-detect
+
+db-validate-state:
+	@read -p "Enter target version (e.g., 1.0.0): " version; \
+	cd backend && go run cmd/migrate/main.go -command=validate-state -version=$$version
+
 # Remote database deployment
 db-deploy-status:
 	./scripts/deploy-db.sh --status
@@ -236,6 +247,11 @@ help:
 	@echo "  db-migrate-validate - Validate migration files and integrity"
 	@echo "  db-migrate-check   - Check migration health (CI/CD friendly)"
 	@echo "  db-migrate-rollback - Rollback to specific version"
+	@echo ""
+	@echo "Schema State Validation:"
+	@echo "  db-schema-state    - Show current database schema state"
+	@echo "  db-drift-detect    - Detect schema drift from expected state"
+	@echo "  db-validate-state  - Validate database matches intended state for version"
 	@echo ""
 	@echo "Batch Jobs:"
 	@echo "  job-setup-python      - Set up Python environment for batch jobs"
