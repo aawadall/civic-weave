@@ -239,7 +239,7 @@ func main() {
 	router := gin.Default()
 
 	// CORS middleware
-	router.Use(middleware.CORS())
+	router.Use(middleware.CORS(cfg.CORS.AllowedOrigins))
 
 	// Log handler status before registering routes
 	log.Println("📋 Handler Status:")

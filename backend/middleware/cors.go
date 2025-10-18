@@ -7,17 +7,9 @@ import (
 )
 
 // CORS middleware for cross-origin requests
-func CORS() gin.HandlerFunc {
+func CORS(allowedOrigins []string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		origin := c.Request.Header.Get("Origin")
-
-		// Allow requests from frontend development server and production
-		allowedOrigins := []string{
-			"http://localhost:3000",
-			"http://localhost:3001",
-			"https://civicweave.com", // Production frontend URL
-			"https://civicweave-frontend-162941711179.us-central1.run.app", // Cloud Run frontend URL
-		}
 
 		// Check if origin is allowed
 		allowed := false
@@ -28,6 +20,7 @@ func CORS() gin.HandlerFunc {
 			}
 		}
 
+		// Set CORS headers before any response (including errors)
 		if allowed {
 			c.Header("Access-Control-Allow-Origin", origin)
 		}

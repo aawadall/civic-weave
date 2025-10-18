@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"strings"
 )
 
 // Config holds all configuration for the application
@@ -14,6 +15,7 @@ type Config struct {
 	Geocoding GeocodingConfig
 	OpenAI    OpenAIConfig
 	Features  FeatureFlags
+	CORS      CORSConfig
 }
 
 // FeatureFlags holds feature toggle settings
@@ -67,6 +69,11 @@ type OpenAIConfig struct {
 	EmbeddingModel string
 }
 
+// CORSConfig holds CORS settings
+type CORSConfig struct {
+	AllowedOrigins []string
+}
+
 // Load loads configuration from environment variables
 func Load() *Config {
 	return &Config{
@@ -105,8 +112,14 @@ func Load() *Config {
 		Features: FeatureFlags{
 			EmailEnabled: getEnv("ENABLE_EMAIL", "true") == "true",
 		},
+		CORS: CORSConfig{
+			AllowedOrigins: parseCORSOrigins(getEnv("CORS_ALLOWED_ORIGINS", defaultCORSOrigins)),
+		},
 	}
 }
+
+// Default CORS origins for development and production
+const defaultCORSOrigins = "http://localhost:3000,http://localhost:3001,https://civicweave.com,https://civicweave-frontend-162941711179.us-central1.run.app"
 
 // getEnv gets an environment variable with a fallback default value
 func getEnv(key, defaultValue string) string {
@@ -114,4 +127,20 @@ func getEnv(key, defaultValue string) string {
 		return value
 	}
 	return defaultValue
+}
+
+// parseCORSOrigins parses comma-separated CORS origins
+func parseCORSOrigins(origins string) []string {
+	if origins == "" {
+		return []string{}
+	}
+	
+	var result []string
+	for _, origin := range strings.Split(origins, ",") {
+		trimmed := strings.TrimSpace(origin)
+		if trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
+	return result
 }

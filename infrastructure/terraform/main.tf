@@ -6,6 +6,12 @@ terraform {
       version = "~> 5.0"
     }
   }
+  
+  # Remote backend configuration (uncomment when ready to migrate)
+  # backend "gcs" {
+  #   bucket = "civicweave-terraform-state"
+  #   prefix = "terraform/state"
+  # }
 }
 
 # Configure the Google Cloud Provider

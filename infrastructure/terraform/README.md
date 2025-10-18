@@ -107,6 +107,31 @@ If Terraform state gets corrupted:
 terraform init -reconfigure
 ```
 
+## Terraform State Management
+
+### State Backup
+
+Terraform state files are no longer tracked in git. Critical state information is backed up to GCloud Secret Manager:
+
+- **terraform-outputs-backup**: Contains all Terraform outputs (URLs, connection strings, etc.)
+- **terraform-state-full-backup**: Full state backup (if needed for complex recovery)
+
+See `STATE_BACKUP.md` for detailed backup and recovery procedures.
+
+### Remote Backend (Recommended)
+
+For production deployments, consider migrating to a remote backend:
+
+```hcl
+# Uncomment in main.tf when ready to migrate
+terraform {
+  backend "gcs" {
+    bucket = "civicweave-terraform-state"
+    prefix = "terraform/state"
+  }
+}
+```
+
 ## Security Considerations
 
 - All secrets are stored in Google Secret Manager
