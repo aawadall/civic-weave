@@ -19,9 +19,9 @@ type SchemaState struct {
 
 // TableInfo represents a database table
 type TableInfo struct {
-	Name    string     `json:"name"`
-	Columns []ColumnInfo `json:"columns"`
-	Checksum string   `json:"checksum"`
+	Name     string       `json:"name"`
+	Columns  []ColumnInfo `json:"columns"`
+	Checksum string       `json:"checksum"`
 }
 
 // ColumnInfo represents a table column
@@ -46,19 +46,19 @@ type IndexInfo struct {
 type FunctionInfo struct {
 	Name       string `json:"name"`
 	Definition string `json:"definition"`
-	Checksum  string `json:"checksum"`
+	Checksum   string `json:"checksum"`
 }
 
 // StateComparison represents the comparison between two database states
 type StateComparison struct {
-	IsIdentical     bool     `json:"is_identical"`
-	Differences     []string `json:"differences"`
-	MissingTables   []string `json:"missing_tables"`
-	ExtraTables     []string `json:"extra_tables"`
-	SchemaDrift     []string `json:"schema_drift"`
-	ChecksumMatch   bool     `json:"checksum_match"`
-	LocalChecksum   string   `json:"local_checksum"`
-	RemoteChecksum  string   `json:"remote_checksum"`
+	IsIdentical    bool     `json:"is_identical"`
+	Differences    []string `json:"differences"`
+	MissingTables  []string `json:"missing_tables"`
+	ExtraTables    []string `json:"extra_tables"`
+	SchemaDrift    []string `json:"schema_drift"`
+	ChecksumMatch  bool     `json:"checksum_match"`
+	LocalChecksum  string   `json:"local_checksum"`
+	RemoteChecksum string   `json:"remote_checksum"`
 }
 
 // GetCurrentSchemaState captures the current state of the database schema
@@ -133,7 +133,7 @@ func getTableInfo(db *sql.DB) ([]TableInfo, error) {
 	for rows.Next() {
 		var tableName, columnName, dataType, isNullable, isPK, isFK string
 		var defaultValue sql.NullString
-		
+
 		err := rows.Scan(&tableName, &columnName, &dataType, &isNullable, &defaultValue, &isPK, &isFK)
 		if err != nil {
 			return nil, err
@@ -153,7 +153,7 @@ func getTableInfo(db *sql.DB) ([]TableInfo, error) {
 			if defaultValue.Valid {
 				defaultVal = defaultValue.String
 			}
-			
+
 			column := ColumnInfo{
 				Name:         columnName,
 				DataType:     dataType,
@@ -275,17 +275,17 @@ func getFunctionInfo(db *sql.DB) ([]FunctionInfo, error) {
 func calculateTableChecksum(table TableInfo) string {
 	var parts []string
 	parts = append(parts, table.Name)
-	
+
 	// Sort columns for consistent checksum
 	sort.Slice(table.Columns, func(i, j int) bool {
 		return table.Columns[i].Name < table.Columns[j].Name
 	})
-	
+
 	for _, col := range table.Columns {
-		parts = append(parts, fmt.Sprintf("%s:%s:%t:%s:%t:%t", 
+		parts = append(parts, fmt.Sprintf("%s:%s:%t:%s:%t:%t",
 			col.Name, col.DataType, col.IsNullable, col.DefaultValue, col.IsPrimaryKey, col.IsForeignKey))
 	}
-	
+
 	return calculateStringChecksum(strings.Join(parts, "|"))
 }
 
@@ -297,25 +297,25 @@ func calculateFunctionChecksum(function FunctionInfo) string {
 // calculateSchemaChecksum calculates an overall checksum for the schema
 func calculateSchemaChecksum(state *SchemaState) string {
 	var parts []string
-	
+
 	// Add table checksums
 	for _, table := range state.Tables {
 		parts = append(parts, fmt.Sprintf("table:%s:%s", table.Name, table.Checksum))
 	}
-	
+
 	// Add index checksums
 	for _, index := range state.Indexes {
 		parts = append(parts, fmt.Sprintf("index:%s:%s", index.Name, strings.Join(index.Columns, ",")))
 	}
-	
+
 	// Add function checksums
 	for _, function := range state.Functions {
 		parts = append(parts, fmt.Sprintf("function:%s:%s", function.Name, function.Checksum))
 	}
-	
+
 	// Sort for consistent checksum
 	sort.Strings(parts)
-	
+
 	return calculateStringChecksum(strings.Join(parts, "|"))
 }
 
@@ -429,21 +429,21 @@ func indexesEqual(a, b IndexInfo) bool {
 	if a.Name != b.Name || a.TableName != b.TableName || a.IsUnique != b.IsUnique {
 		return false
 	}
-	
+
 	if len(a.Columns) != len(b.Columns) {
 		return false
 	}
-	
+
 	// Sort columns for comparison
 	sort.Strings(a.Columns)
 	sort.Strings(b.Columns)
-	
+
 	for i, col := range a.Columns {
 		if col != b.Columns[i] {
 			return false
 		}
 	}
-	
+
 	return true
 }
 
@@ -513,7 +513,7 @@ func DetectSchemaDrift(db *sql.DB) (*StateComparison, error) {
 	// In a full implementation, you might want to compare with a reference schema
 	log.Printf("🔍 Schema drift detection completed")
 	log.Printf("📊 Current schema checksum: %s", currentState.Checksum)
-	
+
 	// Return a basic comparison showing current state
 	return &StateComparison{
 		IsIdentical:    true,
