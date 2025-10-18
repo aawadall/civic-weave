@@ -84,6 +84,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	// Check if user already exists
 	existingUser, err := h.UserService.GetByEmail(req.Email)
 	if err != nil {
+		log.Printf("❌ REGISTER_DB_ERROR: Failed to check existing user for email %s: %v", req.Email, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
 		return
 	}
@@ -107,6 +108,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	}
 
 	if err := h.UserService.Create(user); err != nil {
+		log.Printf("❌ REGISTER_USER_CREATE_ERROR: Failed to create user %s: %v", req.Email, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user"})
 		return
 	}
