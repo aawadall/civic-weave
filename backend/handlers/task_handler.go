@@ -105,6 +105,14 @@ func (h *TaskHandler) ListTasks(c *gin.Context) {
 		isProjectOwner = true
 	}
 
+	// Get volunteer record for task filtering
+	volunteer, err := h.volunteerService.GetByUserID(userCtx.ID)
+	if err != nil && !userCtx.HasRole("admin") {
+		// Non-admin users need a volunteer profile
+		c.JSON(http.StatusForbidden, gin.H{"error": "Volunteer profile required"})
+		return
+	}
+
 	// Get tasks (filtered based on permissions)
 	// If user is not a team member but is a volunteer, only show unassigned tasks
 	var tasks []models.ProjectTask
@@ -117,7 +125,11 @@ func (h *TaskHandler) ListTasks(c *gin.Context) {
 		}
 	} else {
 		// Team members and admins see filtered tasks
-		tasks, err = h.taskService.ListByProject(projectID, &userCtx.ID, isProjectOwner)
+		var volunteerID *uuid.UUID
+		if volunteer != nil {
+			volunteerID = &volunteer.ID
+		}
+		tasks, err = h.taskService.ListByProject(projectID, volunteerID, isProjectOwner)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get tasks"})
 			return
@@ -315,7 +327,7 @@ func (h *TaskHandler) UpdateTask(c *gin.Context) {
 		}
 		// Assignee can only update status
 		if req.Status != "" {
-			if err := h.taskService.UpdateStatus(taskID, models.TaskStatus(req.Status)); err != nil {
+			if err := h.taskService.UpdateStatus(taskID, models.TaskStatus(req.Status), userCtx.ID); err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update task status"})
 				return
 			}
@@ -762,14 +774,21 @@ func (h *TaskHandler) MarkTaskBlocked(c *gin.Context) {
 		return
 	}
 
+	// Get volunteer record to check if user is the assignee
+	volunteer, err := h.volunteerService.GetByUserID(userCtx.ID)
+	if err != nil || volunteer == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Volunteer profile not found"})
+		return
+	}
+
 	// Check if user is the assignee
-	if task.AssigneeID == nil || *task.AssigneeID != userCtx.ID {
+	if task.AssigneeID == nil || *task.AssigneeID != volunteer.ID {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Only the task assignee can mark it as blocked"})
 		return
 	}
 
-	// Mark as blocked
-	if err := h.taskService.MarkAsBlocked(taskID); err != nil {
+	// Mark as blocked with timeline tracking
+	if err := h.taskService.MarkAsBlocked(taskID, req.Reason, userCtx.ID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to mark task as blocked"})
 		return
 	}
@@ -818,14 +837,21 @@ func (h *TaskHandler) RequestTaskTakeover(c *gin.Context) {
 		return
 	}
 
+	// Get volunteer record to check if user is the assignee
+	volunteer, err := h.volunteerService.GetByUserID(userCtx.ID)
+	if err != nil || volunteer == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Volunteer profile not found"})
+		return
+	}
+
 	// Check if user is the assignee
-	if task.AssigneeID == nil || *task.AssigneeID != userCtx.ID {
+	if task.AssigneeID == nil || *task.AssigneeID != volunteer.ID {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Only the task assignee can request takeover"})
 		return
 	}
 
-	// Request takeover
-	if err := h.taskService.RequestTakeover(taskID); err != nil {
+	// Request takeover with timeline tracking
+	if err := h.taskService.RequestTakeover(taskID, req.Reason, userCtx.ID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to request task takeover"})
 		return
 	}
@@ -874,14 +900,21 @@ func (h *TaskHandler) MarkTaskDone(c *gin.Context) {
 		return
 	}
 
+	// Get volunteer record to check if user is the assignee
+	volunteer, err := h.volunteerService.GetByUserID(userCtx.ID)
+	if err != nil || volunteer == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Volunteer profile not found"})
+		return
+	}
+
 	// Check if user is the assignee
-	if task.AssigneeID == nil || *task.AssigneeID != userCtx.ID {
+	if task.AssigneeID == nil || *task.AssigneeID != volunteer.ID {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Only the task assignee can mark it as done"})
 		return
 	}
 
-	// Mark as done
-	if err := h.taskService.MarkAsDone(taskID); err != nil {
+	// Mark as done with timeline tracking
+	if err := h.taskService.MarkAsDone(taskID, req.CompletionNote, userCtx.ID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to mark task as done"})
 		return
 	}
@@ -941,8 +974,8 @@ func (h *TaskHandler) StartTask(c *gin.Context) {
 		return
 	}
 
-	// Update task status to in_progress
-	err = h.taskService.UpdateStatus(taskID, "in_progress")
+	// Start task with timeline tracking
+	err = h.taskService.StartTask(taskID, userCtx.ID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to start task"})
 		return
@@ -996,7 +1029,7 @@ func (h *TaskHandler) AssignTask(c *gin.Context) {
 
 	// If volunteer_id is provided, verify they are a team member
 	if req.VolunteerID != nil {
-		isTeamMember, err := h.projectService.IsTeamMember(task.ProjectID, *req.VolunteerID)
+		isTeamMember, err := h.projectService.IsVolunteerTeamMember(task.ProjectID, *req.VolunteerID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check team membership"})
 			return

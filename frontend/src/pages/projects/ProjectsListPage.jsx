@@ -67,7 +67,7 @@ export default function ProjectsListPage() {
   const filteredProjects = projects.filter(project => {
     const matchesSearch = project.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          project.description.toLowerCase().includes(searchTerm.toLowerCase())
-    const projectStatus = project.project_status || project.status || 'draft'
+    const projectStatus = project.project_status || 'draft'
     const matchesStatus = !statusFilter || projectStatus === statusFilter
     return matchesSearch && matchesStatus
   })
@@ -151,12 +151,12 @@ export default function ProjectsListPage() {
                   {project.title}
                 </h3>
                 <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                  (project.project_status || project.status) === 'active' ? 'bg-green-100 text-green-800' :
-                  (project.project_status || project.status) === 'recruiting' ? 'bg-blue-100 text-blue-800' :
-                  (project.project_status || project.status) === 'completed' ? 'bg-gray-100 text-gray-800' :
+                  project.project_status === 'active' ? 'bg-green-100 text-green-800' :
+                  project.project_status === 'recruiting' ? 'bg-blue-100 text-blue-800' :
+                  project.project_status === 'completed' ? 'bg-gray-100 text-gray-800' :
                   'bg-yellow-100 text-yellow-800'
                 }`}>
-                  {project.project_status || project.status || 'draft'}
+                  {project.project_status || 'draft'}
                 </span>
               </div>
 

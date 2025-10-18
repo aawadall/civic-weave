@@ -91,14 +91,53 @@ export default function TaskCard({ task, onClick, onStatusChange, canEdit = fals
         )}
       </div>
 
-      {/* Assignee info */}
-      {task.assignee_id && (
-        <div className="mt-2 pt-2 border-t border-secondary-100">
-          <span className="text-xs text-secondary-500">
-            Assigned to: {task.assignee_name || 'Unknown'}
-          </span>
-        </div>
-      )}
+      {/* Assignee and project info */}
+      <div className="mt-2 pt-2 border-t border-secondary-100">
+        {task.assignee_id && (
+          <div className="text-xs text-secondary-500 mb-1">
+            <span className="font-medium">Assigned to:</span> {task.assignee_name || 'Unknown'}
+            {task.assignee_email && (
+              <span className="ml-1 text-secondary-400">({task.assignee_email})</span>
+            )}
+          </div>
+        )}
+        {task.project_title && (
+          <div className="text-xs text-secondary-500 mb-1">
+            <span className="font-medium">Project:</span> {task.project_title}
+            {task.project_status && (
+              <span className={`ml-1 px-1 py-0.5 rounded text-xs ${
+                task.project_status === 'active' ? 'bg-green-100 text-green-700' :
+                task.project_status === 'recruiting' ? 'bg-blue-100 text-blue-700' :
+                task.project_status === 'completed' ? 'bg-gray-100 text-gray-700' :
+                'bg-yellow-100 text-yellow-700'
+              }`}>
+                {task.project_status}
+              </span>
+            )}
+          </div>
+        )}
+        
+        {/* Timeline badges */}
+        {(task.blocked_at || task.completed_at || task.takeover_requested_at) && (
+          <div className="flex flex-wrap gap-1 mt-1">
+            {task.blocked_at && (
+              <span className="text-xs bg-red-50 text-red-700 px-1 py-0.5 rounded">
+                🚫 Blocked {new Date(task.blocked_at).toLocaleDateString()}
+              </span>
+            )}
+            {task.completed_at && (
+              <span className="text-xs bg-green-50 text-green-700 px-1 py-0.5 rounded">
+                ✅ Completed {new Date(task.completed_at).toLocaleDateString()}
+              </span>
+            )}
+            {task.takeover_requested_at && (
+              <span className="text-xs bg-orange-50 text-orange-700 px-1 py-0.5 rounded">
+                🔄 Takeover requested {new Date(task.takeover_requested_at).toLocaleDateString()}
+              </span>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
