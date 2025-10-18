@@ -1,7 +1,7 @@
 # CivicWeave Source-Available License
 
 **Version 1.0**  
-**Effective Date:** [INSERT EFFECTIVE DATE]
+**Effective Date:** October 18, 2025
 
 ## 1. License Grant
 
