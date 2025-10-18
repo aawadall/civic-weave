@@ -134,6 +134,22 @@ db-agent-k8s-status:
 db-agent-k8s-cleanup:
 	cd backend && ./scripts/deploy-k8s.sh cleanup
 
+# Google Cloud Run Deployment
+db-agent-gcloud:
+	cd backend && ./scripts/deploy-gcloud.sh deploy
+
+db-agent-gcloud-update:
+	cd backend && ./scripts/deploy-gcloud.sh update
+
+db-agent-gcloud-status:
+	cd backend && ./scripts/deploy-gcloud.sh status
+
+db-agent-gcloud-logs:
+	cd backend && ./scripts/deploy-gcloud.sh logs
+
+db-agent-gcloud-cleanup:
+	cd backend && ./scripts/deploy-gcloud.sh cleanup
+
 # Batch jobs
 job-calculate-matches:
 	cd backend && venv/bin/python jobs/calculate_matches.py
@@ -330,6 +346,13 @@ help:
 	@echo "  db-agent-k8s-update - Update Kubernetes deployment"
 	@echo "  db-agent-k8s-status - Show Kubernetes deployment status"
 	@echo "  db-agent-k8s-cleanup - Remove Kubernetes deployment"
+	@echo ""
+	@echo "Google Cloud Run Deployment:"
+	@echo "  db-agent-gcloud        - Deploy agent to Cloud Run"
+	@echo "  db-agent-gcloud-update - Update Cloud Run deployment"
+	@echo "  db-agent-gcloud-status - Show Cloud Run deployment status"
+	@echo "  db-agent-gcloud-logs   - View Cloud Run logs"
+	@echo "  db-agent-gcloud-cleanup - Remove Cloud Run deployment"
 	@echo ""
 	@echo "Batch Jobs:"
 	@echo "  job-setup-python      - Set up Python environment for batch jobs"
