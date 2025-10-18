@@ -37,7 +37,7 @@ type Project struct {
 	Title             string                 `json:"title" db:"title"`
 	Description       string                 `json:"description" db:"description"`
 	ContentJSON       map[string]interface{} `json:"content_json,omitempty" db:"content_json"`
-	RequiredSkills    []string               `json:"required_skills" db:"required_skills"`
+	RequiredSkills    []string               `json:"required_skills"`
 	LocationLat       *float64               `json:"location_lat" db:"location_lat"`
 	LocationLng       *float64               `json:"location_lng" db:"location_lng"`
 	LocationAddress   string                 `json:"location_address" db:"location_address"`
@@ -474,6 +474,16 @@ func (s *ProjectService) IsTeamLead(projectID, userID uuid.UUID) (bool, error) {
 func (s *ProjectService) IsTeamMember(projectID, userID uuid.UUID) (bool, error) {
 	var count int
 	err := s.db.QueryRow(projectIsTeamMemberQuery, projectID, userID).Scan(&count)
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
+// IsVolunteerTeamMember checks if a volunteer is an active team member of a project
+func (s *ProjectService) IsVolunteerTeamMember(projectID, volunteerID uuid.UUID) (bool, error) {
+	var count int
+	err := s.db.QueryRow(projectIsVolunteerTeamMemberQuery, projectID, volunteerID).Scan(&count)
 	if err != nil {
 		return false, err
 	}

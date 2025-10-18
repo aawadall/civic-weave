@@ -290,12 +290,12 @@ export default function ProjectDetailPage() {
                   />
                 ) : (
                   <span className={`px-3 py-1 text-sm font-medium rounded-full ${
-                    (project.status || project.project_status) === 'active' ? 'bg-green-100 text-green-800' :
-                    (project.status || project.project_status) === 'recruiting' ? 'bg-blue-100 text-blue-800' :
-                    (project.status || project.project_status) === 'completed' ? 'bg-gray-100 text-gray-800' :
+                    project.project_status === 'active' ? 'bg-green-100 text-green-800' :
+                    project.project_status === 'recruiting' ? 'bg-blue-100 text-blue-800' :
+                    project.project_status === 'completed' ? 'bg-gray-100 text-gray-800' :
                     'bg-yellow-100 text-yellow-800'
                   }`}>
-                    {project.status || project.project_status || 'draft'}
+                    {project.project_status || 'draft'}
                   </span>
                 )}
                 

@@ -33,8 +33,14 @@ db-backfill-skills:
 db-migrate-v2:
 	cd backend && go run cmd/migrate/main.go -command=up -runtime-version=1.0.0
 
+db-migrate-v2-prod:
+	cd backend && go run cmd/migrate/main.go -command=up -runtime-version=1.0.0 -env=../.env.production
+
 db-migrate-status:
 	cd backend && go run cmd/migrate/main.go -command=status
+
+db-migrate-status-prod:
+	cd backend && go run cmd/migrate/main.go -command=status -env=../.env.production
 
 db-migrate-compat:
 	cd backend && go run cmd/migrate/main.go -command=compatibility -runtime-version=1.0.0
@@ -242,7 +248,9 @@ help:
 	@echo ""
 	@echo "Enhanced Migrations (v2):"
 	@echo "  db-migrate-v2      - Run enhanced migrations with versioning"
+	@echo "  db-migrate-v2-prod - Run enhanced migrations against production database"
 	@echo "  db-migrate-status  - Show migration status and pending migrations"
+	@echo "  db-migrate-status-prod - Show production migration status"
 	@echo "  db-migrate-compat  - Display compatibility matrix"
 	@echo "  db-migrate-validate - Validate migration files and integrity"
 	@echo "  db-migrate-check   - Check migration health (CI/CD friendly)"

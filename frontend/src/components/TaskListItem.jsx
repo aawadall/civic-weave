@@ -137,6 +137,16 @@ const TaskListItem = ({ task, showProject = true, showActions = true, onTaskUpda
               >
                 {task.project_title}
               </Link>
+              {task.project_status && (
+                <span className={`ml-2 px-2 py-0.5 rounded text-xs ${
+                  task.project_status === 'active' ? 'bg-green-100 text-green-700' :
+                  task.project_status === 'recruiting' ? 'bg-blue-100 text-blue-700' :
+                  task.project_status === 'completed' ? 'bg-gray-100 text-gray-700' :
+                  'bg-yellow-100 text-yellow-700'
+                }`}>
+                  {task.project_status}
+                </span>
+              )}
             </div>
           )}
 
@@ -151,6 +161,35 @@ const TaskListItem = ({ task, showProject = true, showActions = true, onTaskUpda
                   {label}
                 </span>
               ))}
+            </div>
+          )}
+
+          {/* Timeline badges */}
+          {(task.blocked_at || task.completed_at || task.takeover_requested_at || task.started_at) && (
+            <div className="flex flex-wrap gap-1 mb-3">
+              {task.started_at && (
+                <span className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded">
+                  🚀 Started {new Date(task.started_at).toLocaleDateString()}
+                </span>
+              )}
+              {task.blocked_at && (
+                <span className="text-xs bg-red-50 text-red-700 px-2 py-1 rounded">
+                  🚫 Blocked {new Date(task.blocked_at).toLocaleDateString()}
+                  {task.blocked_reason && ` - ${task.blocked_reason}`}
+                </span>
+              )}
+              {task.completed_at && (
+                <span className="text-xs bg-green-50 text-green-700 px-2 py-1 rounded">
+                  ✅ Completed {new Date(task.completed_at).toLocaleDateString()}
+                  {task.completion_note && ` - ${task.completion_note}`}
+                </span>
+              )}
+              {task.takeover_requested_at && (
+                <span className="text-xs bg-orange-50 text-orange-700 px-2 py-1 rounded">
+                  🔄 Takeover requested {new Date(task.takeover_requested_at).toLocaleDateString()}
+                  {task.takeover_reason && ` - ${task.takeover_reason}`}
+                </span>
+              )}
             </div>
           )}
 

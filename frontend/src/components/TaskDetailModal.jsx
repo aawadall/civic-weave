@@ -146,7 +146,30 @@ export default function TaskDetailModal({ task, isOpen, onClose, onTaskUpdated }
                       {task.assignee_id && (
                         <div>
                           <dt className="text-sm font-medium text-secondary-500">Assignee</dt>
-                          <dd className="text-sm text-secondary-900">Assigned</dd>
+                          <dd className="text-sm text-secondary-900">
+                            {task.assignee_name || 'Unknown'}
+                            {task.assignee_email && (
+                              <span className="text-secondary-500 ml-1">({task.assignee_email})</span>
+                            )}
+                          </dd>
+                        </div>
+                      )}
+                      {task.project_title && (
+                        <div>
+                          <dt className="text-sm font-medium text-secondary-500">Project</dt>
+                          <dd className="text-sm text-secondary-900">
+                            {task.project_title}
+                            {task.project_status && (
+                              <span className={`ml-2 px-2 py-0.5 rounded text-xs ${
+                                task.project_status === 'active' ? 'bg-green-100 text-green-700' :
+                                task.project_status === 'recruiting' ? 'bg-blue-100 text-blue-700' :
+                                task.project_status === 'completed' ? 'bg-gray-100 text-gray-700' :
+                                'bg-yellow-100 text-yellow-700'
+                              }`}>
+                                {task.project_status}
+                              </span>
+                            )}
+                          </dd>
                         </div>
                       )}
                       {task.labels && task.labels.length > 0 && (
@@ -171,6 +194,68 @@ export default function TaskDetailModal({ task, isOpen, onClose, onTaskUpdated }
                     <TaskTimeSummary taskId={task.id} />
                   </div>
                 </div>
+
+                {/* Timeline Section */}
+                {(task.started_at || task.blocked_at || task.completed_at || task.takeover_requested_at) && (
+                  <div>
+                    <h3 className="text-lg font-semibold text-secondary-900 mb-3">Timeline</h3>
+                    <div className="space-y-3">
+                      {task.started_at && (
+                        <div className="flex items-center space-x-3 p-3 bg-blue-50 rounded-lg">
+                          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                            <span className="text-blue-600 text-sm">🚀</span>
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-blue-900">Task Started</p>
+                            <p className="text-xs text-blue-700">{new Date(task.started_at).toLocaleString()}</p>
+                          </div>
+                        </div>
+                      )}
+                      {task.blocked_at && (
+                        <div className="flex items-center space-x-3 p-3 bg-red-50 rounded-lg">
+                          <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
+                            <span className="text-red-600 text-sm">🚫</span>
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-red-900">Task Blocked</p>
+                            <p className="text-xs text-red-700">
+                              {new Date(task.blocked_at).toLocaleString()}
+                              {task.blocked_reason && ` - ${task.blocked_reason}`}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                      {task.completed_at && (
+                        <div className="flex items-center space-x-3 p-3 bg-green-50 rounded-lg">
+                          <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                            <span className="text-green-600 text-sm">✅</span>
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-green-900">Task Completed</p>
+                            <p className="text-xs text-green-700">
+                              {new Date(task.completed_at).toLocaleString()}
+                              {task.completion_note && ` - ${task.completion_note}`}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                      {task.takeover_requested_at && (
+                        <div className="flex items-center space-x-3 p-3 bg-orange-50 rounded-lg">
+                          <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center">
+                            <span className="text-orange-600 text-sm">🔄</span>
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-orange-900">Takeover Requested</p>
+                            <p className="text-xs text-orange-700">
+                              {new Date(task.takeover_requested_at).toLocaleString()}
+                              {task.takeover_reason && ` - ${task.takeover_reason}`}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

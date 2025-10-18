@@ -57,7 +57,7 @@ export default function DebugInfo({ project, title = "Debug Info" }) {
           {project && (
             <>
               <div><strong>Project ID:</strong> {project.id}</div>
-              <div><strong>Project Status:</strong> {project.status || project.project_status || 'Unknown'}</div>
+              <div><strong>Project Status:</strong> {project.project_status || 'Unknown'}</div>
               <div><strong>Team Lead ID:</strong> {project.team_lead_id || 'None'}</div>
               <div><strong>Created By:</strong> {project.created_by_admin_id || 'Unknown'}</div>
               <div><strong>Active Team Count:</strong> {project.active_team_count || 0}</div>

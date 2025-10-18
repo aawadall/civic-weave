@@ -29,20 +29,30 @@ const (
 
 // ProjectTask represents a task in a project
 type ProjectTask struct {
-	ID            uuid.UUID    `json:"id" db:"id"`
-	ProjectID     uuid.UUID    `json:"project_id" db:"project_id"`
-	Title         string       `json:"title" db:"title"`
-	Description   string       `json:"description" db:"description"`
-	AssigneeID    *uuid.UUID   `json:"assignee_id" db:"assignee_id"`
-	AssigneeName  *string      `json:"assignee_name,omitempty" db:"assignee_name"`
-	AssigneeEmail *string      `json:"assignee_email,omitempty" db:"assignee_email"`
-	CreatedByID   uuid.UUID    `json:"created_by_id" db:"created_by_id"`
-	Status        TaskStatus   `json:"status" db:"status"`
-	Priority      TaskPriority `json:"priority" db:"priority"`
-	DueDate       *time.Time   `json:"due_date" db:"due_date"`
-	Labels        []string     `json:"labels" db:"labels"`
-	CreatedAt     time.Time    `json:"created_at" db:"created_at"`
-	UpdatedAt     time.Time    `json:"updated_at" db:"updated_at"`
+	ID                  uuid.UUID    `json:"id" db:"id"`
+	ProjectID           uuid.UUID    `json:"project_id" db:"project_id"`
+	Title               string       `json:"title" db:"title"`
+	Description         string       `json:"description" db:"description"`
+	AssigneeID          *uuid.UUID   `json:"assignee_id" db:"assignee_id"`
+	AssigneeName        *string      `json:"assignee_name,omitempty" db:"assignee_name"`
+	AssigneeEmail       *string      `json:"assignee_email,omitempty" db:"assignee_email"`
+	CreatedByID         uuid.UUID    `json:"created_by_id" db:"created_by_id"`
+	Status              TaskStatus   `json:"status" db:"status"`
+	Priority            TaskPriority `json:"priority" db:"priority"`
+	DueDate             *time.Time   `json:"due_date" db:"due_date"`
+	Labels              []string     `json:"labels" db:"labels"`
+	ProjectTitle        string       `json:"project_title,omitempty" db:"project_title"`
+	ProjectStatus       string       `json:"project_status,omitempty" db:"project_status"`
+	StartedAt           *time.Time   `json:"started_at,omitempty" db:"started_at"`
+	BlockedAt           *time.Time   `json:"blocked_at,omitempty" db:"blocked_at"`
+	BlockedReason       *string      `json:"blocked_reason,omitempty" db:"blocked_reason"`
+	CompletedAt         *time.Time   `json:"completed_at,omitempty" db:"completed_at"`
+	CompletionNote      *string      `json:"completion_note,omitempty" db:"completion_note"`
+	TakeoverRequestedAt *time.Time   `json:"takeover_requested_at,omitempty" db:"takeover_requested_at"`
+	TakeoverReason      *string      `json:"takeover_reason,omitempty" db:"takeover_reason"`
+	LastStatusChangedBy *uuid.UUID   `json:"last_status_changed_by,omitempty" db:"last_status_changed_by"`
+	CreatedAt           time.Time    `json:"created_at" db:"created_at"`
+	UpdatedAt           time.Time    `json:"updated_at" db:"updated_at"`
 }
 
 // TaskUpdate represents a progress update on a task
@@ -115,19 +125,19 @@ func (s *TaskService) GetByID(id uuid.UUID) (*ProjectTask, error) {
 }
 
 // ListByProject retrieves all tasks for a project
-// If userID is provided and is not the project owner, only returns tasks assigned to that user
-func (s *TaskService) ListByProject(projectID uuid.UUID, userID *uuid.UUID, isProjectOwner bool) ([]ProjectTask, error) {
+// If assigneeID is provided and is not the project owner, only returns tasks assigned to that volunteer
+func (s *TaskService) ListByProject(projectID uuid.UUID, assigneeID *uuid.UUID, isProjectOwner bool) ([]ProjectTask, error) {
 	var query string
 	var args []interface{}
 
-	if isProjectOwner || userID == nil {
+	if isProjectOwner || assigneeID == nil {
 		// Project owner or admin sees all tasks
 		query = taskListByProjectOwnerQuery
 		args = []interface{}{projectID}
 	} else {
 		// Regular team member only sees their assigned tasks
 		query = taskListByProjectMemberQuery
-		args = []interface{}{projectID, userID}
+		args = []interface{}{projectID, assigneeID}
 	}
 
 	rows, err := s.db.Query(query, args...)
@@ -143,7 +153,10 @@ func (s *TaskService) ListByProject(projectID uuid.UUID, userID *uuid.UUID, isPr
 		err := rows.Scan(
 			&task.ID, &task.ProjectID, &task.Title, &task.Description, &task.AssigneeID,
 			&task.CreatedByID, &task.Status, &task.Priority, &task.DueDate, &labelsJSON,
-			&task.CreatedAt, &task.UpdatedAt,
+			&task.CreatedAt, &task.UpdatedAt, &task.AssigneeName, &task.AssigneeEmail,
+			&task.ProjectTitle, &task.ProjectStatus, &task.StartedAt, &task.BlockedAt,
+			&task.BlockedReason, &task.CompletedAt, &task.CompletionNote,
+			&task.TakeoverRequestedAt, &task.TakeoverReason, &task.LastStatusChangedBy,
 		)
 		if err != nil {
 			return nil, err
@@ -175,7 +188,8 @@ func (s *TaskService) ListUnassignedByProject(projectID uuid.UUID) ([]ProjectTas
 		err := rows.Scan(
 			&task.ID, &task.ProjectID, &task.Title, &task.Description, &task.AssigneeID,
 			&task.CreatedByID, &task.Status, &task.Priority, &task.DueDate, &labelsJSON,
-			&task.CreatedAt, &task.UpdatedAt,
+			&task.CreatedAt, &task.UpdatedAt, &task.AssigneeName, &task.AssigneeEmail,
+			&task.ProjectTitle, &task.ProjectStatus,
 		)
 		if err != nil {
 			return nil, err
@@ -207,7 +221,10 @@ func (s *TaskService) ListByAssignee(assigneeID uuid.UUID) ([]ProjectTask, error
 		err := rows.Scan(
 			&task.ID, &task.ProjectID, &task.Title, &task.Description, &task.AssigneeID,
 			&task.CreatedByID, &task.Status, &task.Priority, &task.DueDate, &labelsJSON,
-			&task.CreatedAt, &task.UpdatedAt,
+			&task.CreatedAt, &task.UpdatedAt, &task.AssigneeName, &task.AssigneeEmail,
+			&task.ProjectTitle, &task.ProjectStatus, &task.StartedAt, &task.BlockedAt,
+			&task.BlockedReason, &task.CompletedAt, &task.CompletionNote,
+			&task.TakeoverRequestedAt, &task.TakeoverReason, &task.LastStatusChangedBy,
 		)
 		if err != nil {
 			return nil, err
@@ -235,9 +252,19 @@ func (s *TaskService) Update(task *ProjectTask) error {
 		task.Status, task.Priority, task.DueDate, labelsJSON).Scan(&task.UpdatedAt)
 }
 
-// UpdateStatus updates only the status of a task
-func (s *TaskService) UpdateStatus(taskID uuid.UUID, status TaskStatus) error {
-	result, err := s.db.Exec(taskUpdateStatusQuery, taskID, status)
+// UpdateStatus updates only the status of a task with activity logging
+func (s *TaskService) UpdateStatus(taskID uuid.UUID, status TaskStatus, actorUserID uuid.UUID) error {
+	// Get current task to determine previous status
+	task, err := s.GetByID(taskID)
+	if err != nil {
+		return err
+	}
+	if task == nil {
+		return sql.ErrNoRows
+	}
+
+	// Update status
+	result, err := s.db.Exec(taskUpdateStatusQuery, taskID, status, &actorUserID)
 	if err != nil {
 		return err
 	}
@@ -249,6 +276,11 @@ func (s *TaskService) UpdateStatus(taskID uuid.UUID, status TaskStatus) error {
 
 	if rowsAffected == 0 {
 		return sql.ErrNoRows
+	}
+
+	// Log activity if status changed
+	if task.Status != status {
+		return s.insertActivityLog(taskID, actorUserID, task.Status, status, map[string]interface{}{})
 	}
 
 	return nil
@@ -339,16 +371,117 @@ func (s *TaskService) GetTaskWithUpdates(taskID uuid.UUID) (*TaskWithUpdates, er
 }
 
 // MarkAsBlocked marks a task as blocked
-func (s *TaskService) MarkAsBlocked(taskID uuid.UUID) error {
-	return s.UpdateStatus(taskID, TaskStatusBlocked)
+func (s *TaskService) MarkAsBlocked(taskID uuid.UUID, reason string, actorUserID uuid.UUID) error {
+	// Get current task to determine previous status
+	task, err := s.GetByID(taskID)
+	if err != nil {
+		return err
+	}
+	if task == nil {
+		return sql.ErrNoRows
+	}
+
+	// Update timeline fields and status
+	now := time.Now()
+	_, err = s.db.Exec(taskUpdateTimelineQuery, taskID, nil, &now, &reason, nil, nil, nil, nil, TaskStatusBlocked, &actorUserID)
+	if err != nil {
+		return err
+	}
+
+	// Log activity
+	return s.insertActivityLog(taskID, actorUserID, task.Status, TaskStatusBlocked, map[string]interface{}{
+		"reason": reason,
+	})
 }
 
 // RequestTakeover marks a task as requesting takeover
-func (s *TaskService) RequestTakeover(taskID uuid.UUID) error {
-	return s.UpdateStatus(taskID, TaskStatusTakeoverRequested)
+func (s *TaskService) RequestTakeover(taskID uuid.UUID, reason string, actorUserID uuid.UUID) error {
+	// Get current task to determine previous status
+	task, err := s.GetByID(taskID)
+	if err != nil {
+		return err
+	}
+	if task == nil {
+		return sql.ErrNoRows
+	}
+
+	// Update timeline fields and status
+	now := time.Now()
+	_, err = s.db.Exec(taskUpdateTimelineQuery, taskID, nil, nil, nil, nil, nil, &now, &reason, TaskStatusTakeoverRequested, &actorUserID)
+	if err != nil {
+		return err
+	}
+
+	// Log activity
+	return s.insertActivityLog(taskID, actorUserID, task.Status, TaskStatusTakeoverRequested, map[string]interface{}{
+		"reason": reason,
+	})
 }
 
 // MarkAsDone marks a task as done
-func (s *TaskService) MarkAsDone(taskID uuid.UUID) error {
-	return s.UpdateStatus(taskID, TaskStatusDone)
+func (s *TaskService) MarkAsDone(taskID uuid.UUID, completionNote string, actorUserID uuid.UUID) error {
+	// Get current task to determine previous status
+	task, err := s.GetByID(taskID)
+	if err != nil {
+		return err
+	}
+	if task == nil {
+		return sql.ErrNoRows
+	}
+
+	// Update timeline fields and status
+	now := time.Now()
+	_, err = s.db.Exec(taskUpdateTimelineQuery, taskID, nil, nil, nil, &now, &completionNote, nil, nil, TaskStatusDone, &actorUserID)
+	if err != nil {
+		return err
+	}
+
+	// Log activity
+	return s.insertActivityLog(taskID, actorUserID, task.Status, TaskStatusDone, map[string]interface{}{
+		"completion_note": completionNote,
+	})
+}
+
+// StartTask marks a task as started (in_progress)
+func (s *TaskService) StartTask(taskID uuid.UUID, actorUserID uuid.UUID) error {
+	// Get current task to determine previous status
+	task, err := s.GetByID(taskID)
+	if err != nil {
+		return err
+	}
+	if task == nil {
+		return sql.ErrNoRows
+	}
+
+	// Update timeline fields and status
+	now := time.Now()
+	_, err = s.db.Exec(taskUpdateTimelineQuery, taskID, &now, nil, nil, nil, nil, nil, nil, TaskStatusInProgress, &actorUserID)
+	if err != nil {
+		return err
+	}
+
+	// Log activity
+	return s.insertActivityLog(taskID, actorUserID, task.Status, TaskStatusInProgress, map[string]interface{}{
+		"started_at": now,
+	})
+}
+
+// insertActivityLog logs a task status change to the activity log
+func (s *TaskService) insertActivityLog(taskID, actorUserID uuid.UUID, fromStatus, toStatus TaskStatus, context map[string]interface{}) error {
+	// Look up volunteer ID from user ID
+	var volunteerID *uuid.UUID
+	err := s.db.QueryRow("SELECT id FROM volunteers WHERE user_id = $1", actorUserID).Scan(&volunteerID)
+	if err != nil && err != sql.ErrNoRows {
+		return err
+	}
+
+	// Prepare context JSON
+	contextJSON, err := ToJSON(context)
+	if err != nil {
+		return err
+	}
+
+	// Insert activity log entry
+	_, err = s.db.Exec(taskInsertActivityLogQuery, uuid.New(), taskID, actorUserID, volunteerID, fromStatus, toStatus, contextJSON)
+	return err
 }

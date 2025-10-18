@@ -15,11 +15,6 @@ import (
 )
 
 func main() {
-	// Load environment variables
-	if err := godotenv.Load(); err != nil {
-		log.Println("No .env file found, using system environment variables")
-	}
-
 	// Parse command line arguments
 	var (
 		command            = flag.String("command", "up", "Migration command: up, down, status, compatibility, validate, check, schema-state, drift-detect, validate-state")
@@ -28,8 +23,14 @@ func main() {
 		dryRun             = flag.Bool("dry-run", false, "Show what would be done without executing")
 		failOnIncompatible = flag.Bool("fail-on-incompatible", false, "Fail if runtime version is incompatible")
 		quiet              = flag.Bool("quiet", false, "Suppress output (useful for CI/CD)")
+		envFile            = flag.String("env", ".env", "Environment file path")
 	)
 	flag.Parse()
+
+	// Load environment variables
+	if err := godotenv.Load(*envFile); err != nil {
+		log.Printf("No %s file found, using system environment variables", *envFile)
+	}
 
 	// Load configuration
 	cfg := config.Load()
