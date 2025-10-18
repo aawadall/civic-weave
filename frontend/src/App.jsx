@@ -25,6 +25,7 @@ import ProjectDetailPage from './pages/projects/ProjectDetailPage'
 import CreateProjectPage from './pages/projects/CreateProjectPage'
 import EditProjectPage from './pages/projects/EditProjectPage'
 import MessageCenter from './pages/MessageCenter'
+import DirectConversationPage from './pages/DirectConversationPage'
 // Volunteer pages
 import VolunteersPoolPage from './pages/volunteers/VolunteersPoolPage'
 import VolunteerScorecardPage from './pages/volunteers/VolunteerScorecardPage'
@@ -169,6 +170,14 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <MessageCenter />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="messages/direct/:conversationId" 
+                element={
+                  <ProtectedRoute>
+                    <DirectConversationPage />
                   </ProtectedRoute>
                 } 
               />
