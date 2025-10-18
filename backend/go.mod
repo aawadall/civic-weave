@@ -3,6 +3,7 @@ module civicweave/backend
 go 1.22
 
 require (
+	github.com/Masterminds/semver/v3 v3.2.1
 	github.com/gin-gonic/gin v1.9.1
 	github.com/golang-jwt/jwt/v5 v5.2.0
 	github.com/google/uuid v1.5.0

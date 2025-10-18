@@ -1,0 +1,10 @@
+{
+  "version": "1.0.0",
+  "name": "initial_schema",
+  "description": "Initial database schema setup for CivicWeave v2 migration system",
+  "min_runtime_version": "0.1.0",
+  "max_runtime_version": "",
+  "dependencies": [],
+  "author": "CivicWeave Team",
+  "created_at": "2025-01-18T00:00:00Z"
+}
