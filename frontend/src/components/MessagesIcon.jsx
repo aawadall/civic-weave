@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { getUnreadMessageCounts } from '../services/api'
+import { getUnreadMessageCounts, getInbox } from '../services/api'
 import NotificationBadge from './NotificationBadge'
 
 export default function MessagesIcon() {
@@ -8,9 +8,20 @@ export default function MessagesIcon() {
 
   const fetchUnreadCounts = async () => {
     try {
-      const response = await getUnreadMessageCounts()
-      // Sum up all unread counts across projects
-      const total = response.data.unread_counts?.reduce((sum, item) => sum + item.count, 0) || 0
+      // Fetch both project and direct message counts
+      const [projectResponse, directResponse] = await Promise.all([
+        getUnreadMessageCounts().catch(() => ({ data: { unread_counts: [] } })),
+        getInbox({ limit: 50, offset: 0 }).catch(() => ({ data: { messages: [] } }))
+      ])
+      
+      // Sum up project unread counts
+      const projectCount = projectResponse.data.unread_counts?.reduce((sum, item) => sum + item.count, 0) || 0
+      
+      // Count unread direct messages
+      const directCount = directResponse.data.messages?.filter(msg => !msg.is_read).length || 0
+      
+      // Total unread count
+      const total = projectCount + directCount
       setUnreadCount(total)
     } catch (error) {
       console.error('Failed to fetch unread message counts:', error)
