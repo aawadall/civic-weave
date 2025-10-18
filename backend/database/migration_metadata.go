@@ -13,15 +13,15 @@ import (
 
 // MigrationMetadata represents the metadata for a migration
 type MigrationMetadata struct {
-	Version            string   `json:"version"`
-	Name               string   `json:"name"`
-	Description        string   `json:"description"`
-	MinRuntimeVersion  string   `json:"min_runtime_version"`
-	MaxRuntimeVersion  string   `json:"max_runtime_version,omitempty"`
-	Dependencies       []string `json:"dependencies,omitempty"`
-	Checksum           string   `json:"checksum,omitempty"`
-	Author             string   `json:"author,omitempty"`
-	CreatedAt          string   `json:"created_at,omitempty"`
+	Version           string   `json:"version"`
+	Name              string   `json:"name"`
+	Description       string   `json:"description"`
+	MinRuntimeVersion string   `json:"min_runtime_version"`
+	MaxRuntimeVersion string   `json:"max_runtime_version,omitempty"`
+	Dependencies      []string `json:"dependencies,omitempty"`
+	Checksum          string   `json:"checksum,omitempty"`
+	Author            string   `json:"author,omitempty"`
+	CreatedAt         string   `json:"created_at,omitempty"`
 }
 
 // MigrationStatus represents the status of a migration

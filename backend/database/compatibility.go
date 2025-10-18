@@ -11,12 +11,12 @@ import (
 
 // CompatibilityMatrix represents the compatibility status between database and runtime
 type CompatibilityMatrix struct {
-	CurrentDBVersion    string             `json:"current_db_version"`
-	RuntimeVersion      string             `json:"runtime_version"`
-	OverallStatus       string             `json:"overall_status"` // compatible, warning, incompatible
-	AppliedMigrations   []MigrationStatus  `json:"applied_migrations"`
-	PendingMigrations   []MigrationStatus  `json:"pending_migrations"`
-	CompatibilityIssues []string           `json:"compatibility_issues,omitempty"`
+	CurrentDBVersion    string            `json:"current_db_version"`
+	RuntimeVersion      string            `json:"runtime_version"`
+	OverallStatus       string            `json:"overall_status"` // compatible, warning, incompatible
+	AppliedMigrations   []MigrationStatus `json:"applied_migrations"`
+	PendingMigrations   []MigrationStatus `json:"pending_migrations"`
+	CompatibilityIssues []string          `json:"compatibility_issues,omitempty"`
 }
 
 // CheckDatabaseCompatibility checks the overall compatibility between database and runtime
@@ -60,7 +60,7 @@ func CheckDatabaseCompatibility(db *sql.DB, runtimeVersion string) (*Compatibili
 
 		if !compat.IsCompatible {
 			allCompatible = false
-			matrix.CompatibilityIssues = append(matrix.CompatibilityIssues, 
+			matrix.CompatibilityIssues = append(matrix.CompatibilityIssues,
 				fmt.Sprintf("Migration %s: %s", migration.Version, compat.Message))
 		} else if compat.Status == "warning" {
 			hasWarnings = true
@@ -204,7 +204,7 @@ func DisplayCompatibilityMatrix(matrix *CompatibilityMatrix) {
 			if migration.Status == "failed" {
 				statusIcon = "❌"
 			}
-			fmt.Printf("  %s %s (%s) - %s\n", 
+			fmt.Printf("  %s %s (%s) - %s\n",
 				statusIcon, migration.Version, migration.Name, migration.AppliedAt)
 		}
 		fmt.Println()

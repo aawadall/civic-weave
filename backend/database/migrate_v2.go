@@ -20,11 +20,11 @@ type MigrationResult struct {
 
 // MigrationOptions represents options for migration operations
 type MigrationOptions struct {
-	DryRun           bool
+	DryRun             bool
 	FailOnIncompatible bool
-	MaxVersion       string
-	AutoApprove     bool
-	RuntimeVersion   string
+	MaxVersion         string
+	AutoApprove        bool
+	RuntimeVersion     string
 }
 
 // MigrateV2 runs the enhanced migration system
@@ -107,7 +107,7 @@ func MigrateV2(db *sql.DB, options *MigrationOptions) error {
 
 		if result.Status == "applied" {
 			appliedVersions[migration.Version] = true
-			log.Printf("✅ Applied migration %s (%s) in %dms", 
+			log.Printf("✅ Applied migration %s (%s) in %dms",
 				migration.Version, migration.Name, result.ExecutionTimeMs)
 		}
 	}
@@ -169,7 +169,7 @@ func RollbackV2(db *sql.DB, targetVersion string, options *MigrationOptions) err
 		}
 
 		if result.Status == "rolled_back" {
-			log.Printf("✅ Rolled back migration %s (%s) in %dms", 
+			log.Printf("✅ Rolled back migration %s (%s) in %dms",
 				migration.Version, migration.Name, result.ExecutionTimeMs)
 		}
 	}
@@ -191,7 +191,7 @@ func createMigrationsTableV2(db *sql.DB) error {
 			status VARCHAR(20) DEFAULT 'applied'
 		);
 	`
-	
+
 	_, err := db.Exec(query)
 	return err
 }
@@ -398,7 +398,7 @@ func ValidateMigrationIntegrity(db *sql.DB) error {
 
 		// Compare with recorded checksum
 		if migration.Checksum != "" && migration.Checksum != currentChecksum {
-			issues = append(issues, fmt.Sprintf("Migration %s checksum mismatch (recorded: %s, current: %s)", 
+			issues = append(issues, fmt.Sprintf("Migration %s checksum mismatch (recorded: %s, current: %s)",
 				migration.Version, migration.Checksum, currentChecksum))
 		}
 	}
@@ -410,4 +410,3 @@ func ValidateMigrationIntegrity(db *sql.DB) error {
 	log.Println("All migration files are valid")
 	return nil
 }
-

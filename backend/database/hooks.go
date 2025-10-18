@@ -101,9 +101,9 @@ func GetMigrationStatus(db *sql.DB) (*CompatibilityMatrix, error) {
 
 	status := &CompatibilityMatrix{
 		CurrentDBVersion:  currentDBVersion,
-		AppliedMigrations:  appliedMigrations,
-		PendingMigrations:  pendingMigrations,
-		OverallStatus:      "unknown",
+		AppliedMigrations: appliedMigrations,
+		PendingMigrations: pendingMigrations,
+		OverallStatus:     "unknown",
 	}
 
 	// Determine overall status
@@ -238,7 +238,7 @@ func GetMigrationSummary(db *sql.DB) (map[string]interface{}, error) {
 	summary := map[string]interface{}{
 		"current_db_version": status.CurrentDBVersion,
 		"applied_count":      len(status.AppliedMigrations),
-		"pending_count":     len(status.PendingMigrations),
+		"pending_count":      len(status.PendingMigrations),
 		"overall_status":     status.OverallStatus,
 	}
 
@@ -246,10 +246,10 @@ func GetMigrationSummary(db *sql.DB) (map[string]interface{}, error) {
 	var appliedList []map[string]interface{}
 	for _, migration := range status.AppliedMigrations {
 		appliedList = append(appliedList, map[string]interface{}{
-			"version":   migration.Version,
-			"name":      migration.Name,
+			"version":    migration.Version,
+			"name":       migration.Name,
 			"applied_at": migration.AppliedAt,
-			"status":    migration.Status,
+			"status":     migration.Status,
 		})
 	}
 	summary["applied_migrations"] = appliedList
@@ -275,7 +275,7 @@ func RollbackToVersion(db *sql.DB, targetVersion string, options *MigrationHookO
 	}
 
 	rollbackOptions := &MigrationOptions{
-		DryRun:  options.DryRun,
+		DryRun: options.DryRun,
 	}
 	return RollbackV2(db, targetVersion, rollbackOptions)
 }

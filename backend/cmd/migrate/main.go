@@ -21,12 +21,12 @@ func main() {
 
 	// Parse command line arguments
 	var (
-		command        = flag.String("command", "up", "Migration command: up, down, status, compatibility, validate, check")
-		targetVersion  = flag.String("version", "", "Target version for rollback")
-		runtimeVersion = flag.String("runtime-version", "1.0.0", "Runtime version for compatibility checking")
-		dryRun         = flag.Bool("dry-run", false, "Show what would be done without executing")
+		command            = flag.String("command", "up", "Migration command: up, down, status, compatibility, validate, check")
+		targetVersion      = flag.String("version", "", "Target version for rollback")
+		runtimeVersion     = flag.String("runtime-version", "1.0.0", "Runtime version for compatibility checking")
+		dryRun             = flag.Bool("dry-run", false, "Show what would be done without executing")
 		failOnIncompatible = flag.Bool("fail-on-incompatible", false, "Fail if runtime version is incompatible")
-		quiet          = flag.Bool("quiet", false, "Suppress output (useful for CI/CD)")
+		quiet              = flag.Bool("quiet", false, "Suppress output (useful for CI/CD)")
 	)
 	flag.Parse()
 
@@ -90,8 +90,8 @@ func runMigrations(db *sql.DB, runtimeVersion string, dryRun, failOnIncompatible
 
 func rollbackMigrations(db *sql.DB, targetVersion string, dryRun, quiet bool) error {
 	options := &database.MigrationHookOptions{
-		DryRun:  dryRun,
-		Quiet:   quiet,
+		DryRun: dryRun,
+		Quiet:  quiet,
 	}
 
 	return database.RollbackToVersion(db, targetVersion, options)
