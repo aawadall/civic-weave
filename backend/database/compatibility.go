@@ -25,10 +25,15 @@ func CheckDatabaseCompatibility(db *sql.DB, runtimeVersion string) (*Compatibili
 		RuntimeVersion: runtimeVersion,
 	}
 
-	// Get applied migrations
+	// Get applied migrations (ignore error if table doesn't exist yet)
 	appliedMigrations, err := getAppliedMigrationsV2(db)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get applied migrations: %w", err)
+		// If table doesn't exist, that's fine - no migrations applied yet
+		if err.Error() == `pq: relation "schema_migrations_v2" does not exist` {
+			appliedMigrations = []MigrationStatus{}
+		} else {
+			return nil, fmt.Errorf("failed to get applied migrations: %w", err)
+		}
 	}
 
 	// Get current database version (highest applied migration)
@@ -142,11 +147,16 @@ func getPendingMigrations(db *sql.DB, registry *MigrationRegistry) ([]MigrationS
 	// Get all available migrations
 	allMigrations := registry.GetSortedMigrations()
 
-	// Get applied migration versions
+	// Get applied migration versions (ignore error if table doesn't exist yet)
 	appliedVersions := make(map[string]bool)
 	appliedMigrations, err := getAppliedMigrationsV2(db)
 	if err != nil {
-		return nil, err
+		// If table doesn't exist, that's fine - no migrations applied yet
+		if err.Error() == `pq: relation "schema_migrations_v2" does not exist` {
+			appliedMigrations = []MigrationStatus{}
+		} else {
+			return nil, err
+		}
 	}
 
 	for _, migration := range appliedMigrations {
@@ -238,6 +248,10 @@ func DisplayCompatibilityMatrix(matrix *CompatibilityMatrix) {
 func GetMinimumRequiredVersion(db *sql.DB) (string, error) {
 	appliedMigrations, err := getAppliedMigrationsV2(db)
 	if err != nil {
+		// If table doesn't exist, that's fine - no migrations applied yet
+		if err.Error() == `pq: relation "schema_migrations_v2" does not exist` {
+			return "0.0.0", nil
+		}
 		return "", err
 	}
 

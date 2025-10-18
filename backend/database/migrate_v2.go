@@ -359,10 +359,15 @@ func ValidateMigrationIntegrity(db *sql.DB) error {
 		return fmt.Errorf("failed to load migration registry: %w", err)
 	}
 
-	// Get applied migrations
+	// Get applied migrations (ignore error if table doesn't exist yet)
 	appliedMigrations, err := getAppliedMigrationsV2(db)
 	if err != nil {
-		return fmt.Errorf("failed to get applied migrations: %w", err)
+		// If table doesn't exist, that's fine - no migrations applied yet
+		if err.Error() == `pq: relation "schema_migrations_v2" does not exist` {
+			appliedMigrations = []MigrationStatus{}
+		} else {
+			return fmt.Errorf("failed to get applied migrations: %w", err)
+		}
 	}
 
 	var issues []string

@@ -70,10 +70,15 @@ func CheckCompatibility(db *sql.DB, runtimeVersion string) (*CompatibilityStatus
 
 // GetMigrationStatus returns structured migration status data
 func GetMigrationStatus(db *sql.DB) (*CompatibilityMatrix, error) {
-	// Get applied migrations
+	// Get applied migrations (ignore error if table doesn't exist yet)
 	appliedMigrations, err := getAppliedMigrationsV2(db)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get applied migrations: %w", err)
+		// If table doesn't exist, that's fine - no migrations applied yet
+		if err.Error() == `pq: relation "schema_migrations_v2" does not exist` {
+			appliedMigrations = []MigrationStatus{}
+		} else {
+			return nil, fmt.Errorf("failed to get applied migrations: %w", err)
+		}
 	}
 
 	// Load migration registry
