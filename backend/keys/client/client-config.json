@@ -1,0 +1,8 @@
+{
+  "agent_url": "localhost:50051",
+  "client_id": "10a4a2cb-5b3c-4c0a-9236-844d52c15ced",
+  "private_key": "kxrnDSYbgt/KhR4ZZ0v+29d1pTrC2XESymN8z4pXAw4=",
+  "public_key": "ref5wU4zGZbZ38FDkaC/IM1II0JLpPjHWbc1M9sjW/o=",
+  "created_at": "2025-10-18T18:07:13.673700398-04:00",
+  "expires_at": "2026-10-18T18:07:13.673700398-04:00"
+}

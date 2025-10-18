@@ -1,0 +1,18 @@
+{
+  "keys": [
+    {
+      "id": "98d90661-acd0-45bc-805b-070d5769f554",
+      "public_key": "XnHa/fBuUUdTxsBiFCl9WDRELAXftSZTiGXc3JYX31E=",
+      "description": "Development Server Key",
+      "created_at": "2025-10-18T18:07:06.308612888-04:00",
+      "expires_at": "2026-10-18T18:07:06.308612888-04:00",
+      "permissions": [
+        "read",
+        "write",
+        "deploy",
+        "bootstrap"
+      ],
+      "is_active": true
+    }
+  ]
+}

@@ -497,7 +497,7 @@ export default function ProjectDetailPage() {
               <ProjectTasksTab projectId={id} isProjectOwner={canManageProject()} />
             )}
 
-            {activeTab === 'messages' && isTeamMember && (
+            {activeTab === 'messages' && (isTeamMember || canManageProject()) && (
               <ProjectMessagesTab projectId={id} />
             )}
 

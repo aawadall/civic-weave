@@ -1,0 +1,13 @@
+{
+  "version": "3.0.0",
+  "name": "add_content_json",
+  "description": "Add content_json column to projects table for rich text descriptions",
+  "author": "System",
+  "created_at": "2025-10-18T17:57:00Z",
+  "dependencies": [],
+  "compatibility": {
+    "min_runtime_version": "1.0.0",
+    "max_runtime_version": "3.0.0"
+  },
+  "checksum": "add_content_json_checksum"
+}

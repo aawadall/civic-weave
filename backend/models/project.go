@@ -243,7 +243,7 @@ func (s *ProjectService) List(limit, offset int, status *string, skills []string
 		rowCount++
 		var project Project
 		var skillsJSON string
-		err := rows.Scan(&project.ID, &project.Title, &project.Description,
+		err := rows.Scan(&project.ID, &project.Title, &project.Description, &project.ContentJSON,
 			&project.LocationLat, &project.LocationLng, &project.LocationAddress,
 			&project.StartDate, &project.EndDate, &project.ProjectStatus,
 			&project.CreatedByAdminID, &project.TeamLeadID, &project.AutoNotifyMatches, &project.CreatedAt, &project.UpdatedAt,
@@ -295,7 +295,7 @@ func (s *ProjectService) ListByTeamLead(teamLeadID uuid.UUID, limit, offset int)
 	for rows.Next() {
 		var project Project
 		var skillsJSON string
-		err := rows.Scan(&project.ID, &project.Title, &project.Description,
+		err := rows.Scan(&project.ID, &project.Title, &project.Description, &project.ContentJSON,
 			&project.LocationLat, &project.LocationLng, &project.LocationAddress,
 			&project.StartDate, &project.EndDate, &project.ProjectStatus,
 			&project.CreatedByAdminID, &project.TeamLeadID, &project.AutoNotifyMatches, &project.CreatedAt, &project.UpdatedAt,
@@ -521,7 +521,7 @@ func (s *ProjectService) GetActiveProjects() ([]Project, error) {
 	for rows.Next() {
 		var project Project
 		var skillsJSON string
-		err := rows.Scan(&project.ID, &project.Title, &project.Description,
+		err := rows.Scan(&project.ID, &project.Title, &project.Description, &project.ContentJSON,
 			&project.LocationLat, &project.LocationLng, &project.LocationAddress,
 			&project.StartDate, &project.EndDate, &project.ProjectStatus,
 			&project.CreatedByAdminID, &project.TeamLeadID, &project.AutoNotifyMatches, &project.CreatedAt, &project.UpdatedAt,

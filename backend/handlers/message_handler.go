@@ -69,15 +69,21 @@ func (h *MessageHandler) ListMessages(c *gin.Context) {
 		return
 	}
 
-	// Check if user is team member
+	// Check if user is team member or team lead
 	isTeamMember, err := h.projectService.IsTeamMember(projectID, userCtx.ID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check team membership"})
 		return
 	}
 
-	if !isTeamMember {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Only team members can view messages"})
+	isTeamLead, err := h.projectService.IsTeamLead(projectID, userCtx.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check team lead status"})
+		return
+	}
+
+	if !isTeamMember && !isTeamLead {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Only team members and team leads can view messages"})
 		return
 	}
 
@@ -118,15 +124,21 @@ func (h *MessageHandler) GetRecentMessages(c *gin.Context) {
 		return
 	}
 
-	// Check if user is team member
+	// Check if user is team member or team lead
 	isTeamMember, err := h.projectService.IsTeamMember(projectID, userCtx.ID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check team membership"})
 		return
 	}
 
-	if !isTeamMember {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Only team members can view messages"})
+	isTeamLead, err := h.projectService.IsTeamLead(projectID, userCtx.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check team lead status"})
+		return
+	}
+
+	if !isTeamMember && !isTeamLead {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Only team members and team leads can view messages"})
 		return
 	}
 
@@ -170,15 +182,21 @@ func (h *MessageHandler) GetNewMessages(c *gin.Context) {
 		return
 	}
 
-	// Check if user is team member
+	// Check if user is team member or team lead
 	isTeamMember, err := h.projectService.IsTeamMember(projectID, userCtx.ID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check team membership"})
 		return
 	}
 
-	if !isTeamMember {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Only team members can view messages"})
+	isTeamLead, err := h.projectService.IsTeamLead(projectID, userCtx.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check team lead status"})
+		return
+	}
+
+	if !isTeamMember && !isTeamLead {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Only team members and team leads can view messages"})
 		return
 	}
 
@@ -214,15 +232,21 @@ func (h *MessageHandler) SendMessage(c *gin.Context) {
 		return
 	}
 
-	// Check if user is team member
+	// Check if user is team member or team lead
 	isTeamMember, err := h.projectService.IsTeamMember(projectID, userCtx.ID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check team membership"})
 		return
 	}
 
-	if !isTeamMember {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Only team members can send messages"})
+	isTeamLead, err := h.projectService.IsTeamLead(projectID, userCtx.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check team lead status"})
+		return
+	}
+
+	if !isTeamMember && !isTeamLead {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Only team members and team leads can send messages"})
 		return
 	}
 

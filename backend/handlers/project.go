@@ -980,13 +980,35 @@ func (h *ProjectHandler) TransitionProjectStatus(c *gin.Context) {
 	if err := h.service.TransitionProjectStatus(id, newStatus, userCtx.ID); err != nil {
 		if err == sql.ErrNoRows {
 			if strings.Contains(err.Error(), "permission") {
-				c.JSON(http.StatusForbidden, gin.H{"error": "Insufficient permissions to transition project status"})
+				c.JSON(http.StatusForbidden, gin.H{
+					"error": "Insufficient permissions to transition project status",
+					"code":  "INSUFFICIENT_PERMISSIONS",
+				})
 			} else {
-				c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
+				c.JSON(http.StatusNotFound, gin.H{
+					"error": "Project not found",
+					"code":  "PROJECT_NOT_FOUND",
+				})
 			}
 		} else {
 			log.Printf("❌ TRANSITION_PROJECT_STATUS: Failed to transition project: %v", err)
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			// Check if it's a validation error
+			if strings.Contains(err.Error(), "cannot transition") {
+				c.JSON(http.StatusBadRequest, gin.H{
+					"error": err.Error(),
+					"code":  "INVALID_TRANSITION",
+					"details": map[string]interface{}{
+						"current_status": "unknown", // Will be filled by frontend
+						"target_status":  newStatus,
+						"requirements":   []string{err.Error()},
+					},
+				})
+			} else {
+				c.JSON(http.StatusBadRequest, gin.H{
+					"error": err.Error(),
+					"code":  "TRANSITION_FAILED",
+				})
+			}
 		}
 		return
 	}
