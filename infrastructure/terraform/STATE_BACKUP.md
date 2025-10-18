@@ -38,10 +38,10 @@ To restore state information for redeployment:
 gcloud secrets versions access latest --secret="terraform-outputs-backup" --project=civicweave-474622 > terraform-outputs.json
 
 # Use outputs in deployment scripts
-export BACKEND_URL=$(jq -r '.backend_url.value' terraform-outputs.json)
-export FRONTEND_URL=$(jq -r '.frontend_url.value' terraform-outputs.json)
-export DATABASE_CONNECTION_NAME=$(jq -r '.database_connection_name.value' terraform-outputs.json)
-export REDIS_HOST=$(jq -r '.redis_host.value' terraform-outputs.json)
+export BACKEND_URL=$(jq -r '.backend_url' terraform-outputs.json)
+export FRONTEND_URL=$(jq -r '.frontend_url' terraform-outputs.json)
+export DATABASE_CONNECTION_NAME=$(jq -r '.database_connection_name' terraform-outputs.json)
+export REDIS_HOST=$(jq -r '.redis_host' terraform-outputs.json)
 ```
 
 ### Migration to Remote Backend

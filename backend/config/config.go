@@ -113,10 +113,13 @@ func Load() *Config {
 			EmailEnabled: getEnv("ENABLE_EMAIL", "true") == "true",
 		},
 		CORS: CORSConfig{
-			AllowedOrigins: parseCORSOrigins(getEnv("CORS_ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:3001,https://civicweave.com,https://civicweave-frontend-162941711179.us-central1.run.app")),
+			AllowedOrigins: parseCORSOrigins(getEnv("CORS_ALLOWED_ORIGINS", defaultCORSOrigins)),
 		},
 	}
 }
+
+// Default CORS origins for development and production
+const defaultCORSOrigins = "http://localhost:3000,http://localhost:3001,https://civicweave.com,https://civicweave-frontend-162941711179.us-central1.run.app"
 
 // getEnv gets an environment variable with a fallback default value
 func getEnv(key, defaultValue string) string {
