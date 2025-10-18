@@ -103,14 +103,8 @@ setup_cloud_sql() {
 }
 
 build_and_push_image() {
-    log_info "Building and pushing Docker image..."
-    
-    # Build image using Cloud Build
-    gcloud builds submit \
-        --tag gcr.io/$PROJECT_ID/$IMAGE_NAME:$IMAGE_TAG \
-        --file Dockerfile.agent .
-    
-    log_success "Image built and pushed: gcr.io/$PROJECT_ID/$IMAGE_NAME:$IMAGE_TAG"
+    log_info "Skipping build - using existing image: gcr.io/$PROJECT_ID/$IMAGE_NAME:latest"
+    log_success "Image ready: gcr.io/$PROJECT_ID/$IMAGE_NAME:latest"
 }
 
 create_secrets() {
@@ -150,20 +144,8 @@ deploy_to_cloud_run() {
         --timeout 300 \
         --concurrency 100 \
         --add-cloudsql-instances $CONNECTION_NAME \
-        --set-env-vars \
-            AGENT_HOST=0.0.0.0,\
-            AGENT_PORT=50051,\
-            METADB_HOST=/cloudsql/$CONNECTION_NAME,\
-            METADB_PORT=5432,\
-            METADB_NAME=db_agent_metadata,\
-            METADB_USER=db_agent_user,\
-            METADB_SSL_MODE=disable,\
-            ENABLE_AUTH=true,\
-            ENABLE_RATE_LIMIT=true,\
-            RATE_LIMIT_RPS=100,\
-            LOG_LEVEL=info \
-        --set-secrets METADB_PASSWORD=db-agent-db-password:latest,\
-                     API_KEY=db-agent-api-key:latest
+        --set-env-vars AGENT_HOST=0.0.0.0,AGENT_PORT=50051,METADB_HOST=/cloudsql/$CONNECTION_NAME,METADB_PORT=5432,METADB_NAME=db_agent_metadata,METADB_USER=db_agent_user,METADB_SSL_MODE=disable,ENABLE_AUTH=true,ENABLE_RATE_LIMIT=true,RATE_LIMIT_RPS=100,LOG_LEVEL=info \
+        --set-secrets METADB_PASSWORD=db-agent-db-password:latest,API_KEY=db-agent-api-key:latest
     
     log_success "Deployed to Cloud Run."
 }
