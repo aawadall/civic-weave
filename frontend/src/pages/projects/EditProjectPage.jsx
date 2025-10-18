@@ -10,6 +10,24 @@ import {
 } from '../../utils/projectLifecycle'
 import DebugInfo from '../../components/DebugInfo'
 import SkillChipInput from '../../components/SkillChipInput'
+import RichTextEditor from '../../components/RichTextEditor'
+
+// Utility function to extract plain text from TipTap JSON
+const extractPlainText = (json) => {
+  if (!json || !json.content) return ''
+  
+  const extractText = (node) => {
+    if (node.type === 'text') {
+      return node.text || ''
+    }
+    if (node.content) {
+      return node.content.map(extractText).join('')
+    }
+    return ''
+  }
+  
+  return json.content.map(extractText).join('\n').trim()
+}
 
 export default function EditProjectPage() {
   const { id } = useParams()
@@ -22,6 +40,7 @@ export default function EditProjectPage() {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
+    content_json: null,
     location_address: '',
     start_date: '',
     end_date: '',
@@ -51,6 +70,7 @@ export default function EditProjectPage() {
       setFormData({
         title: projectData.title || '',
         description: projectData.description || '',
+        content_json: projectData.content_json || null,
         location_address: projectData.location_address || '',
         start_date: projectData.start_date ? new Date(projectData.start_date).toISOString().split('T')[0] : '',
         end_date: projectData.end_date ? new Date(projectData.end_date).toISOString().split('T')[0] : '',
@@ -285,17 +305,17 @@ export default function EditProjectPage() {
                     <span className="text-xs text-gray-500 ml-2">(Locked in {getStatusLabel(currentStatus)} stage)</span>
                   )}
                 </label>
-                <textarea
-                  name="description"
-                  value={formData.description}
-                  onChange={handleInputChange}
-                  disabled={!isFieldEditable('description', currentStatus) && !isAdmin}
-                  rows={4}
-                  className={`w-full px-3 py-2 border rounded-md ${
-                    (!isFieldEditable('description', currentStatus) && !isAdmin) 
-                      ? 'bg-gray-100 border-gray-300 text-gray-500' 
-                      : 'border-gray-300 focus:ring-primary-500 focus:border-primary-500'
-                  }`}
+                <RichTextEditor 
+                  value={formData.content_json} 
+                  onChange={(json) => {
+                    setFormData(prev => ({ ...prev, content_json: json }))
+                    // Extract plain text for description field
+                    if (json && json.content) {
+                      const plainText = extractPlainText(json)
+                      setFormData(prev => ({ ...prev, description: plainText }))
+                    }
+                  }}
+                  readOnly={!isFieldEditable('description', currentStatus) && !isAdmin}
                   placeholder="Describe the project goals and requirements"
                 />
               </div>

@@ -373,7 +373,7 @@ export default function ProjectDetailPage() {
           <div className="border-b border-secondary-200">
             <nav className="flex space-x-8 px-6 overflow-x-auto">
               <button
-                onClick={() => setActiveTab('overview')}
+                onClick={() => navigate(`/projects/${id}/overview`)}
                 className={`py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
                   activeTab === 'overview'
                     ? 'border-primary-500 text-primary-600'
@@ -384,7 +384,7 @@ export default function ProjectDetailPage() {
               </button>
               {project.required_skills && project.required_skills.length > 0 && (
                 <button
-                  onClick={() => setActiveTab('skills')}
+                  onClick={() => navigate(`/projects/${id}/skills`)}
                   className={`py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
                     activeTab === 'skills'
                       ? 'border-primary-500 text-primary-600'
@@ -397,7 +397,7 @@ export default function ProjectDetailPage() {
               {(isTeamMember || canManageProject()) && (
                 <>
                   <button
-                    onClick={() => setActiveTab('tasks')}
+                    onClick={() => navigate(`/projects/${id}/tasks`)}
                     className={`py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
                       activeTab === 'tasks'
                         ? 'border-primary-500 text-primary-600'
@@ -407,7 +407,7 @@ export default function ProjectDetailPage() {
                     Tasks
                   </button>
                   <button
-                    onClick={() => setActiveTab('messages')}
+                    onClick={() => navigate(`/projects/${id}/messages`)}
                     className={`py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
                       activeTab === 'messages'
                         ? 'border-primary-500 text-primary-600'
@@ -421,7 +421,7 @@ export default function ProjectDetailPage() {
               {canManageProject() && (
                 <>
                   <button
-                    onClick={() => setActiveTab('logistics')}
+                    onClick={() => navigate(`/projects/${id}/logistics`)}
                     className={`py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
                       activeTab === 'logistics'
                         ? 'border-primary-500 text-primary-600'
@@ -431,7 +431,7 @@ export default function ProjectDetailPage() {
                     Logistics
                   </button>
                   <button
-                    onClick={() => setActiveTab('signups')}
+                    onClick={() => navigate(`/projects/${id}/signups`)}
                     className={`py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
                       activeTab === 'signups'
                         ? 'border-primary-500 text-primary-600'
@@ -441,7 +441,7 @@ export default function ProjectDetailPage() {
                     Signups ({signups.length})
                   </button>
                   <button
-                    onClick={() => setActiveTab('team')}
+                    onClick={() => navigate(`/projects/${id}/team`)}
                     className={`py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
                       activeTab === 'team'
                         ? 'border-primary-500 text-primary-600'
@@ -458,6 +458,17 @@ export default function ProjectDetailPage() {
           <div className="p-6">
             {activeTab === 'overview' && (
               <div>
+                {/* Status Transition for Overview Tab */}
+                {canManageProject() && project && (
+                  <div className="mb-6">
+                    <ProjectStatusTransition 
+                      project={project} 
+                      onStatusChange={handleStatusChange}
+                      showWorkflow={true}
+                    />
+                  </div>
+                )}
+                
                 <h3 className="text-lg font-semibold text-secondary-900 mb-4">Project Description</h3>
                 <div className="prose max-w-none">
                   {project.content_json ? (

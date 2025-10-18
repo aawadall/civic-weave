@@ -24,8 +24,9 @@ ENV VERSION=${VERSION}
 ENV GIT_COMMIT=${GIT_COMMIT}
 ENV BUILD_ENV=${BUILD_ENV}
 
-# Build the application
+# Build the application and matching worker
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main ./cmd/server
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o matchingworker ./cmd/matchingworker
 
 # Use distroless image for smaller size and better security
 FROM gcr.io/distroless/static-debian12:latest
@@ -40,8 +41,9 @@ ENV VERSION=${VERSION}
 ENV GIT_COMMIT=${GIT_COMMIT}
 ENV BUILD_ENV=${BUILD_ENV}
 
-# Copy the binary from builder stage
+# Copy the binaries from builder stage
 COPY --from=builder /app/main /main
+COPY --from=builder /app/matchingworker /app/matchingworker
 
 # Copy migration files
 COPY --from=builder /app/migrations /migrations

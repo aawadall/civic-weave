@@ -3,20 +3,20 @@ package models
 // Query constants for ProjectService
 const (
 	projectCreateQuery = `
-		INSERT INTO projects (id, title, description, required_skills, location_lat, location_lng, 
+		INSERT INTO projects (id, title, description, content_json, required_skills, location_lat, location_lng, 
 		                     location_address, start_date, end_date, project_status, 
 		                     created_by_admin_id, team_lead_id, auto_notify_matches)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 		RETURNING created_at, updated_at`
 
 	projectGetByIDQuery = `
-		SELECT id, title, description, required_skills, location_lat, location_lng, 
+		SELECT id, title, description, content_json, required_skills, location_lat, location_lng, 
 		       location_address, start_date, end_date, project_status, 
 		       created_by_admin_id, team_lead_id, auto_notify_matches, created_at, updated_at
 		FROM projects WHERE id = $1`
 
 	projectListWithSkillsQuery = `
-		SELECT p.id, p.title, p.description, p.location_lat, p.location_lng, 
+		SELECT p.id, p.title, p.description, p.content_json, p.location_lat, p.location_lng, 
 		       p.location_address, p.start_date, p.end_date, p.project_status, 
 		       p.created_by_admin_id, p.team_lead_id, p.auto_notify_matches, p.created_at, p.updated_at,
 		       CASE 
@@ -30,7 +30,7 @@ const (
 		LEFT JOIN project_required_skills prs ON p.id = prs.project_id
 		LEFT JOIN skill_taxonomy st ON prs.skill_id = st.id
 		WHERE ($1::text IS NULL OR p.project_status::text = $1)
-		GROUP BY p.id, p.title, p.description, p.location_lat, p.location_lng, 
+		GROUP BY p.id, p.title, p.description, p.content_json, p.location_lat, p.location_lng, 
 		         p.location_address, p.start_date, p.end_date, p.project_status, 
 		         p.created_by_admin_id, p.team_lead_id, p.auto_notify_matches, p.created_at, p.updated_at,
 		         p.required_skills
@@ -48,7 +48,7 @@ const (
 		LIMIT $3 OFFSET $4`
 
 	projectListQuery = `
-		SELECT p.id, p.title, p.description, p.location_lat, p.location_lng, 
+		SELECT p.id, p.title, p.description, p.content_json, p.location_lat, p.location_lng, 
 		       p.location_address, p.start_date, p.end_date, p.project_status, 
 		       p.created_by_admin_id, p.team_lead_id, p.auto_notify_matches, p.created_at, p.updated_at,
 		       CASE 
@@ -62,7 +62,7 @@ const (
 		LEFT JOIN project_required_skills prs ON p.id = prs.project_id
 		LEFT JOIN skill_taxonomy st ON prs.skill_id = st.id
 		WHERE ($1::text IS NULL OR p.project_status::text = $1)
-		GROUP BY p.id, p.title, p.description, p.location_lat, p.location_lng, 
+		GROUP BY p.id, p.title, p.description, p.content_json, p.location_lat, p.location_lng, 
 		         p.location_address, p.start_date, p.end_date, p.project_status, 
 		         p.created_by_admin_id, p.team_lead_id, p.auto_notify_matches, p.created_at, p.updated_at,
 		         p.required_skills
@@ -70,7 +70,7 @@ const (
 		LIMIT $2 OFFSET $3`
 
 	projectListByTeamLeadQuery = `
-		SELECT p.id, p.title, p.description, p.location_lat, p.location_lng, 
+		SELECT p.id, p.title, p.description, p.content_json, p.location_lat, p.location_lng, 
 		       p.location_address, p.start_date, p.end_date, p.project_status, 
 		       p.created_by_admin_id, p.team_lead_id, p.auto_notify_matches, p.created_at, p.updated_at,
 		       CASE 
@@ -84,7 +84,7 @@ const (
 		LEFT JOIN project_required_skills prs ON p.id = prs.project_id
 		LEFT JOIN skill_taxonomy st ON prs.skill_id = st.id
 		WHERE p.team_lead_id = $1
-		GROUP BY p.id, p.title, p.description, p.location_lat, p.location_lng, 
+		GROUP BY p.id, p.title, p.description, p.content_json, p.location_lat, p.location_lng, 
 		         p.location_address, p.start_date, p.end_date, p.project_status, 
 		         p.created_by_admin_id, p.team_lead_id, p.auto_notify_matches, p.created_at, p.updated_at,
 		         p.required_skills
@@ -93,9 +93,9 @@ const (
 
 	projectUpdateQuery = `
 		UPDATE projects 
-		SET title = $2, description = $3, required_skills = $4, location_lat = $5, 
-		    location_lng = $6, location_address = $7, start_date = $8, end_date = $9, 
-		    project_status = $10, team_lead_id = $11, auto_notify_matches = $12, 
+		SET title = $2, description = $3, content_json = $4, required_skills = $5, location_lat = $6, 
+		    location_lng = $7, location_address = $8, start_date = $9, end_date = $10, 
+		    project_status = $11, team_lead_id = $12, auto_notify_matches = $13, 
 		    updated_at = CURRENT_TIMESTAMP
 		WHERE id = $1
 		RETURNING updated_at`
@@ -149,7 +149,7 @@ const (
 		LEFT JOIN project_required_skills prs ON p.id = prs.project_id
 		LEFT JOIN skill_taxonomy st ON prs.skill_id = st.id
 		WHERE p.project_status IN ('recruiting', 'active')
-		GROUP BY p.id, p.title, p.description, p.location_lat, p.location_lng, 
+		GROUP BY p.id, p.title, p.description, p.content_json, p.location_lat, p.location_lng, 
 		         p.location_address, p.start_date, p.end_date, p.project_status, 
 		         p.created_by_admin_id, p.team_lead_id, p.auto_notify_matches, p.created_at, p.updated_at,
 		         p.required_skills
@@ -223,7 +223,7 @@ const (
 		WHERE ptm.volunteer_id = v.id
 		AND v.user_id = $1
 		AND ptm.status = 'active'
-		GROUP BY p.id, p.title, p.description, p.location_lat, p.location_lng, 
+		GROUP BY p.id, p.title, p.description, p.content_json, p.location_lat, p.location_lng, 
 		         p.location_address, p.start_date, p.end_date, p.project_status, 
 		         p.created_by_admin_id, p.team_lead_id, p.auto_notify_matches, p.created_at, p.updated_at,
 		         p.required_skills, tl_v.name, tl_a.name, tl_u.email, admin_v.name, admin_a.name, admin_u.email,

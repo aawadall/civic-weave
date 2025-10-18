@@ -227,6 +227,44 @@ func (s *SkillMatchingService) BatchCalculateMatches() error {
 	return nil
 }
 
+// BatchCalculateProjectMatches calculates matches for multiple volunteer-project pairs
+func (s *SkillMatchingService) BatchCalculateProjectMatches() error {
+	// Get all active/recruiting projects with their required skills
+	projects, err := s.getAllActiveProjectsWithSkills()
+	if err != nil {
+		return fmt.Errorf("failed to get projects: %w", err)
+	}
+
+	// Get all volunteers with their skills
+	volunteers, err := s.getAllVolunteersWithSkills()
+	if err != nil {
+		return fmt.Errorf("failed to get volunteers: %w", err)
+	}
+
+	// Clear existing project matches
+	_, err = s.db.Exec("TRUNCATE volunteer_project_matches")
+	if err != nil {
+		return fmt.Errorf("failed to clear existing project matches: %w", err)
+	}
+
+	// Calculate matches for all combinations
+	for _, project := range projects {
+		for _, volunteer := range volunteers {
+			result := s.CalculateMatch(volunteer.Skills, project.RequiredSkillIDs)
+
+			// Only store if at least 1 skill matches
+			if result.MatchedSkillCount > 0 {
+				err := s.storeProjectMatch(volunteer.ID, project.ID, result)
+				if err != nil {
+					return fmt.Errorf("failed to store project match: %w", err)
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
 // storeMatch stores a calculated match in the database
 func (s *SkillMatchingService) storeMatch(volunteerID, initiativeID uuid.UUID, result SkillMatchResult) error {
 	query := `
@@ -250,8 +288,67 @@ func (s *SkillMatchingService) storeMatch(volunteerID, initiativeID uuid.UUID, r
 	return err
 }
 
+// storeProjectMatch stores a calculated project match in the database
+func (s *SkillMatchingService) storeProjectMatch(volunteerID, projectID uuid.UUID, result SkillMatchResult) error {
+	query := `
+		INSERT INTO volunteer_project_matches 
+		(volunteer_id, project_id, match_score, jaccard_index, 
+		 matched_skill_ids, matched_skill_count, calculated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP)
+	`
+
+	jaccardIndex := float64(result.MatchedSkillCount) / float64(result.TotalRequired)
+
+	_, err := s.db.Exec(query,
+		volunteerID,
+		projectID,
+		result.CosineScore, // Use cosine as primary match score
+		jaccardIndex,
+		result.MatchedSkillIDs,
+		result.MatchedSkillCount,
+	)
+
+	return err
+}
+
+// getAllActiveProjectsWithSkills retrieves all active/recruiting projects with their required skills
+func (s *SkillMatchingService) getAllActiveProjectsWithSkills() ([]ProjectWithSkills, error) {
+	query := `
+		SELECT p.id, COALESCE(ARRAY_AGG(prs.skill_id) FILTER (WHERE prs.skill_id IS NOT NULL), '{}') as skill_ids
+		FROM projects p
+		LEFT JOIN project_required_skills prs ON p.id = prs.project_id
+		WHERE p.project_status IN ('recruiting', 'active')
+		GROUP BY p.id
+	`
+
+	rows, err := s.db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var projects []ProjectWithSkills
+	for rows.Next() {
+		var project ProjectWithSkills
+		var skillIDs []int
+		err := rows.Scan(&project.ID, &skillIDs)
+		if err != nil {
+			return nil, err
+		}
+		project.RequiredSkillIDs = skillIDs
+		projects = append(projects, project)
+	}
+
+	return projects, rows.Err()
+}
+
 // Helper types for batch processing
 type InitiativeWithSkills struct {
+	ID               uuid.UUID `json:"id"`
+	RequiredSkillIDs []int     `json:"required_skill_ids"`
+}
+
+type ProjectWithSkills struct {
 	ID               uuid.UUID `json:"id"`
 	RequiredSkillIDs []int     `json:"required_skill_ids"`
 }

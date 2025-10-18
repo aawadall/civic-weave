@@ -57,6 +57,9 @@ job-notify-matches:
 job-setup-python:
 	cd backend && python3 -m venv venv && venv/bin/pip install psycopg2-binary python-dotenv numpy
 
+matching-worker:
+	cd backend && go run cmd/matchingworker/main.go
+
 db-reset:
 	docker-compose down -v
 	docker-compose up -d postgres

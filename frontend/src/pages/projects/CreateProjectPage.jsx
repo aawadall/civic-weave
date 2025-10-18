@@ -2,6 +2,24 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import api from '../../services/api'
+import RichTextEditor from '../../components/RichTextEditor'
+
+// Utility function to extract plain text from TipTap JSON
+const extractPlainText = (json) => {
+  if (!json || !json.content) return ''
+  
+  const extractText = (node) => {
+    if (node.type === 'text') {
+      return node.text || ''
+    }
+    if (node.content) {
+      return node.content.map(extractText).join('')
+    }
+    return ''
+  }
+  
+  return json.content.map(extractText).join('\n').trim()
+}
 
 export default function CreateProjectPage() {
   const navigate = useNavigate()
@@ -9,6 +27,7 @@ export default function CreateProjectPage() {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
+    content_json: null,
     required_skills: [],
     location_address: '',
     start_date: '',
@@ -121,6 +140,19 @@ export default function CreateProjectPage() {
       }
       console.log('Submitting project data:', projectData)
       const response = await api.post('/projects', projectData)
+      
+      // Update project skills separately to ensure taxonomy is current
+      if (formData.required_skills && formData.required_skills.length > 0) {
+        try {
+          await api.put(`/projects/${response.data.id}/skills`, {
+            skill_names: formData.required_skills
+          })
+        } catch (skillsErr) {
+          console.error('Error updating project skills:', skillsErr)
+          // Don't fail the entire form submission for skills error
+        }
+      }
+      
       navigate(`/projects/${response.data.id}`)
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to create project')
@@ -174,14 +206,16 @@ export default function CreateProjectPage() {
               <label htmlFor="description" className="block text-sm font-medium text-secondary-900 mb-2">
                 Project Description *
               </label>
-              <textarea
-                id="description"
-                name="description"
-                value={formData.description}
-                onChange={handleInputChange}
-                required
-                rows={6}
-                className="w-full px-4 py-2 border border-secondary-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              <RichTextEditor 
+                value={formData.content_json} 
+                onChange={(json) => {
+                  setFormData(prev => ({ ...prev, content_json: json }))
+                  // Extract plain text for description field
+                  if (json && json.content) {
+                    const plainText = extractPlainText(json)
+                    setFormData(prev => ({ ...prev, description: plainText }))
+                  }
+                }}
                 placeholder="Describe the project, its goals, and what volunteers will be doing..."
               />
               <p className="text-xs text-secondary-500 mt-2">

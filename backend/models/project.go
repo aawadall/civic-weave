@@ -97,7 +97,12 @@ func (s *ProjectService) Create(project *Project) error {
 		return err
 	}
 
-	return s.db.QueryRow(projectCreateQuery, project.ID, project.Title, project.Description, skillsJSON,
+	contentJSON, err := ToJSON(project.ContentJSON)
+	if err != nil {
+		return err
+	}
+
+	return s.db.QueryRow(projectCreateQuery, project.ID, project.Title, project.Description, contentJSON, skillsJSON,
 		project.LocationLat, project.LocationLng, project.LocationAddress, project.StartDate,
 		project.EndDate, project.ProjectStatus, project.CreatedByAdminID,
 		project.TeamLeadID, project.AutoNotifyMatches).Scan(&project.CreatedAt, &project.UpdatedAt)
@@ -108,8 +113,9 @@ func (s *ProjectService) GetByID(id uuid.UUID) (*Project, error) {
 	project := &Project{}
 	var skillsJSON string
 
+	var contentJSON sql.NullString
 	err := s.db.QueryRow(projectGetByIDQuery, id).Scan(&project.ID, &project.Title, &project.Description,
-		&skillsJSON, &project.LocationLat, &project.LocationLng, &project.LocationAddress,
+		&contentJSON, &skillsJSON, &project.LocationLat, &project.LocationLng, &project.LocationAddress,
 		&project.StartDate, &project.EndDate, &project.ProjectStatus,
 		&project.CreatedByAdminID, &project.TeamLeadID, &project.AutoNotifyMatches, &project.CreatedAt, &project.UpdatedAt)
 	if err != nil {
@@ -140,6 +146,15 @@ func (s *ProjectService) GetByID(id uuid.UUID) (*Project, error) {
 		}
 	}
 	project.RequiredSkills = skillNames
+
+	// Parse content_json if present
+	if contentJSON.Valid && contentJSON.String != "" {
+		var contentData map[string]interface{}
+		if err := json.Unmarshal([]byte(contentJSON.String), &contentData); err != nil {
+			return nil, err
+		}
+		project.ContentJSON = contentData
+	}
 
 	return project, nil
 }
@@ -324,7 +339,12 @@ func (s *ProjectService) Update(project *Project) error {
 		return err
 	}
 
-	return s.db.QueryRow(projectUpdateQuery, project.ID, project.Title, project.Description, skillsJSON,
+	contentJSON, err := ToJSON(project.ContentJSON)
+	if err != nil {
+		return err
+	}
+
+	return s.db.QueryRow(projectUpdateQuery, project.ID, project.Title, project.Description, contentJSON, skillsJSON,
 		project.LocationLat, project.LocationLng, project.LocationAddress, project.StartDate,
 		project.EndDate, project.ProjectStatus, project.TeamLeadID, project.AutoNotifyMatches).
 		Scan(&project.UpdatedAt)

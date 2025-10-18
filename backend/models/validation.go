@@ -240,6 +240,18 @@ func ToJSONArray(slice []string) (string, error) {
 	return string(jsonData), nil
 }
 
+// ToJSON converts a map to JSON string
+func ToJSON(data map[string]interface{}) (string, error) {
+	if data == nil {
+		return "", nil
+	}
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		return "", err
+	}
+	return string(jsonData), nil
+}
+
 // ParseJSONArray parses a JSON array string into a string slice
 func ParseJSONArray(jsonStr string, target *[]string) error {
 	if jsonStr == "" {
