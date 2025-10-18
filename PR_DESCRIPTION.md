@@ -1,162 +1,144 @@
-# 🚀 Task Management System Enhancements
+# Chore: Improve auth logging, externalize CORS config, and document Terraform state backup
 
-## Overview
-This PR implements comprehensive task management enhancements including task comments, volunteer time logging, status transitions, and automated Team Lead notifications via the unified messaging system.
+## Summary
 
-## 🎯 Features Implemented
+This PR implements three infrastructure improvements to enhance debugging, security, and deployment practices:
 
-### ✅ Core Requirements Met
-1. **Tasks Page** - Enhanced existing tasks tab with full functionality
-2. **TL Task Creation** - Team leads can create and assign tasks  
-3. **Self-Assignment** - Members can assign tasks to themselves
-4. **Task Comments** - Rich commenting system with progress mentions
-5. **Status Transitions** - Task owners can mark done, blocked, or request takeover
-6. **Auto-Notifications** - All status changes create messages to TL via unified system
-7. **Time Logging** - Volunteers can log hours with automatic tallying
-8. **Database Integration** - All changes incorporated into existing schema
+1. **Auth Error Logging Enhancement**: Add structured error logging to Register handler for better 502 debugging
+2. **CORS Configuration Externalization**: Move CORS origins to environment variables with proper header handling
+3. **Terraform State Management**: Document backup process and add remote backend configuration
 
-## 🗄️ Database Changes
+## Changes Made
 
-### New Migration: `011_task_enhancements.sql`
-- **New Tables**: `task_comments`, `task_time_logs` with proper indexes
-- **Enhanced Tables**: Extended `project_tasks` with new status values (`blocked`, `takeover_requested`)
-- **Message Integration**: Added `task_id` and `message_type` to `project_messages`
-- **Helper Functions**: SQL functions for automatic time aggregation
+### 1. Auth Error Logging (`backend/handlers/auth_full.go`)
+- Added structured logging for database errors in user registration
+- Lines 85-88: Log `REGISTER_DB_ERROR` when checking existing users
+- Lines 109-111: Log `REGISTER_USER_CREATE_ERROR` when creating users
+- Maintains existing error responses while adding debugging information
 
-### Schema Changes
-```sql
--- New status values for project_tasks
-ALTER TABLE project_tasks 
-ADD CONSTRAINT project_tasks_status_check 
-CHECK (status IN ('todo', 'in_progress', 'done', 'blocked', 'takeover_requested'));
+### 2. CORS Configuration Externalization
+- **`backend/config/config.go`**: Added `CORSConfig` struct and parsing logic
+- **`backend/middleware/cors.go`**: Updated to accept origins parameter and set headers on all response paths
+- **`backend/cmd/server/main.go`**: Wire CORS config through to middleware
+- **`backend/env.example`**: Added `CORS_ALLOWED_ORIGINS` environment variable
 
--- Enhanced project_messages for task notifications
-ALTER TABLE project_messages 
-ADD COLUMN task_id UUID REFERENCES project_tasks(id),
-ADD COLUMN message_type VARCHAR(50) DEFAULT 'general';
-```
+### 3. Terraform State Management
+- **`infrastructure/terraform/STATE_BACKUP.md`**: Created comprehensive backup documentation
+- **`infrastructure/terraform/README.md`**: Added state management section with remote backend guidance
+- **`infrastructure/terraform/main.tf`**: Added commented remote backend configuration
+- Terraform state files already properly ignored by git
 
-## 🔧 Backend Implementation
+## Testing Instructions
 
-### New Models & Services
-- **TaskTimeLog**: Complete time logging with aggregation functions
-- **TaskComment**: Rich commenting system with edit capability
-- **Enhanced Task**: New status constants and transition methods
-- **Message Service**: Extended for task-related notifications
-
-### New API Endpoints
-- `POST /api/tasks/:id/comments` - Add task comments
-- `GET /api/tasks/:id/comments` - Get task comments  
-- `POST /api/tasks/:id/time-logs` - Log volunteer hours
-- `GET /api/tasks/:id/time-logs` - Get time logs
-- `POST /api/tasks/:id/mark-blocked` - Mark task as blocked
-- `POST /api/tasks/:id/request-takeover` - Request task takeover
-- `POST /api/tasks/:id/mark-done` - Mark task as done
-
-### Auto-Messaging System
-When task owners perform status transitions:
-- **Mark as Done**: "✅ [TaskTitle] marked as done by [VolunteerName]: [CompletionNote]"
-- **Mark as Blocked**: "🚫 [TaskTitle] blocked by [VolunteerName]: [BlockedReason]"  
-- **Request Takeover**: "🔄 [VolunteerName] requesting takeover for [TaskTitle]: [Reason]"
-
-## 🎨 Frontend Components
-
-### New Components
-- **TaskDetailModal**: Comprehensive task management interface with tabs
-- **TaskCommentForm**: Rich comment system with progress updates
-- **TaskTimeLogForm**: Time logging with date and description
-- **TaskStatusActions**: Status transitions with confirmation modals
-- **TaskTimeSummary**: Time aggregation display with volunteer details
-
-### Enhanced Components
-- **TaskCard**: Shows time logged and new status badges
-- **TaskStatusBadge**: Supports blocked and takeover_requested statuses
-- **ProjectTasksTab**: Integrated modal with task click handlers
-
-## 🔄 Key Design Decisions
-
-1. **Unified Messaging**: Task notifications use existing `project_messages` table
-2. **Visibility**: All task comments and status changes visible to all team members
-3. **Time Logs**: Separate entries with automatic SQL aggregation
-4. **Permissions**: 
-   - TL can create/assign/manage all tasks
-   - Members can self-assign unassigned tasks
-   - Task owner can comment, log time, and change status
-
-## 🧪 Testing
-
-### Manual Testing Checklist
-- [ ] Create task as Team Lead
-- [ ] Self-assign task as member
-- [ ] Add comments and view comment thread
-- [ ] Log time entries and verify aggregation
-- [ ] Mark task as done/blocked/request takeover
-- [ ] Verify auto-messages appear in project chat
-- [ ] Test task detail modal functionality
-- [ ] Verify time display on task cards
-
-## 📋 Deployment Steps
-
-### 1. Database Migration
+### 1. Auth Error Logging
 ```bash
-# Run migration
-make db-migrate
+# Start the backend in development mode
+cd backend && go run cmd/server/main.go
+
+# Attempt registration with invalid data to trigger database errors
+curl -X POST http://localhost:8080/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@example.com","password":"short","name":"Test","consent_given":true}'
+
+# Check logs for structured error messages:
+# ❌ REGISTER_DB_ERROR: Failed to check existing user for email test@example.com: [error details]
 ```
 
-### 2. Backend Deployment
+### 2. CORS Configuration
 ```bash
-# Build and deploy backend
-cd backend
-go build -o server cmd/server/main.go
-# Deploy to your server
+# Test with different origins
+curl -H "Origin: http://localhost:3000" http://localhost:8080/api/health
+curl -H "Origin: https://civicweave.com" http://localhost:8080/api/health
+curl -H "Origin: https://malicious-site.com" http://localhost:8080/api/health
+
+# Verify CORS headers are present in all responses (including errors)
 ```
 
-### 3. Frontend Deployment
+### 3. Environment Variable Testing
 ```bash
-# Build frontend
-cd frontend
-npm run build
-# Deploy to your hosting service
+# Test with custom CORS origins
+export CORS_ALLOWED_ORIGINS="http://localhost:3000,https://my-custom-domain.com"
+cd backend && go run cmd/server/main.go
+
+# Verify only specified origins are allowed
 ```
 
-## 🔍 Files Changed
+## Deployment Instructions
 
-### Backend (9 files)
-- `backend/migrations/011_task_enhancements.sql` ✨ NEW
-- `backend/models/task_time_log.go` ✨ NEW
-- `backend/models/task_time_log_queries.go` ✨ NEW
-- `backend/models/task_comment.go` ✨ NEW
-- `backend/models/task_comment_queries.go` ✨ NEW
-- `backend/models/task.go` 🔄 MODIFIED
-- `backend/models/message.go` 🔄 MODIFIED
-- `backend/models/message_queries.go` 🔄 MODIFIED
-- `backend/handlers/task_handler.go` 🔄 MODIFIED
-- `backend/cmd/server/main.go` 🔄 MODIFIED
+### 1. Terraform State Backup (Before Deployment)
+```bash
+# Backup current Terraform state to GCloud Secret Manager
+cd infrastructure/terraform
+gcloud secrets create terraform-outputs-backup --data-file=<(terraform output -json) --project=civicweave-474622
+gcloud secrets create terraform-state-full-backup --data-file=terraform.tfstate --project=civicweave-474622
+```
 
-### Frontend (8 files)
-- `frontend/src/components/TaskCommentForm.jsx` ✨ NEW
-- `frontend/src/components/TaskTimeLogForm.jsx` ✨ NEW
-- `frontend/src/components/TaskStatusActions.jsx` ✨ NEW
-- `frontend/src/components/TaskTimeSummary.jsx` ✨ NEW
-- `frontend/src/components/TaskDetailModal.jsx` ✨ NEW
-- `frontend/src/services/api.js` 🔄 MODIFIED
-- `frontend/src/pages/projects/ProjectTasksTab.jsx` 🔄 MODIFIED
-- `frontend/src/components/TaskCard.jsx` 🔄 MODIFIED
-- `frontend/src/components/TaskStatusBadge.jsx` 🔄 MODIFIED
+### 2. Deploy Infrastructure (if needed)
+```bash
+# Deploy infrastructure changes
+make deploy-infra
+```
 
-## 🚨 Breaking Changes
-None - all changes are additive and backward compatible.
+### 3. Configure Cloud Run with CORS Environment Variable
+```bash
+# Add CORS_ALLOWED_ORIGINS to Cloud Run configuration
+gcloud run services update civicweave-backend \
+  --region=us-central1 \
+  --set-env-vars="CORS_ALLOWED_ORIGINS=https://civicweave.com,https://civicweave-frontend-162941711179.us-central1.run.app" \
+  --quiet
+```
 
-## 📚 Documentation
-- All new components include JSDoc comments
-- API endpoints follow existing patterns
-- Database migration is idempotent
+### 4. Build and Deploy Applications
+```bash
+# Build and push container images
+make build-push
 
-## 🔗 Related Issues
-Implements task management requirements as specified in the project requirements.
+# Deploy to Cloud Run
+make deploy-app
+```
 
----
+### 5. Verify Deployment
+```bash
+# Check backend health
+curl https://civicweave-backend-162941711179.us-central1.run.app/health
 
-**Ready for Review** ✅
-**Ready for Deployment** ✅
-**Backward Compatible** ✅
+# Test CORS headers
+curl -H "Origin: https://civicweave.com" https://civicweave-backend-162941711179.us-central1.run.app/health
+```
+
+## Configuration Migration Guide
+
+### For Existing Deployments
+1. **Backup Terraform state**: `cd infrastructure/terraform && gcloud secrets create terraform-outputs-backup --data-file=<(terraform output -json) --project=civicweave-474622`
+2. **Add CORS environment variable** to Cloud Run: Use the gcloud command in deployment instructions
+3. **Deploy applications**: `make build-push && make deploy-app`
+4. **Monitor logs** for improved error visibility
+
+### For New Deployments
+1. **Set up GCP project**: `make setup-gcp`
+2. **Deploy infrastructure**: `make deploy-infra`
+3. **Configure Cloud Run**: `make configure-cloud-run`
+4. **Set CORS_ALLOWED_ORIGINS** in Cloud Run environment
+5. **Deploy applications**: `make build-push && make deploy-app`
+6. **Use remote backend** for Terraform state (uncomment backend config in main.tf)
+7. **Follow STATE_BACKUP.md** for state management best practices
+
+## Security Considerations
+
+- **CORS origins are now configurable** - ensure production origins are properly set
+- **Terraform state backup** - critical infrastructure data is preserved in GCloud Secret Manager
+- **Error logging** - sensitive information is not logged, only error types and context
+
+## Rollback Plan
+
+If issues arise:
+1. **Revert CORS changes**: Remove `CORS_ALLOWED_ORIGINS` env var to use defaults
+2. **Auth logging**: No impact on functionality, only adds logging
+3. **Terraform state**: Use backup from GCloud Secret Manager if needed
+
+## Monitoring
+
+After deployment, monitor:
+- **Backend logs** for new structured error messages
+- **CORS headers** in browser network tab
+- **Terraform state** backup completion in GCloud Secret Manager
