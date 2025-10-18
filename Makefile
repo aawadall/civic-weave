@@ -29,6 +29,37 @@ db-seed:
 db-backfill-skills:
 	cd backend && go run scripts/backfill_skill_vectors.go
 
+# Enhanced migration system (v2)
+db-migrate-v2:
+	cd backend && go run cmd/migrate/main.go -command=up -runtime-version=1.0.0
+
+db-migrate-status:
+	cd backend && go run cmd/migrate/main.go -command=status
+
+db-migrate-compat:
+	cd backend && go run cmd/migrate/main.go -command=compatibility -runtime-version=1.0.0
+
+db-migrate-validate:
+	cd backend && go run cmd/migrate/main.go -command=validate
+
+db-migrate-check:
+	cd backend && go run cmd/migrate/main.go -command=check -runtime-version=1.0.0
+
+db-migrate-rollback:
+	@read -p "Enter target version (e.g., 1.0.0): " version; \
+	cd backend && go run cmd/migrate/main.go -command=down -version=$$version
+
+# Schema state validation
+db-schema-state:
+	cd backend && go run cmd/migrate/main.go -command=schema-state
+
+db-drift-detect:
+	cd backend && go run cmd/migrate/main.go -command=drift-detect
+
+db-validate-state:
+	@read -p "Enter target version (e.g., 1.0.0): " version; \
+	cd backend && go run cmd/migrate/main.go -command=validate-state -version=$$version
+
 # Remote database deployment
 db-deploy-status:
 	./scripts/deploy-db.sh --status
@@ -208,6 +239,19 @@ help:
 	@echo "  db-seed            - Seed initial data"
 	@echo "  db-backfill-skills - Convert existing JSONB skills to vector claims"
 	@echo "  db-reset           - Reset database with fresh data"
+	@echo ""
+	@echo "Enhanced Migrations (v2):"
+	@echo "  db-migrate-v2      - Run enhanced migrations with versioning"
+	@echo "  db-migrate-status  - Show migration status and pending migrations"
+	@echo "  db-migrate-compat  - Display compatibility matrix"
+	@echo "  db-migrate-validate - Validate migration files and integrity"
+	@echo "  db-migrate-check   - Check migration health (CI/CD friendly)"
+	@echo "  db-migrate-rollback - Rollback to specific version"
+	@echo ""
+	@echo "Schema State Validation:"
+	@echo "  db-schema-state    - Show current database schema state"
+	@echo "  db-drift-detect    - Detect schema drift from expected state"
+	@echo "  db-validate-state  - Validate database matches intended state for version"
 	@echo ""
 	@echo "Batch Jobs:"
 	@echo "  job-setup-python      - Set up Python environment for batch jobs"

@@ -56,12 +56,43 @@ func main() {
 		db = nil
 	} else {
 		log.Println("✅ Successfully connected to database")
-		// Run migrations
-		log.Println("🔄 Running database migrations...")
-		if err := database.Migrate(db); err != nil {
-			log.Printf("⚠️  Warning: Failed to run migrations: %v", err)
+
+		// Check database compatibility with runtime version
+		runtimeVersion := "1.0.0" // TODO: Get from build info or config
+		log.Printf("🔍 Checking database compatibility with runtime version %s...", runtimeVersion)
+
+		compat, err := database.CheckCompatibility(db, runtimeVersion)
+		if err != nil {
+			log.Printf("⚠️  Warning: Failed to check database compatibility: %v", err)
 		} else {
-			log.Println("✅ Database migrations completed")
+			if !compat.IsCompatible {
+				log.Printf("❌ Database compatibility issue: %s", compat.Message)
+				log.Println("⚠️  WARNING: Database version may be incompatible with runtime!")
+			} else if compat.Status == "warning" {
+				log.Printf("⚠️  Database compatibility warning: %s", compat.Message)
+			} else {
+				log.Println("✅ Database is compatible with runtime version")
+			}
+		}
+
+		// Run legacy migrations (backward compatibility)
+		log.Println("🔄 Running legacy database migrations...")
+		if err := database.Migrate(db); err != nil {
+			log.Printf("⚠️  Warning: Failed to run legacy migrations: %v", err)
+		} else {
+			log.Println("✅ Legacy database migrations completed")
+		}
+
+		// Run v2 migrations if available
+		log.Println("🔄 Checking for enhanced migrations...")
+		options := &database.MigrationHookOptions{
+			RuntimeVersion: runtimeVersion,
+			Quiet:          true,
+		}
+		if err := database.AutoMigrate(db, runtimeVersion, options); err != nil {
+			log.Printf("⚠️  Warning: Enhanced migrations not available or failed: %v", err)
+		} else {
+			log.Println("✅ Enhanced migrations completed")
 		}
 	}
 
